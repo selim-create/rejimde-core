@@ -88,7 +88,7 @@ class UserMeta {
         if ($custom_avatar && !empty($custom_avatar)) {
             $data['avatar_url'] = $custom_avatar;
         } else {
-            $data['avatar_url'] = 'https://api.dicebear.com/9.x/personas/svg?seed=' . $user->user_nicename;
+            $data['avatar_url'] = 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_nicename);
         }
         
         // Override Gravatar URLs with custom avatar
@@ -134,7 +134,7 @@ class UserMeta {
             } else {
                 // Use DiceBear as fallback
                 $user_nicename = get_the_author_meta('user_nicename', $comment->user_id);
-                $dicebear_url = 'https://api.dicebear.com/9.x/personas/svg?seed=' . $user_nicename;
+                $dicebear_url = 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user_nicename);
                 $data['author_avatar_urls'] = [
                     '24' => $dicebear_url,
                     '48' => $dicebear_url,

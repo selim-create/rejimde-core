@@ -50,12 +50,12 @@ class PostMeta {
                 $author_avatar = $custom_avatar;
             } else {
                 $author_nicename = get_the_author_meta('user_nicename', $author_id);
-                $author_avatar = 'https://api.dicebear.com/9.x/personas/svg?seed=' . $author_nicename;
+                $author_avatar = 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($author_nicename);
             }
             
-            // Check if user is an expert
-            $user = new \WP_User($author_id);
-            $is_expert = in_array('rejimde_pro', (array) $user->roles);
+            // Check if user is an expert - use get_userdata() for efficiency
+            $user_data = get_userdata($author_id);
+            $is_expert = $user_data && in_array('rejimde_pro', (array) $user_data->roles);
             
             // Add enriched author data
             $data['author_info'] = [
