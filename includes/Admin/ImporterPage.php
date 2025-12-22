@@ -9,7 +9,7 @@ class ImporterPage {
 
     public function add_admin_menu() {
         add_submenu_page(
-            'rejimde_settings',
+            'rejimde-core', // DÜZELTİLDİ: CoreSettings ile uyumlu
             'Toplu Uzman Ekle',
             'İçe Aktar (Import)',
             'manage_options',
@@ -40,8 +40,6 @@ class ImporterPage {
                         update_post_meta($post_id, 'unvan', $item['title'] ?? 'Uzman');
                         update_post_meta($post_id, 'konum', $item['city'] ?? '');
                         update_post_meta($post_id, 'ilce', $item['district'] ?? '');
-                        update_post_meta($post_id, 'email', $item['email'] ?? '');
-                        update_post_meta($post_id, 'is_claimed', '0'); // Sahipsiz
                         update_post_meta($post_id, 'onayli', '0');
                         $count++;
                     }
@@ -80,8 +78,7 @@ class ImporterPage {
 ]
                 </pre>
                 <textarea name="rejimde_import_json" rows="15" style="width:100%; font-family:monospace;" placeholder="JSON verisini buraya yapıştırın..."></textarea>
-                <br><br>
-                <button type="submit" class="button button-primary">İçe Aktar ve Oluştur</button>
+                <?php submit_button('İçe Aktar'); ?>
             </form>
         </div>
         <?php
