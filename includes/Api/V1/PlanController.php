@@ -4,6 +4,7 @@ namespace Rejimde\Api\V1;
 use WP_REST_Controller;
 use WP_REST_Response;
 use WP_Error;
+use WP_User;
 
 class PlanController extends WP_REST_Controller {
 
@@ -11,6 +12,14 @@ class PlanController extends WP_REST_Controller {
     protected $base = 'plans';
 
     public function register_routes() {
+        // YENİ: Listeleme (Tüm Planlar)
+        register_rest_route($this->namespace, '/' . $this->base, [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_items'],
+            'permission_callback' => '__return_true', // Herkes görebilir
+        ]);
+
+        // ... (Diğer route'lar aynı kalıyor: create, update, get_item, approve, start, complete)
         register_rest_route($this->namespace, '/' . $this->base . '/create', [
             'methods' => 'POST',
             'callback' => [$this, 'create_item'],
@@ -28,130 +37,303 @@ class PlanController extends WP_REST_Controller {
             'callback' => [$this, 'get_item'],
             'permission_callback' => '__return_true',
         ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/approve/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'callback' => [$this, 'approve_plan'],
+            'permission_callback' => [$this, 'check_expert_permission'], 
+        ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/start/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'callback' => [$this, 'start_plan'],
+            'permission_callback' => [$this, 'check_auth_permission'], 
+        ]);
+        
+        register_rest_route($this->namespace, '/' . $this->base . '/complete/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'callback' => [$this, 'complete_plan'],
+            'permission_callback' => [$this, 'check_auth_permission'],
+        ]);
     }
 
     public function create_item($request) { return $this->handle_save($request, 'create'); }
     public function update_item($request) { return $this->handle_save($request, 'update'); }
 
+    // ... (handle_save aynı kalıyor) ...
     private function handle_save($request, $action) {
         $params = $request->get_json_params();
-        $title = sanitize_text_field($params['title'] ?? '');
-        $content = wp_kses_post($params['content'] ?? '');
-        $status = sanitize_text_field($params['status'] ?? 'draft');
         
-        // KRİTİK DÜZELTME: Gelen plan datasını array olarak garantiye al
-        $plan_data = isset($params['plan_data']) && is_array($params['plan_data']) 
-            ? array_values($params['plan_data']) 
-            : [];
-            
-        $meta = $params['meta'] ?? [];
-        $featured_media_id = intval($params['featured_media_id'] ?? 0);
-        $categories = $params['categories'] ?? [];
-
-        if (empty($title)) return $this->error('Başlık zorunludur.', 400);
+        if (empty($params['title'])) {
+            return new WP_Error('missing_title', 'Başlık zorunludur.', ['status' => 400]);
+        }
 
         $post_data = [
-            'post_title'    => $title,
-            'post_content'  => $content,
-            'post_status'   => $status,
-            'post_type'     => 'rejimde_plan',
-            'post_author'   => get_current_user_id()
+            'post_title'   => sanitize_text_field($params['title']),
+            'post_content' => wp_kses_post($params['content'] ?? ''),
+            'post_status'  => 'publish',
+            'post_type'    => 'rejimde_plan',
+            'post_author'  => get_current_user_id(),
         ];
 
         if ($action === 'update') {
-            $post_id = $request->get_param('id');
+            $post_id = $request['id'];
             $post_data['ID'] = $post_id;
-            // Yetki kontrolü...
-            $post = get_post($post_id);
-            if (!$post) return $this->error('Plan bulunamadı.', 404);
-            if ($post->post_author != get_current_user_id() && !current_user_can('edit_others_posts')) {
-                return $this->error('Yetkiniz yok.', 403);
+            
+            $existing = get_post($post_id);
+            if (!$existing || $existing->post_type !== 'rejimde_plan') {
+                return new WP_Error('not_found', 'Plan bulunamadı.', ['status' => 404]);
             }
-            wp_update_post($post_data);
+            
+            if (!current_user_can('manage_options') && $existing->post_author != get_current_user_id()) {
+                return new WP_Error('forbidden', 'Bu planı düzenleme yetkiniz yok.', ['status' => 403]);
+            }
+
+            $result = wp_update_post($post_data);
         } else {
-            $post_id = wp_insert_post($post_data);
+            $result = wp_insert_post($post_data);
         }
 
-        if (is_wp_error($post_id)) return $this->error($post_id->get_error_message(), 500);
+        if (is_wp_error($result)) {
+            return $result;
+        }
 
-        // JSON olarak kaydet (Unicode desteği ile)
-        update_post_meta($post_id, 'plan_data', wp_json_encode($plan_data, JSON_UNESCAPED_UNICODE));
-        
-        if (!empty($meta)) {
-            foreach ($meta as $key => $value) {
-                update_post_meta($post_id, sanitize_key($key), sanitize_text_field($value));
+        $post_id = $result;
+
+        if (isset($params['plan_data'])) {
+            $json_plan = is_string($params['plan_data']) ? $params['plan_data'] : json_encode($params['plan_data'], JSON_UNESCAPED_UNICODE);
+            update_post_meta($post_id, 'plan_data', $json_plan);
+        }
+
+        if (!empty($params['featured_media_id'])) {
+            set_post_thumbnail($post_id, intval($params['featured_media_id']));
+        }
+
+        if (!empty($params['meta']) && is_array($params['meta'])) {
+            $meta = $params['meta'];
+            $simple_fields = ['difficulty', 'duration', 'calories', 'score_reward', 'diet_category', 'rank_math_title', 'rank_math_description', 'rank_math_focus_keyword'];
+
+            foreach ($simple_fields as $key) {
+                if (isset($meta[$key])) {
+                    update_post_meta($post_id, $key, sanitize_text_field($meta[$key]));
+                }
+            }
+
+            if (isset($meta['shopping_list'])) {
+                $shop_list = is_string($meta['shopping_list']) ? $meta['shopping_list'] : json_encode($meta['shopping_list'], JSON_UNESCAPED_UNICODE);
+                update_post_meta($post_id, 'shopping_list', $shop_list);
+            }
+
+            if (isset($meta['tags'])) {
+                $tags = is_string($meta['tags']) ? $meta['tags'] : json_encode($meta['tags'], JSON_UNESCAPED_UNICODE);
+                update_post_meta($post_id, 'tags', $tags);
             }
         }
-
-        if ($featured_media_id > 0) set_post_thumbnail($post_id, $featured_media_id);
-        if (!empty($categories)) wp_set_post_categories($post_id, $categories);
 
         $post = get_post($post_id);
         return $this->success([
             'id' => $post->ID,
             'slug' => $post->post_name,
-            'link' => get_permalink($post->ID),
-            'message' => 'Plan kaydedildi.'
+            'message' => $action === 'create' ? 'Plan oluşturuldu.' : 'Plan güncellendi.'
         ]);
     }
 
-    public function get_item($request) {
-        $slug = $request->get_param('slug');
-        $args = ['name' => $slug, 'post_type' => 'rejimde_plan', 'numberposts' => 1];
+    // --- YENİ: Listeleme Metodu ---
+    public function get_items($request) {
+        $args = [
+            'post_type' => 'rejimde_plan',
+            'post_status' => 'publish',
+            'posts_per_page' => -1, // Tümünü getir
+            'orderby' => 'date',
+            'order' => 'DESC'
+        ];
+
+        // Filtreleme parametreleri eklenebilir
+        // if ($request['category']) ...
+
         $posts = get_posts($args);
+        $data = [];
 
-        if (empty($posts)) return $this->error('Plan bulunamadı', 404);
-        
+        foreach ($posts as $post) {
+            $author_id = $post->post_author;
+            $author_name = get_the_author_meta('display_name', $author_id);
+            $author_user = get_userdata($author_id);
+            $author_avatar = get_avatar_url($author_id); // Varsayılan WP avatarı, frontendde dicebear fallback var
+
+            $completed_users_raw = get_post_meta($post->ID, 'completed_users', true);
+            $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
+            
+            // Son 3 tamamlayan (avatar için)
+            $last_completed_avatars = [];
+            $count = 0;
+            if(is_array($completed_users)) {
+                foreach (array_reverse($completed_users) as $uid) {
+                    if ($count >= 3) break;
+                    $last_completed_avatars[] = [
+                        'avatar' => get_avatar_url($uid),
+                        'name' => get_the_author_meta('display_name', $uid)
+                    ];
+                    $count++;
+                }
+            }
+
+            $data[] = [
+                'id' => $post->ID,
+                'title' => $post->post_title,
+                'excerpt' => wp_trim_words($post->post_content, 20),
+                'content' => $post->post_content, // Full içerik gerekirse
+                'slug' => $post->post_name,
+                'image' => get_the_post_thumbnail_url($post->ID, 'medium_large') ?: '',
+                'date' => $post->post_date,
+                'meta' => [
+                    'difficulty' => get_post_meta($post->ID, 'difficulty', true),
+                    'duration' => get_post_meta($post->ID, 'duration', true),
+                    'calories' => get_post_meta($post->ID, 'calories', true),
+                    'score_reward' => get_post_meta($post->ID, 'score_reward', true),
+                    'diet_category' => get_post_meta($post->ID, 'diet_category', true),
+                    'is_verified' => (bool) get_post_meta($post->ID, 'is_verified', true),
+                ],
+                'author' => [
+                    'name' => $author_name,
+                    'avatar' => $author_avatar,
+                    'slug' => $author_user ? $author_user->user_nicename : ''
+                ],
+                'completed_users' => $last_completed_avatars, // Sadece avatar listesi
+                'completed_count' => count($completed_users)
+            ];
+        }
+
+        return $this->success($data);
+    }
+
+    // ... (approve, start, complete, get_item metodları aynı kalıyor) ...
+    public function approve_plan($request) {
+        $post_id = $request['id'];
+        $user_id = get_current_user_id();
+        update_post_meta($post_id, 'is_verified', true);
+        update_post_meta($post_id, 'approved_by', $user_id);
+        return $this->success(['message' => 'Plan başarıyla onaylandı.']);
+    }
+
+    public function start_plan($request) {
+        $post_id = $request['id'];
+        $user_id = get_current_user_id();
+        $started_users_raw = get_post_meta($post_id, 'started_users', true);
+        $started_users = $started_users_raw ? json_decode($started_users_raw, true) : [];
+        if (!in_array($user_id, $started_users)) {
+            $started_users[] = $user_id;
+            update_post_meta($post_id, 'started_users', json_encode($started_users));
+        }
+        return $this->success(['message' => 'Diyete başarıyla başladınız.']);
+    }
+    
+    public function complete_plan($request) {
+        $post_id = $request['id'];
+        $user_id = get_current_user_id();
+        $completed_users_raw = get_post_meta($post_id, 'completed_users', true);
+        $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
+        if (!in_array($user_id, $completed_users)) {
+            $completed_users[] = $user_id;
+            update_post_meta($post_id, 'completed_users', json_encode($completed_users));
+        }
+        return $this->success(['message' => 'Diyet tamamlandı olarak işaretlendi.']);
+    }
+
+    public function get_item($request) {
+        $slug = $request['slug'];
+        $posts = get_posts(['name' => $slug, 'post_type' => 'rejimde_plan', 'post_status' => 'publish', 'numberposts' => 1]);
+
+        if (empty($posts)) { return new WP_Error('not_found', 'Plan bulunamadı.', ['status' => 404]); }
+
         $post = $posts[0];
-        
-        // Veriyi çek ve decode et
-        $raw_plan_data = get_post_meta($post->ID, 'plan_data', true);
-        $plan_data = json_decode($raw_plan_data, true);
+        $post_id = $post->ID;
 
-        // KRİTİK DÜZELTME: Verinin kesinlikle bir liste (array) olduğundan emin ol
-        if (!is_array($plan_data)) {
-            $plan_data = [];
-        } else {
-            // Eğer obje geldiyse (key-value), onu listeye çevir
-            if (array_keys($plan_data) !== range(0, count($plan_data) - 1)) {
-                $plan_data = array_values($plan_data);
+        // Meta Çözümleme
+        $plan_data = json_decode(get_post_meta($post_id, 'plan_data', true)) ?: [];
+        $shopping_list = json_decode(get_post_meta($post_id, 'shopping_list', true)) ?: [];
+        $tags = json_decode(get_post_meta($post_id, 'tags', true)) ?: [];
+        
+        // Yazar Bilgisi
+        $author_id = $post->post_author;
+        $author_user = get_userdata($author_id);
+        $author_data = [
+            'id' => $author_id,
+            'name' => $author_user->display_name,
+            'avatar' => get_avatar_url($author_id),
+            'slug' => $author_user->user_nicename,
+            'is_expert' => in_array('rejimde_pro', (array) $author_user->roles) || in_array('administrator', (array) $author_user->roles)
+        ];
+
+        // Onaylayan Uzman Bilgisi
+        $approved_by_id = get_post_meta($post_id, 'approved_by', true);
+        $approved_by = null;
+        if ($approved_by_id) {
+            $approver = get_userdata($approved_by_id);
+            if ($approver) {
+                $approved_by = [
+                    'name' => $approver->display_name,
+                    'avatar' => get_avatar_url($approved_by_id),
+                    'slug' => $approver->user_nicename
+                ];
             }
         }
         
-        $author_id = $post->post_author;
-        $author_name = get_the_author_meta('display_name', $author_id);
-        // Avatar mantığı: Özel > DiceBear
-        $author_avatar = get_user_meta($author_id, 'avatar_url', true) ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . get_the_author_meta('user_nicename', $author_id);
-        
-        // Uzman mı?
-        $user = new \WP_User($author_id);
-        $is_expert = in_array('rejimde_pro', (array) $user->roles);
-        $author_slug = get_the_author_meta('user_nicename', $author_id);
+        // Tamamlayan Kullanıcılar (Son 5 - Avatar için)
+        $completed_users_ids = json_decode(get_post_meta($post_id, 'completed_users', true)) ?: [];
+        $completed_users = [];
+        $count = 0;
+        foreach (array_reverse($completed_users_ids) as $uid) {
+            if ($count >= 5) break;
+            $u = get_userdata($uid);
+            if ($u) {
+                $completed_users[] = [
+                    'id' => $uid,
+                    'name' => $u->display_name,
+                    'avatar' => get_avatar_url($uid),
+                    'slug' => $u->user_nicename // Link için slug ekledik
+                ];
+                $count++;
+            }
+        }
 
         $data = [
             'id' => $post->ID,
             'title' => $post->post_title,
             'content' => $post->post_content,
-            'image' => get_the_post_thumbnail_url($post->ID, 'large') ?: 'https://placehold.co/600x400',
+            'slug' => $post->post_name,
+            'image' => get_the_post_thumbnail_url($post->ID, 'large') ?: '',
             'plan_data' => $plan_data,
+            'shopping_list' => $shopping_list,
+            'tags' => $tags,
             'meta' => [
-                'difficulty' => get_post_meta($post->ID, 'difficulty', true),
-                'duration' => get_post_meta($post->ID, 'duration', true),
-                'calories' => get_post_meta($post->ID, 'calories', true),
+                'difficulty' => get_post_meta($post_id, 'difficulty', true),
+                'duration' => get_post_meta($post_id, 'duration', true),
+                'calories' => get_post_meta($post_id, 'calories', true),
+                'score_reward' => get_post_meta($post_id, 'score_reward', true),
+                'diet_category' => get_post_meta($post_id, 'diet_category', true),
+                'is_verified' => (bool) get_post_meta($post_id, 'is_verified', true),
             ],
-            'author' => [
-                'name' => $author_name,
-                'avatar' => $author_avatar,
-                'slug' => $author_slug,
-                'is_expert' => $is_expert
-            ],
-            'categories' => [] // Gerekirse eklenebilir
+            'author' => $author_data,
+            'approved_by' => $approved_by,
+            'completed_users' => $completed_users,
+            'completed_count' => count($completed_users_ids),
+            'date' => get_the_date('d F Y', $post_id)
         ];
 
         return $this->success($data);
     }
 
     public function check_permission() { return current_user_can('edit_posts'); }
-    protected function success($data = null) { return new WP_REST_Response(['status' => 'success', 'data' => $data], 200); }
-    protected function error($message = 'Error', $code = 400) { return new WP_REST_Response(['status' => 'error', 'message' => $message], $code); }
+    public function check_expert_permission() { 
+        $user = wp_get_current_user();
+        return in_array('rejimde_pro', (array) $user->roles) || in_array('administrator', (array) $user->roles);
+    }
+    public function check_auth_permission() { return is_user_logged_in(); }
+
+    protected function success($data) {
+        return new WP_REST_Response([
+            'status' => 'success',
+            'data' => $data
+        ], 200);
+    }
 }
