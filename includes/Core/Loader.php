@@ -37,7 +37,9 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php';
         // YENİ: Progress Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProgressController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProgressController.php';
-
+        // YENİ: Comment Sınıfları
+        if (file_exists(REJIMDE_PATH . 'includes/Core/CommentMeta.php')) require_once REJIMDE_PATH . 'includes/Core/CommentMeta.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CommentController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CommentController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -72,17 +74,14 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\PlanController')) (new \Rejimde\Api\V1\PlanController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ExerciseController')) (new \Rejimde\Api\V1\ExerciseController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\AIController') || class_exists('Rejimde\\Api\\V1\\AiController')) {
-            // Sınıf adını kontrol ederek yükle
                 $class = class_exists('Rejimde\\Api\\V1\\AIController') ? 'Rejimde\\Api\\V1\\AIController' : 'Rejimde\\Api\\V1\\AiController';
                 (new $class())->register_routes();
             }
-            // YENİ: Dictionary Routes
             if (class_exists('Rejimde\\Api\\V1\\DictionaryController')) (new \Rejimde\Api\V1\DictionaryController())->register_routes();
             
-            // YENİ: Clan Routes
             if (class_exists('Rejimde\\Api\\V1\\ClanController')) (new \Rejimde\Api\V1\ClanController())->register_routes();
-            
-            // YENİ: Progress Routes
+            // YENİ: Comment Routes
+            if (class_exists('Rejimde\\Api\\V1\\CommentController')) (new \Rejimde\Api\V1\CommentController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
         });
 
@@ -122,5 +121,8 @@ class Loader {
         // Meta Alanları
         if (class_exists('Rejimde\\Core\\UserMeta')) (new \Rejimde\Core\UserMeta())->register();
         if (class_exists('Rejimde\\Core\\PostMeta')) (new \Rejimde\Core\PostMeta())->register();
+        
+        // YENİ: Comment Meta
+        if (class_exists('Rejimde\\Core\\CommentMeta')) (new \Rejimde\Core\CommentMeta())->register();
     }
 }
