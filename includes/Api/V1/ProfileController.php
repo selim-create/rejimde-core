@@ -11,6 +11,13 @@ class ProfileController extends WP_REST_Controller {
     protected $base = 'profile';
 
     public function register_routes() {
+        // Kullanıcı Profilini Getir (Username ile)
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<username>[a-zA-Z0-9_-]+)', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_profile_by_username'],
+            'permission_callback' => '__return_true',
+        ]);
+
         // Takip Et / Bırak
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/follow', [
             'methods' => 'POST',
@@ -28,6 +35,118 @@ class ProfileController extends WP_REST_Controller {
 
     public function check_auth() {
         return is_user_logged_in();
+    }
+
+    /**
+     * Kullanıcı Profilini Username ile Getir
+     * Hem rejimde_pro (uzman) hem de rejimde_user rollerini destekler
+     */
+    public function get_profile_by_username($request) {
+        $username = sanitize_user($request->get_param('username'));
+        
+        if (empty($username)) {
+            return new WP_Error('missing_username', 'Kullanıcı adı gerekli', ['status' => 400]);
+        }
+
+        // Username ile kullanıcıyı bul
+        $user = get_user_by('login', $username);
+        
+        if (!$user) {
+            return new WP_Error('user_not_found', 'Kullanıcı Bulunamadı', ['status' => 404]);
+        }
+
+        $user_id = $user->ID;
+        $roles = (array) $user->roles;
+        $is_expert = in_array('rejimde_pro', $roles);
+
+        // Temel kullanıcı bilgileri
+        $profile_data = [
+            'id' => $user_id,
+            'username' => $user->user_login,
+            'display_name' => $user->display_name,
+            'roles' => $roles,
+            'is_expert' => $is_expert,
+        ];
+
+        // Avatar
+        $custom_avatar = get_user_meta($user_id, 'avatar_url', true);
+        $profile_data['avatar_url'] = $custom_avatar ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_login);
+
+        // Profile URL
+        if ($is_expert) {
+            $professional_id = get_user_meta($user_id, 'professional_profile_id', true);
+            if ($professional_id) {
+                $professional_post = get_post($professional_id);
+                if ($professional_post && $professional_post->post_status === 'publish') {
+                    $profile_data['profile_url'] = '/experts/' . $professional_post->post_name;
+                    $profile_data['professional_id'] = $professional_id;
+                } else {
+                    $profile_data['profile_url'] = '/profile/' . $username;
+                }
+            } else {
+                $profile_data['profile_url'] = '/profile/' . $username;
+            }
+        } else {
+            $profile_data['profile_url'] = '/profile/' . $username;
+        }
+
+        // Gamification data
+        $profile_data['level'] = (int) get_user_meta($user_id, 'rejimde_level', true) ?: 1;
+        $profile_data['total_score'] = (int) get_user_meta($user_id, 'rejimde_total_score', true) ?: 0;
+        $profile_data['current_streak'] = (int) get_user_meta($user_id, 'current_streak', true) ?: 0;
+
+        // Social data
+        $followers = get_user_meta($user_id, 'rejimde_followers', true);
+        $profile_data['followers_count'] = is_array($followers) ? count($followers) : 0;
+        
+        $following = get_user_meta($user_id, 'rejimde_following', true);
+        $profile_data['following_count'] = is_array($following) ? count($following) : 0;
+
+        $profile_data['high_fives'] = (int) get_user_meta($user_id, 'rejimde_high_fives', true);
+
+        // Check if current user follows this profile
+        $current_user_id = get_current_user_id();
+        if ($current_user_id) {
+            $profile_data['is_following'] = is_array($followers) && in_array($current_user_id, $followers);
+        } else {
+            $profile_data['is_following'] = false;
+        }
+
+        // Badges
+        $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
+        $profile_data['earned_badges'] = is_array($earned_badges) ? array_map('intval', $earned_badges) : [];
+
+        // Clan info
+        $clan_id = get_user_meta($user_id, 'clan_id', true);
+        if ($clan_id) {
+            $clan = get_post($clan_id);
+            if ($clan && $clan->post_status === 'publish') {
+                $profile_data['clan'] = [
+                    'id' => $clan->ID,
+                    'name' => $clan->post_title,
+                    'slug' => $clan->post_name,
+                    'logo' => get_post_meta($clan->ID, 'clan_logo_url', true)
+                ];
+            }
+        }
+
+        // Expert-specific data
+        if ($is_expert) {
+            $profile_data['title'] = get_user_meta($user_id, 'title', true) ?: '';
+            $profile_data['bio'] = get_user_meta($user_id, 'bio', true) ?: '';
+            $profile_data['profession'] = get_user_meta($user_id, 'profession', true) ?: '';
+            
+            $is_verified_meta = get_user_meta($user_id, 'is_verified', true);
+            $profile_data['is_verified'] = $is_verified_meta === '1' || $is_verified_meta === true;
+            
+            // Get rating from professional profile if exists
+            if (!empty($profile_data['professional_id'])) {
+                $profile_data['rating'] = get_post_meta($profile_data['professional_id'], 'puan', true) ?: '0.0';
+                $profile_data['review_count'] = get_post_meta($profile_data['professional_id'], 'review_count', true) ?: 0;
+            }
+        }
+
+        return new WP_REST_Response($profile_data, 200);
     }
 
     /**

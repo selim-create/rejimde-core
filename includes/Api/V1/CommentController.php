@@ -157,7 +157,8 @@ class CommentController extends WP_REST_Controller {
     // --- YARDIMCILAR ---
 
     private function prepare_comment_response($comment, $meta_helper) {
-        $author_details = $meta_helper->get_author_details((array)$comment);
+        // Ensure we pass the comment object properly to get_author_details
+        $author_details = $meta_helper->get_author_details($comment);
         
         // Alt yorumları (replies) çek
         $replies = get_comments([

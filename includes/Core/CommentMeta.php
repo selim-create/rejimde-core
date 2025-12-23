@@ -38,11 +38,41 @@ class CommentMeta {
     }
 
     public function get_author_details($comment) {
-        $user_id = $comment['author'];
-        if (!$user_id) return null; // Anonim yorumlar için null döner
+        // Handle both array and object comment formats
+        // WordPress uses 'user_id' in comment objects
+        $user_id = 0;
+        if (is_array($comment)) {
+            $user_id = isset($comment['user_id']) ? $comment['user_id'] : (isset($comment['author']) ? $comment['author'] : 0);
+        } elseif (is_object($comment)) {
+            $user_id = isset($comment->user_id) ? $comment->user_id : 0;
+        }
+            
+        if (!$user_id) return [
+            'id' => 0,
+            'name' => 'Anonim Kullanıcı',
+            'username' => '',
+            'is_expert' => false,
+            'role_label' => 'ANONIM',
+            'level' => 0,
+            'score' => 0,
+            'title' => '',
+            'avatar' => 'https://api.dicebear.com/9.x/personas/svg?seed=anonymous',
+            'profile_url' => ''
+        ];
 
         $user = get_userdata($user_id);
-        if (!$user) return null;
+        if (!$user) return [
+            'id' => 0,
+            'name' => 'Silinmiş Kullanıcı',
+            'username' => '',
+            'is_expert' => false,
+            'role_label' => 'SİLİNDİ',
+            'level' => 0,
+            'score' => 0,
+            'title' => '',
+            'avatar' => 'https://api.dicebear.com/9.x/personas/svg?seed=deleted',
+            'profile_url' => ''
+        ];
 
         $roles = (array) $user->roles;
         $is_expert = in_array('rejimde_pro', $roles);
@@ -52,16 +82,33 @@ class CommentMeta {
             ? get_post_meta(get_user_meta($user_id, 'professional_profile_id', true), 'puan', true) 
             : get_user_meta($user_id, 'rejimde_total_score', true);
 
+        // Profile URL: experts go to /experts/{slug}, regular users go to /profile/{username}
+        $profile_url = '';
+        if ($is_expert) {
+            $professional_id = get_user_meta($user_id, 'professional_profile_id', true);
+            if ($professional_id) {
+                $professional_post = get_post($professional_id);
+                if ($professional_post) {
+                    $profile_url = '/experts/' . $professional_post->post_name;
+                }
+            }
+        }
+        if (empty($profile_url)) {
+            $profile_url = '/profile/' . $user->user_login;
+        }
+
         return [
             'id' => $user_id,
             'name' => $user->display_name,
+            'username' => $user->user_login,
             'is_expert' => $is_expert,
             'role_label' => $is_expert ? 'UZMAN' : 'ÜYE',
             'level' => (int) get_user_meta($user_id, 'rejimde_level', true) ?: 1,
             'score' => $score ?: 0,
             'title' => get_user_meta($user_id, 'title', true) ?: '', // Dyt., Pt. vb.
             'avatar' => get_user_meta($user_id, 'avatar_url', true) 
-                        ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_login)
+                        ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_login),
+            'profile_url' => $profile_url
         ];
     }
 }
