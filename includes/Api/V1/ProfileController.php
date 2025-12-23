@@ -64,7 +64,6 @@ class ProfileController extends WP_REST_Controller {
             'id' => $user_id,
             'username' => $user->user_login,
             'display_name' => $user->display_name,
-            'email' => $user->user_email,
             'roles' => $roles,
             'is_expert' => $is_expert,
         ];
@@ -136,7 +135,9 @@ class ProfileController extends WP_REST_Controller {
             $profile_data['title'] = get_user_meta($user_id, 'title', true) ?: '';
             $profile_data['bio'] = get_user_meta($user_id, 'bio', true) ?: '';
             $profile_data['profession'] = get_user_meta($user_id, 'profession', true) ?: '';
-            $profile_data['is_verified'] = get_user_meta($user_id, 'is_verified', true) === '1' || get_user_meta($user_id, 'is_verified', true) === true;
+            
+            $is_verified_meta = get_user_meta($user_id, 'is_verified', true);
+            $profile_data['is_verified'] = $is_verified_meta === '1' || $is_verified_meta === true;
             
             // Get rating from professional profile if exists
             if (!empty($profile_data['professional_id'])) {

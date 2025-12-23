@@ -39,9 +39,13 @@ class CommentMeta {
 
     public function get_author_details($comment) {
         // Handle both array and object comment formats
-        $user_id = is_array($comment) 
-            ? (isset($comment['user_id']) ? $comment['user_id'] : (isset($comment['author']) ? $comment['author'] : 0))
-            : (isset($comment->user_id) ? $comment->user_id : 0);
+        // WordPress uses 'user_id' in comment objects
+        $user_id = 0;
+        if (is_array($comment)) {
+            $user_id = isset($comment['user_id']) ? $comment['user_id'] : (isset($comment['author']) ? $comment['author'] : 0);
+        } elseif (is_object($comment)) {
+            $user_id = isset($comment->user_id) ? $comment->user_id : 0;
+        }
             
         if (!$user_id) return [
             'id' => 0,
