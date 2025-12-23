@@ -10,8 +10,8 @@ class UserMeta {
     }
 
     public function register_user_meta() {
-        // API'de görünmesini istediğimiz tüm alanlar
-        $fields = [
+        // String alanları
+        $string_fields = [
             // Temel Alanlar
             'age',
             'birth_date', 
@@ -20,22 +20,15 @@ class UserMeta {
             'current_weight', 
             'target_weight', 
             'activity_level', 
-            'goals', 
-            'notifications',
             'avatar_url',
 
             // Oyunlaştırma
             'rejimde_total_score', 
             'rejimde_level',       
             'current_streak',
-            'rejimde_earned_badges', // Rozetler (Array)
-
-            // Sosyal (YENİ)
-            'rejimde_followers', // Takipçi ID listesi
-            'rejimde_following', // Takip edilen ID listesi
             'rejimde_high_fives', // Alınan beşlik sayısı
 
-            // KLAN (YENİ)
+            // KLAN
             'clan_id',      // Kullanıcının üye olduğu klan ID'si
             'clan_role',    // 'leader', 'member'
             
@@ -54,6 +47,7 @@ class UserMeta {
             'address',         // Açık adres
             'phone',
             'brand_name',      // Kurum adı
+            'location',        // Şehir/Ülke bilgisi
 
             // Sertifika & Onay
             'certificate_url', // Dosya URL
@@ -63,7 +57,17 @@ class UserMeta {
             'score_impact'
         ];
 
-        foreach ($fields as $field) {
+        // Array alanları (özel callback ile)
+        $array_fields = [
+            'goals',              // Hedefler objesi
+            'notifications',      // Bildirim tercihleri objesi
+            'rejimde_earned_badges', // Rozetler (Array)
+            'rejimde_followers',  // Takipçi ID listesi
+            'rejimde_following'   // Takip edilen ID listesi
+        ];
+
+        // String alanları kaydet
+        foreach ($string_fields as $field) {
             register_rest_field('user', $field, [
                 'get_callback' => function ($user) use ($field) {
                     return get_user_meta($user['id'], $field, true);
@@ -73,7 +77,37 @@ class UserMeta {
                 },
                 'schema' => [
                     'description' => "User $field",
-                    'type'        => in_array($field, ['goals', 'notifications', 'rejimde_earned_badges', 'rejimde_followers', 'rejimde_following']) ? 'array' : 'string',
+                    'type'        => 'string',
+                    'context'     => ['view', 'edit'],
+                ],
+            ]);
+        }
+
+        // Array alanları kaydet (özel update callback ile)
+        foreach ($array_fields as $field) {
+            register_rest_field('user', $field, [
+                'get_callback' => function ($user) use ($field) {
+                    $value = get_user_meta($user['id'], $field, true);
+                    // Eğer array değilse boş array dön
+                    return is_array($value) ? $value : [];
+                },
+                'update_callback' => function ($value, $user, $field) {
+                    // JSON string gelirse decode et
+                    if (is_string($value)) {
+                        $decoded = json_decode($value, true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $value = $decoded;
+                        }
+                    }
+                    // Array değilse boş array yap
+                    if (!is_array($value)) {
+                        $value = [];
+                    }
+                    return update_user_meta($user->ID, $field, $value);
+                },
+                'schema' => [
+                    'description' => "User $field",
+                    'type'        => 'object', // WordPress REST API uyumluluğu için object kullanıyoruz
                     'context'     => ['view', 'edit'],
                 ],
             ]);
