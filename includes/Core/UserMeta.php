@@ -95,7 +95,7 @@ class UserMeta {
                     // JSON string gelirse decode et
                     if (is_string($value)) {
                         $decoded = json_decode($value, true);
-                        if (json_last_error() === JSON_ERROR_NONE) {
+                        if (json_last_error() === JSON_ERROR_NONE && $decoded !== null) {
                             $value = $decoded;
                         }
                     }
@@ -107,7 +107,7 @@ class UserMeta {
                 },
                 'schema' => [
                     'description' => "User $field",
-                    'type'        => 'object', // WordPress REST API uyumluluğu için object kullanıyoruz
+                    'type'        => 'object', // Using 'object' for WordPress REST API compatibility
                     'context'     => ['view', 'edit'],
                 ],
             ]);
