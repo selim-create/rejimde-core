@@ -40,5 +40,27 @@ class Activator {
             UNIQUE KEY user_date (user_id, log_date)
         ) $charset_collate;";
         dbDelta( $sql_logs );
+
+        // 3. User Progress Tracking
+        $table_progress = $wpdb->prefix . 'rejimde_user_progress';
+        $sql_progress = "CREATE TABLE $table_progress (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            user_id bigint(20) unsigned NOT NULL,
+            content_type varchar(50) NOT NULL,
+            content_id bigint(20) unsigned NOT NULL,
+            progress_data longtext,
+            is_started tinyint(1) DEFAULT 0,
+            is_completed tinyint(1) DEFAULT 0,
+            reward_claimed tinyint(1) DEFAULT 0,
+            started_at datetime DEFAULT NULL,
+            completed_at datetime DEFAULT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY user_content (user_id, content_type, content_id),
+            KEY idx_user_id (user_id),
+            KEY idx_content (content_type, content_id)
+        ) $charset_collate;";
+        dbDelta( $sql_progress );
     }
 }
