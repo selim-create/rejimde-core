@@ -7,10 +7,10 @@ class OpenAIService {
     private $model;
 
     public function __construct() {
-        $options = get_option('rejimde_core_options');
-        $this->api_key = isset($options['openai_api_key']) ? $options['openai_api_key'] : '';
-        $this->model = isset($options['openai_model']) ? $options['openai_model'] : 'gpt-3.5-turbo';
-    }
+    // DOĞRU option adları
+    $this->api_key = get_option('rejimde_openai_api_key', '');
+    $this->model = get_option('rejimde_openai_model', 'gpt-3.5-turbo');
+}
 
     // --- DİYET METODLARI ---
     public function generate_diet_plan($user_data) {
