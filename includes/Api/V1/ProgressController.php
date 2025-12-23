@@ -135,8 +135,20 @@ class ProgressController extends WP_REST_Controller {
         
         if (isset($params['is_started'])) {
             $data['is_started'] = (bool) $params['is_started'] ? 1 : 0;
-            if ($data['is_started'] && !$existing) {
-                $data['started_at'] = current_time('mysql');
+            // Set started_at if marking as started and it's not already set
+            if ($data['is_started']) {
+                if (!$existing) {
+                    $data['started_at'] = current_time('mysql');
+                } else {
+                    // Check if existing record doesn't have started_at set
+                    $current = $wpdb->get_row($wpdb->prepare(
+                        "SELECT started_at FROM $table WHERE id = %d",
+                        $existing->id
+                    ));
+                    if (!$current->started_at) {
+                        $data['started_at'] = current_time('mysql');
+                    }
+                }
             }
         }
         
@@ -303,16 +315,22 @@ class ProgressController extends WP_REST_Controller {
             if ($existing->is_completed) {
                 return $this->error('Content already completed', 409);
             }
+            // Check if started_at is already set
+            $update_data = [
+                'is_started' => 1,
+                'is_completed' => 1,
+                'completed_at' => current_time('mysql')
+            ];
+            // Set started_at if not already set
+            $current = $wpdb->get_row($wpdb->prepare(
+                "SELECT started_at FROM $table WHERE id = %d",
+                $existing->id
+            ));
+            if (!$current->started_at) {
+                $update_data['started_at'] = current_time('mysql');
+            }
             // Update existing record
-            $wpdb->update(
-                $table,
-                [
-                    'is_started' => 1,
-                    'is_completed' => 1,
-                    'completed_at' => current_time('mysql')
-                ],
-                ['id' => $existing->id]
-            );
+            $wpdb->update($table, $update_data, ['id' => $existing->id]);
         } else {
             // Create new record with completed status
             $wpdb->insert($table, [
@@ -375,33 +393,14 @@ class ProgressController extends WP_REST_Controller {
         );
 
         // Integrate with gamification system
-        $gamification_action = $this->get_gamification_action($content_type);
-        if ($gamification_action && class_exists('Rejimde\\Api\\V1\\GamificationController')) {
-            // Create a mock request for the gamification controller
-            $gam_request = new \WP_REST_Request('POST', '/rejimde/v1/gamification/earn');
-            $gam_request->set_body_params([
-                'action' => $gamification_action,
-                'ref_id' => $content_id
-            ]);
-            
-            $gam_controller = new \Rejimde\Api\V1\GamificationController();
-            $gam_response = $gam_controller->earn_points($gam_request);
-            
-            $response_data = $gam_response->get_data();
-            
-            return $this->success([
-                'message' => 'Reward claimed successfully',
-                'content_type' => $content_type,
-                'content_id' => $content_id,
-                'points_earned' => $response_data['data']['earned'] ?? 0,
-                'total_score' => $response_data['data']['total_score'] ?? 0
-            ]);
-        }
+        $points_data = $this->award_gamification_points($user_id, $content_type, $content_id);
 
         return $this->success([
             'message' => 'Reward claimed successfully',
             'content_type' => $content_type,
-            'content_id' => $content_id
+            'content_id' => $content_id,
+            'points_earned' => $points_data['points_earned'] ?? 0,
+            'total_score' => $points_data['total_score'] ?? 0
         ]);
     }
 
@@ -424,6 +423,34 @@ class ProgressController extends WP_REST_Controller {
         ];
         
         return $action_map[$content_type] ?? null;
+    }
+
+    /**
+     * Award gamification points for content completion
+     */
+    private function award_gamification_points($user_id, $content_type, $content_id) {
+        $gamification_action = $this->get_gamification_action($content_type);
+        
+        if (!$gamification_action || !class_exists('Rejimde\\Api\\V1\\GamificationController')) {
+            return ['points_earned' => 0, 'total_score' => 0];
+        }
+
+        // Create a request object for the gamification controller
+        $gam_request = new \WP_REST_Request('POST', '/rejimde/v1/gamification/earn');
+        $gam_request->set_body_params([
+            'action' => $gamification_action,
+            'ref_id' => $content_id
+        ]);
+        
+        $gam_controller = new \Rejimde\Api\V1\GamificationController();
+        $gam_response = $gam_controller->earn_points($gam_request);
+        
+        $response_data = $gam_response->get_data();
+        
+        return [
+            'points_earned' => $response_data['data']['earned'] ?? 0,
+            'total_score' => $response_data['data']['total_score'] ?? 0
+        ];
     }
 
     /**
