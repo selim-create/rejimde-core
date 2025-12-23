@@ -35,6 +35,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ClanController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ClanController.php';
         // YENİ: Dictionary Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php';
+        // YENİ: Progress Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProgressController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProgressController.php';
 
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
@@ -79,6 +81,9 @@ class Loader {
             
             // YENİ: Clan Routes
             if (class_exists('Rejimde\\Api\\V1\\ClanController')) (new \Rejimde\Api\V1\ClanController())->register_routes();
+            
+            // YENİ: Progress Routes
+            if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
         });
 
         // CPT Kayıtları
