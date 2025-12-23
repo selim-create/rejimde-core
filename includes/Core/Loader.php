@@ -4,6 +4,7 @@ namespace Rejimde\Core;
 use Rejimde\Admin\CoreSettings;
 use Rejimde\Admin\VerificationPage;
 use Rejimde\Admin\ImporterPage;
+use Rejimde\Admin\MascotSettings; // EKLENDİ
 
 class Loader {
 
@@ -18,7 +19,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Core/UserMeta.php')) require_once REJIMDE_PATH . 'includes/Core/UserMeta.php';
         if (file_exists(REJIMDE_PATH . 'includes/Core/PostMeta.php')) require_once REJIMDE_PATH . 'includes/Core/PostMeta.php';
        
-        // Services (YENİ)
+        // Services
         if (file_exists(REJIMDE_PATH . 'includes/Services/OpenAIService.php')) require_once REJIMDE_PATH . 'includes/Services/OpenAIService.php';
 
         // API Controllers
@@ -30,13 +31,20 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/BlogController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/BlogController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/PlanController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/PlanController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ExerciseController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ExerciseController.php';
-        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AiController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AiController.php'; // YENİ
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AIController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AIController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ClanController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ClanController.php';
+        // YENİ: Dictionary Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php';
 
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Professional.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Professional.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Badge.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Badge.php';
+        
+        if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Clan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Clan.php';
+        // YENİ: Dictionary Post Type
+        if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Dictionary.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Dictionary.php';
 
         // Admin Pages
         if (is_admin()) {
@@ -61,7 +69,16 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\BlogController')) (new \Rejimde\Api\V1\BlogController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\PlanController')) (new \Rejimde\Api\V1\PlanController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ExerciseController')) (new \Rejimde\Api\V1\ExerciseController())->register_routes();
-            if (class_exists('Rejimde\\Api\\V1\\AiController')) (new \Rejimde\Api\V1\AiController())->register_routes(); // YENİ        
+            if (class_exists('Rejimde\\Api\\V1\\AIController') || class_exists('Rejimde\\Api\\V1\\AiController')) {
+            // Sınıf adını kontrol ederek yükle
+                $class = class_exists('Rejimde\\Api\\V1\\AIController') ? 'Rejimde\\Api\\V1\\AIController' : 'Rejimde\\Api\\V1\\AiController';
+                (new $class())->register_routes();
+            }
+            // YENİ: Dictionary Routes
+            if (class_exists('Rejimde\\Api\\V1\\DictionaryController')) (new \Rejimde\Api\V1\DictionaryController())->register_routes();
+            
+            // YENİ: Clan Routes
+            if (class_exists('Rejimde\\Api\\V1\\ClanController')) (new \Rejimde\Api\V1\ClanController())->register_routes();
         });
 
         // CPT Kayıtları
@@ -70,19 +87,27 @@ class Loader {
             if (class_exists('Rejimde\\PostTypes\\ExercisePlan')) (new \Rejimde\PostTypes\ExercisePlan())->register();
             if (class_exists('Rejimde\\PostTypes\\Professional')) (new \Rejimde\PostTypes\Professional())->register();
             if (class_exists('Rejimde\\PostTypes\\Badge')) (new \Rejimde\PostTypes\Badge())->register();
+            
+            // YENİ: Dictionary Post Type
+            if (class_exists('Rejimde\\PostTypes\\Dictionary')) (new \Rejimde\PostTypes\Dictionary())->register();
+
+            // YENİ: Clan Post Type
+            if (class_exists('Rejimde\\PostTypes\\Clan')) (new \Rejimde\PostTypes\Clan())->register();
         });
 
         // Admin Menüleri
+        // Düzeltme: Admin sınıflarını doğrudan is_admin() kontrolü altında başlatıyoruz.
+        // CoreSettings sınıfının nasıl yazıldığına bağlı olarak (constructor vs run methodu),
+        // burada güvenli bir başlatma yapıyoruz.
         if (is_admin()) {
-            if (class_exists('Rejimde\\Admin\\CoreSettings')) (new \Rejimde\Admin\CoreSettings())->run(); // run() metodu CoreSettings'de tanımlı değilse hata verebilir, __construct içinde add_action varsa new yeterli
-            // Düzeltme: CoreSettings constructor içinde action ekliyor, sadece newlemek yeterli olabilir ama singleton değilse her initte newlenmeli.
-            // CoreSettings yapısına baktığımızda __construct içinde add_action var.
-            // Bu yüzden burada newlemek yerine, admin_menu hookunda veya initte bir kere newlemek lazım.
-            // Ancak Loader::run() bir kere çalışıyor.
-            
-            // Mevcut yapıda CoreSettings __construct içinde hook ekliyor.
-            // Bu yüzden sadece sınıfı başlatmak yeterli.
-            new \Rejimde\Admin\CoreSettings();
+            // CoreSettings'i başlat
+            if (class_exists('Rejimde\\Admin\\CoreSettings')) {
+                $settings = new \Rejimde\Admin\CoreSettings();
+                // Eğer run metodu varsa çağır, yoksa constructor hallediyordur.
+                if (method_exists($settings, 'run')) {
+                    $settings->run();
+                }
+            }
 
             if (class_exists('Rejimde\\Admin\\VerificationPage')) (new \Rejimde\Admin\VerificationPage())->run();
             if (class_exists('Rejimde\\Admin\\ImporterPage')) (new \Rejimde\Admin\ImporterPage())->run();

@@ -3,6 +3,7 @@ namespace Rejimde\Api\V1;
 
 use WP_REST_Controller;
 use WP_REST_Response;
+use WP_Query; // WP_Query sınıfını kullanabilmek için ekledik
 
 class GamificationController extends WP_REST_Controller {
 
@@ -17,11 +18,10 @@ class GamificationController extends WP_REST_Controller {
             'log_meal'          => ['points' => 15, 'limit' => 5,  'label' => 'Öğün Girme'],
             'read_blog'         => ['points' => 10, 'limit' => 5,  'label' => 'Makale Okuma'],
             'complete_workout'  => ['points' => 50, 'limit' => 1,  'label' => 'Antrenman'],
-            'update_weight'     => ['points' => 50, 'limit' => 1,  'label' => 'Profil Güncelleme'], // İsteğin üzerine 50 puan
+            'update_weight'     => ['points' => 50, 'limit' => 1,  'label' => 'Profil Güncelleme'],
             'join_clan'         => ['points' => 100,'limit' => 1,  'label' => 'Klana Katılma'],
         ];
     }
-
 
     public function register_routes() {
         // Puan Kazanma
@@ -42,7 +42,7 @@ class GamificationController extends WP_REST_Controller {
         register_rest_route($this->namespace, '/' . $this->base . '/badges', [
             'methods' => 'GET',
             'callback' => [$this, 'get_badges'],
-            'permission_callback' => '__return_true', // Herkes görebilir
+            'permission_callback' => '__return_true',
         ]);
         
         // Geçmiş
@@ -51,6 +51,86 @@ class GamificationController extends WP_REST_Controller {
             'callback' => [$this, 'get_user_history'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+
+        // LİDERLİK TABLOSU (YENİ) - Hem bireysel hem klan sıralaması
+        register_rest_route($this->namespace, '/' . $this->base . '/leaderboard', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_leaderboard'],
+            'permission_callback' => '__return_true', // Herkes görebilir
+        ]);
+    }
+
+    /**
+     * LİDERLİK TABLOSU VE LİGLER (YENİ)
+     * type=users (varsayılan) veya type=clans parametresi alır.
+     */
+    public function get_leaderboard($request) {
+        $type = $request->get_param('type') ?: 'users';
+        $limit = (int) ($request->get_param('limit') ?: 20);
+        
+        $data = [];
+
+        if ($type === 'clans') {
+            // --- KLAN SIRALAMASI ---
+            $args = [
+                'post_type' => 'rejimde_clan',
+                'posts_per_page' => $limit,
+                'post_status' => 'publish',
+                'meta_key' => 'total_score',
+                'orderby' => 'meta_value_num',
+                'order' => 'DESC'
+            ];
+            $query = new WP_Query($args);
+            
+            foreach ($query->posts as $post) {
+                $score = (int) get_post_meta($post->ID, 'total_score', true);
+                $data[] = [
+                    'id' => $post->ID,
+                    'name' => $post->post_title,
+                    'slug' => $post->post_name,
+                    'score' => $score,
+                    'league' => $this->calculate_league($score), // Lig bilgisi
+                    'logo' => get_the_post_thumbnail_url($post->ID, 'thumbnail') ?: null
+                ];
+            }
+        } else {
+            // --- KULLANICI SIRALAMASI ---
+            // Sadece rejimde_total_score'a sahip kullanıcıları getir
+            $user_query = new \WP_User_Query([
+                'meta_key' => 'rejimde_total_score',
+                'orderby' => 'meta_value_num',
+                'order' => 'DESC',
+                'number' => $limit,
+                'role__not_in' => ['administrator'], // Adminleri gizle
+                'fields' => 'all_with_meta' // Performans için
+            ]);
+            
+            $users = $user_query->get_results();
+            
+            foreach ($users as $user) {
+                $score = (int) get_user_meta($user->ID, 'rejimde_total_score', true);
+                $data[] = [
+                    'id' => $user->ID,
+                    'name' => $user->display_name ?: $user->user_login,
+                    'avatar' => get_user_meta($user->ID, 'avatar_url', true),
+                    'score' => $score,
+                    'league' => $this->calculate_league($score) // Lig bilgisi
+                ];
+            }
+        }
+
+        return $this->success($data);
+    }
+
+    /**
+     * PUANA GÖRE LİG HESAPLAMA (YARDIMCI)
+     */
+    private function calculate_league($score) {
+        if ($score >= 10000) return ['id' => 'diamond', 'name' => 'Elmas Lig', 'color' => 'from-blue-400 to-cyan-300'];
+        if ($score >= 5000) return ['id' => 'platinum', 'name' => 'Platin Lig', 'color' => 'from-slate-300 to-slate-100'];
+        if ($score >= 2000) return ['id' => 'gold', 'name' => 'Altın Lig', 'color' => 'from-yellow-400 to-yellow-200'];
+        if ($score >= 500) return ['id' => 'silver', 'name' => 'Gümüş Lig', 'color' => 'from-gray-400 to-gray-200'];
+        return ['id' => 'bronze', 'name' => 'Bronz Lig', 'color' => 'from-orange-400 to-orange-200'];
     }
 
     /**
@@ -69,7 +149,9 @@ class GamificationController extends WP_REST_Controller {
         $daily_score = $daily_row ? (int)$daily_row->score_daily : 0;
 
         $total_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-        $level = (int) get_user_meta($user_id, 'rejimde_level', true) ?: 1;
+        
+        // Seviye yerine Lig bilgisini dönelim
+        $league = $this->calculate_league($total_score);
         
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
@@ -77,13 +159,13 @@ class GamificationController extends WP_REST_Controller {
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
-            'level' => $level,
+            'league' => $league, // Seviye yerine Lig
             'earned_badges' => $earned_badges
         ]);
     }
 
     /**
-     * ROZETLERİ LİSTELE (DÜZELTİLDİ: Temiz Metin)
+     * ROZETLERİ LİSTELE
      */
     public function get_badges($request) {
         $args = [
@@ -95,7 +177,6 @@ class GamificationController extends WP_REST_Controller {
         $badges = [];
 
         foreach ($posts as $post) {
-            // İçeriği temizle: Önce HTML yorumlarını (Gutenberg blokları), sonra HTML etiketlerini kaldır
             $raw_content = $post->post_content;
             $clean_content = preg_replace('/<!--(.|\s)*?-->/', '', $raw_content);
             $clean_content = wp_strip_all_tags($clean_content);
@@ -104,7 +185,7 @@ class GamificationController extends WP_REST_Controller {
             $badges[] = [
                 'id' => $post->ID,
                 'title' => $post->post_title,
-                'description' => $clean_content, // Temizlenmiş açıklama
+                'description' => $clean_content,
                 'image' => get_the_post_thumbnail_url($post->ID, 'thumbnail') ?: 'https://placehold.co/100x100/orange/white?text=Badge',
                 'points_required' => (int) get_post_meta($post->ID, 'points_required', true),
                 'action_required' => get_post_meta($post->ID, 'action_required', true)
@@ -119,16 +200,11 @@ class GamificationController extends WP_REST_Controller {
         $action = sanitize_text_field($params['action'] ?? '');
         $ref_id = isset($params['ref_id']) ? sanitize_text_field($params['ref_id']) : null;
 
-        // 1. Kuralları Getir (DB'den veya Default'tan)
         $rules_json = get_option('rejimde_gamification_rules');
         $db_rules = !empty($rules_json) ? json_decode($rules_json, true) : [];
-        
-        // Varsayılanlarla birleştir (Eksik kural kalmasın diye)
         $rules = array_merge($this->get_default_rules(), $db_rules);
 
-        // Kural Kontrolü
         if (!isset($rules[$action])) {
-            // Hata vermek yerine loglayalım ve işlemi durduralım
             return $this->error('Geçersiz işlem: ' . $action . ' kuralı bulunamadı.', 400);
         }
 
@@ -143,17 +219,14 @@ class GamificationController extends WP_REST_Controller {
 
         $current_count = $actions_data[$action]['count'] ?? 0;
         
-        // Referans kontrolü
         if ($ref_id && isset($actions_data[$action]['refs']) && in_array($ref_id, $actions_data[$action]['refs'])) {
              return $this->error('Bu işlemden zaten puan aldınız.', 409);
         }
 
-        // Limit kontrolü
         if ($current_count >= $rule['limit']) {
             return $this->error('Günlük işlem limitine ulaştınız.', 403);
         }
 
-        // --- PUANLARI İŞLE ---
         if (!isset($actions_data[$action])) $actions_data[$action] = ['count' => 0, 'refs' => []];
         $actions_data[$action]['count']++;
         if ($ref_id) $actions_data[$action]['refs'][] = $ref_id;
@@ -169,9 +242,13 @@ class GamificationController extends WP_REST_Controller {
         $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
         $new_total = $current_total + $rule['points'];
         update_user_meta($user_id, 'rejimde_total_score', $new_total);
-
-        // Rozetleri kontrol et (Bu fonksiyon aynı sınıfta private olmalı veya ayrı helper)
-        // $this->check_badges($user_id, $new_total);
+        
+        // Eğer klanı varsa, klan puanını da artır
+        $clan_id = get_user_meta($user_id, 'clan_id', true);
+        if ($clan_id) {
+            $clan_score = (int) get_post_meta($clan_id, 'total_score', true);
+            update_post_meta($clan_id, 'total_score', $clan_score + $rule['points']);
+        }
 
         return $this->success([
             'earned' => $rule['points'],

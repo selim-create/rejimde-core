@@ -24,10 +24,20 @@ class UserMeta {
             'notifications',
             'avatar_url',
 
-            // Gaming Alanlar            
-            'rejimde_total_score', // YENİ
-            'rejimde_level',       // YENİ
-            'current_streak',       // YENİ (Henüz logic eklemedik ama yeri olsun)
+            // Oyunlaştırma
+            'rejimde_total_score', 
+            'rejimde_level',       
+            'current_streak',
+            'rejimde_earned_badges', // Rozetler (Array)
+
+            // Sosyal (YENİ)
+            'rejimde_followers', // Takipçi ID listesi
+            'rejimde_following', // Takip edilen ID listesi
+            'rejimde_high_fives', // Alınan beşlik sayısı
+
+            // KLAN (YENİ)
+            'clan_id',      // Kullanıcının üye olduğu klan ID'si
+            'clan_role',    // 'leader', 'member'
             
             // Uzman (Pro)
             'profession',      // Meslek (dietitian, pt...)
@@ -63,7 +73,7 @@ class UserMeta {
                 },
                 'schema' => [
                     'description' => "User $field",
-                    'type'        => ($field === 'goals' || $field === 'notifications') ? 'object' : 'string',
+                    'type'        => in_array($field, ['goals', 'notifications', 'rejimde_earned_badges', 'rejimde_followers', 'rejimde_following']) ? 'array' : 'string',
                     'context'     => ['view', 'edit'],
                 ],
             ]);
@@ -73,46 +83,64 @@ class UserMeta {
     /**
      * Add custom avatar and role information to REST API user response
      * Combines avatar_url override and role information
-     * 
-     * @param WP_REST_Response $response The response object
+     * * @param WP_REST_Response $response The response object
      * @param WP_User $user The user object
      * @param WP_REST_Request $request The request object
      * @return WP_REST_Response Modified response
      */
-    public function add_user_info_to_rest($response, $user, $request) {
+     public function add_user_info_to_rest($response, $user, $request) {
         $data = $response->get_data();
         
-        // 1. Custom Avatar Logic: Use custom avatar if exists, otherwise use DiceBear
+        // Avatar
         $custom_avatar = get_user_meta($user->ID, 'avatar_url', true);
+        $data['avatar_url'] = $custom_avatar ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_nicename);
         
-        if ($custom_avatar && !empty($custom_avatar)) {
-            $data['avatar_url'] = $custom_avatar;
+        // Rozetleri ve Sosyal Verileri Formatla
+        $earned_badges = get_user_meta($user->ID, 'rejimde_earned_badges', true);
+        $data['earned_badges'] = is_array($earned_badges) ? array_map('intval', $earned_badges) : [];
+
+        $followers = get_user_meta($user->ID, 'rejimde_followers', true);
+        $data['followers_count'] = is_array($followers) ? count($followers) : 0;
+        
+        $following = get_user_meta($user->ID, 'rejimde_following', true);
+        $data['following_count'] = is_array($following) ? count($following) : 0;
+
+        $data['high_fives'] = (int) get_user_meta($user->ID, 'rejimde_high_fives', true);
+
+        // Mevcut kullanıcı bu profili takip ediyor mu?
+        $current_user_id = get_current_user_id();
+        if ($current_user_id) {
+            $data['is_following'] = is_array($followers) && in_array($current_user_id, $followers);
         } else {
-            $data['avatar_url'] = 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_nicename);
+            $data['is_following'] = false;
         }
+
+        // Klan ve Rol Bilgisi
+        $data['roles'] = (array) $user->roles;
+        $data['is_expert'] = in_array('rejimde_pro', (array) $user->roles);
+        $data['username'] = $user->user_login;
         
-        // Override Gravatar URLs with custom avatar
-        if (isset($data['avatar_urls'])) {
-            foreach ($data['avatar_urls'] as $size => $url) {
-                $data['avatar_urls'][$size] = $data['avatar_url'];
+        $clan_id = get_user_meta($user->ID, 'clan_id', true);
+        if ($clan_id) {
+            $clan = get_post($clan_id);
+            if ($clan && $clan->post_status === 'publish') {
+                $data['clan'] = [
+                    'id' => $clan->ID,
+                    'name' => $clan->post_title,
+                    'slug' => $clan->post_name,
+                    'logo' => get_post_meta($clan->ID, 'clan_logo_url', true)
+                ];
             }
         }
-        
-        // 2. Add Role Information
-        $data['roles'] = (array) $user->roles;
-        
-        // 3. Add is_expert flag for easy frontend checking
-        $data['is_expert'] = in_array('rejimde_pro', (array) $user->roles);
-        
+
         $response->set_data($data);
         return $response;
     }
-
+    
     /**
      * Add custom avatar to comment REST API response
      * Ensures comment author avatars use custom uploads or DiceBear
-     * 
-     * @param WP_REST_Response $response The response object
+     * * @param WP_REST_Response $response The response object
      * @param WP_Comment $comment The comment object
      * @param WP_REST_Request $request The request object
      * @return WP_REST_Response Modified response

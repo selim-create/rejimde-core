@@ -75,7 +75,6 @@ class AuthController extends WP_REST_Controller {
 
         // Meta Verilerini Kaydet
         if (!empty($meta) && is_array($meta)) {
-            // ... (Diğer meta kayıtları aynı kalsın) ...
              // Kilo
             if (isset($meta['weight'])) {
                 update_user_meta($user_id, 'current_weight', sanitize_text_field($meta['weight']));
@@ -139,7 +138,8 @@ class AuthController extends WP_REST_Controller {
                     'ID'           => $post_id,
                     'post_title'   => isset($meta['name']) ? $meta['name'] : $username,
                     'post_content' => isset($meta['bio']) ? $meta['bio'] : '',
-                    'post_author'  => $user_id
+                    'post_author'  => $user_id,
+                    'post_name'    => $username // DÜZELTME: Sahiplenirken slug'ı username yap
                 ]);
                 
             } else {
@@ -149,7 +149,8 @@ class AuthController extends WP_REST_Controller {
                     'post_content'  => isset($meta['bio']) ? $meta['bio'] : '',
                     'post_status'   => 'publish',
                     'post_type'     => 'rejimde_pro',
-                    'post_author'   => $user_id
+                    'post_author'   => $user_id,
+                    'post_name'     => $username // DÜZELTME: Oluştururken slug'ı username yap
                 ];
                 $post_id = wp_insert_post($pro_post_data);
             }

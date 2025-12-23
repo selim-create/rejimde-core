@@ -3,19 +3,22 @@
  * Plugin Name:       Rejimde Core
  * Plugin URI:        https://rejimde.com
  * Description:       Rejimde.com platformunun çekirdek API ve veritabanı yönetim eklentisi.
- * Version:           1.0.1
+ * Version:           1.0.2
  * Author:            Hip Medya
  * Text Domain:       rejimde-core
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit;
+    exit;
 }
 
 // Sabitler
-define( 'REJIMDE_VERSION', '1.0.1' );
+define( 'REJIMDE_VERSION', '1.0.2' ); // Versiyon güncellendi
 define( 'REJIMDE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'REJIMDE_URL', plugin_dir_url( __FILE__ ) );
+
+// Eğer Composer kullanıyorsanız (JWT vb. kütüphaneler için) aşağıdaki satırı açabilirsiniz:
+// if (file_exists(REJIMDE_PATH . 'vendor/autoload.php')) require_once REJIMDE_PATH . 'vendor/autoload.php';
 
 // 1. Önce Loader sınıfını manuel olarak dahil et
 require_once REJIMDE_PATH . 'includes/Core/Loader.php';
@@ -33,8 +36,9 @@ if (file_exists(REJIMDE_PATH . 'includes/Core/Deactivator.php')) {
 
 // 3. Eklentiyi Başlat
 function run_rejimde_core() {
-	$plugin = new Rejimde\Core\Loader();
-	$plugin->run();
+    // Loader sınıfı güncellendiği için yeni modülleri (Klan vb.) otomatik yükleyecektir.
+    $plugin = new Rejimde\Core\Loader();
+    $plugin->run();
 }
 run_rejimde_core();
 

@@ -18,7 +18,8 @@ class ProfessionalController extends WP_REST_Controller {
             'permission_callback' => function() { return true; },
         ]);
         
-        register_rest_route($this->namespace, '/' . $this->base . '/(?P<slug>[a-zA-Z0-9-]+)', [
+        // Slug regex'ini _ (alt çizgi) destekleyecek şekilde güncelledik
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<slug>[a-zA-Z0-9-_]+)', [
             'methods' => 'GET',
             'callback' => [$this, 'get_item'],
             'permission_callback' => function() { return true; },
@@ -53,6 +54,15 @@ class ProfessionalController extends WP_REST_Controller {
                 $post_id = get_the_ID();
                 $user_id = get_post_meta($post_id, 'related_user_id', true);
                 
+                // Username bilgisini al
+                $username = '';
+                if ($user_id) {
+                    $user_info = get_userdata($user_id);
+                    if ($user_info) {
+                        $username = $user_info->user_login;
+                    }
+                }
+
                 $image = 'https://placehold.co/150';
                 if (has_post_thumbnail()) {
                     $image = get_the_post_thumbnail_url($post_id, 'medium');
@@ -69,6 +79,7 @@ class ProfessionalController extends WP_REST_Controller {
                     'id'            => $post_id,
                     'name'          => get_the_title(),
                     'slug'          => get_post_field('post_name', $post_id),
+                    'username'      => $username, // EKLENDİ
                     'type'          => get_post_meta($post_id, 'uzmanlik_tipi', true) ?: 'dietitian',
                     'title'         => get_post_meta($post_id, 'unvan', true) ?: 'Uzman',
                     'image'         => $image,
@@ -79,7 +90,7 @@ class ProfessionalController extends WP_REST_Controller {
                     'is_online'     => true,
                     'location'      => get_post_meta($post_id, 'konum', true),
                     'brand'         => get_post_meta($post_id, 'kurum', true),
-                    'is_claimed'    => $is_claimed // Frontend'e gönder
+                    'is_claimed'    => $is_claimed
                 ];
             }
             wp_reset_postdata();
@@ -110,6 +121,15 @@ class ProfessionalController extends WP_REST_Controller {
         $post_id = $post->ID;
         $user_id = get_post_meta($post_id, 'related_user_id', true);
         
+        // Username bilgisini al
+        $username = '';
+        if ($user_id) {
+            $user_info = get_userdata($user_id);
+            if ($user_info) {
+                $username = $user_info->user_login;
+            }
+        }
+
         $image = 'https://placehold.co/300';
         if (has_post_thumbnail($post_id)) {
              $image = get_the_post_thumbnail_url($post_id, 'large');
@@ -126,6 +146,7 @@ class ProfessionalController extends WP_REST_Controller {
             'id'            => $post_id,
             'name'          => $post->post_title,
             'slug'          => $post->post_name,
+            'username'      => $username, // EKLENDİ
             'bio'           => $post->post_content,
             'type'          => get_post_meta($post_id, 'uzmanlik_tipi', true) ?: 'dietitian',
             'title'         => get_post_meta($post_id, 'unvan', true) ?: 'Uzman',
@@ -138,7 +159,7 @@ class ProfessionalController extends WP_REST_Controller {
             'brand'         => get_post_meta($post_id, 'kurum', true),
             'branches'      => get_post_meta($post_id, 'branslar', true),
             'services'      => get_post_meta($post_id, 'hizmetler', true),
-            'is_claimed'    => $is_claimed, // Frontend'e gönder
+            'is_claimed'    => $is_claimed,
             'client_types'  => get_user_meta($user_id, 'client_types', true),
             'consultation_types' => get_user_meta($user_id, 'consultation_types', true),
             'address'       => get_user_meta($user_id, 'address', true)
