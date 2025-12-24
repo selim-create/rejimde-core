@@ -31,8 +31,8 @@ class Circle {
             'hierarchical'       => false,
             'menu_position'      => 22,
             'menu_icon'          => 'dashicons-groups',
-            'supports'           => ['title', 'editor', 'thumbnail', 'author', 'custom-fields', 'comments'], 
-            'show_in_rest'       => true 
+            'supports'           => ['title', 'editor', 'thumbnail', 'author', 'custom-fields', 'comments'],
+            'show_in_rest'       => true
         ];
 
         register_post_type('rejimde_circle', $args);

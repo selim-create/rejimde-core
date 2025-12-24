@@ -133,7 +133,7 @@ class GamificationController extends WP_REST_Controller {
         if ($score >= 1000) return ['id' => 'level-4', 'name' => 'Balance', 'level' => 4, 'slug' => 'balance', 'icon' => 'fa-scale-balanced', 'color' => 'text-blue-500', 'description' => 'Beslenme, hareket ve zihin dengelenir. Kendini daha kontrollü ve rahat hissedersin.'];
         if ($score >= 500) return ['id' => 'level-3', 'name' => 'Commit', 'level' => 3, 'slug' => 'commit', 'icon' => 'fa-check-circle', 'color' => 'text-green-500', 'description' => 'İstikrar burada doğar. Düzenli devam etmek artık bir tercih değil, alışkanlık.'];
         if ($score >= 300) return ['id' => 'level-2', 'name' => 'Adapt', 'level' => 2, 'slug' => 'adapt', 'icon' => 'fa-sync', 'color' => 'text-orange-500', 'description' => 'Vücut ve zihin yeni rutine alışmaya başlar. Küçük değişimler büyük farklar yaratır.'];
-        return ['id' => 'level-1', 'name' => 'Begin', 'level' => 1, 'slug' => 'begin', 'icon' => 'fa-seedling', 'color' => 'text-gray-500', 'description' => 'Her yolculuk bir adımla başlar. Burada beklenti yok, sadece başlamak var.', 'points_required' => 200];
+        return ['id' => 'level-1', 'name' => 'Begin', 'level' => 1, 'slug' => 'begin', 'icon' => 'fa-seedling', 'color' => 'text-gray-500', 'description' => 'Her yolculuk bir adımla başlar. Burada beklenti yok, sadece başlamak var.'];
     }
 
     /**

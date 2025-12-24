@@ -110,7 +110,7 @@ class CircleController extends WP_REST_Controller {
         $user_id = get_current_user_id();
         $user = wp_get_current_user();
         
-        // Sadece rejimde_pro kullanıcılar circle oluşturabilir
+        // Sadece rejimde_pro kullanıcıları circle oluşturabilir
         if (!in_array('rejimde_pro', (array) $user->roles) && !current_user_can('manage_options')) {
             return new WP_Error('permission_denied', 'Circle oluşturmak için Rejimde Uzmanı olmalısınız.', ['status' => 403]);
         }
@@ -270,7 +270,7 @@ class CircleController extends WP_REST_Controller {
         $members = get_users([
             'meta_key' => 'circle_id',
             'meta_value' => $post_id,
-            'number' => 10 
+            'number' => 10
         ]);
         
         $members_data = [];
@@ -295,7 +295,7 @@ class CircleController extends WP_REST_Controller {
             'mentor_id'    => (int) $mentor_id,
             'members'      => $members_data,
             'privacy'      => get_post_meta($post_id, 'privacy', true) ?: 'public',
-            'chat_status'  => $post->comment_status === 'open' ? 'open' : 'closed', // comment_status'u chat_status olarak döndür
+            'chat_status'  => $post->comment_status === 'open' ? 'open' : 'closed', // comment_status'u chat_status olarak döndürür
             'comment_status' => $post->comment_status // Eski uyumluluk için
         ];
 
