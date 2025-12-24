@@ -51,11 +51,6 @@ class ProfileController extends WP_REST_Controller {
         // Username ile kullanıcıyı bul
         $user = get_user_by('login', $username);
         
-        // Slug ile de dene
-        if (!$user) {
-            $user = get_user_by('slug', $username);
-        }
-        
         // Nicename ile de dene
         if (!$user) {
             global $wpdb;
