@@ -144,23 +144,23 @@ class ProfileController extends WP_REST_Controller {
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         $profile_data['earned_badges'] = is_array($earned_badges) ? array_map('intval', $earned_badges) : [];
 
-        // Clan info
-        $clan_id = get_user_meta($user_id, 'clan_id', true);
-        if ($clan_id) {
-            $clan = get_post($clan_id);
-            if ($clan && $clan->post_status === 'publish') {
-                $profile_data['clan'] = [
-                    'id' => $clan->ID,
-                    'name' => $clan->post_title,
-                    'slug' => $clan->post_name,
-                    'logo' => get_post_meta($clan->ID, 'clan_logo_url', true)
+        // Circle info
+        $circle_id = get_user_meta($user_id, 'circle_id', true);
+        if ($circle_id) {
+            $circle = get_post($circle_id);
+            if ($circle && $circle->post_status === 'publish') {
+                $profile_data['circle'] = [
+                    'id' => $circle->ID,
+                    'name' => $circle->post_title,
+                    'slug' => $circle->post_name,
+                    'logo' => get_post_meta($circle->ID, 'circle_logo_url', true)
                 ];
             }
         }
 
-        // League bilgisi
+        // Level bilgisi
         $total_score = $profile_data['total_score'];
-        $profile_data['league'] = $this->calculate_league($total_score);
+        $profile_data['level'] = $this->calculate_level($total_score);
 
         // Expert-specific data
         if ($is_expert) {
@@ -264,14 +264,17 @@ class ProfileController extends WP_REST_Controller {
     }
 
     /**
-     * Calculate league based on score
+     * Calculate level based on score
      */
-    private function calculate_league($score) {
-        if ($score >= 10000) return ['id' => 'diamond', 'slug' => 'diamond', 'name' => 'Elmas Lig', 'icon' => 'fa-gem', 'color' => 'text-cyan-500'];
-        if ($score >= 5000) return ['id' => 'ruby', 'slug' => 'ruby', 'name' => 'Yakut Lig', 'icon' => 'fa-gem', 'color' => 'text-red-500'];
-        if ($score >= 2000) return ['id' => 'gold', 'slug' => 'gold', 'name' => 'Altın Lig', 'icon' => 'fa-crown', 'color' => 'text-yellow-500'];
-        if ($score >= 500) return ['id' => 'silver', 'slug' => 'silver', 'name' => 'Gümüş Lig', 'icon' => 'fa-medal', 'color' => 'text-gray-400'];
-        return ['id' => 'bronze', 'slug' => 'bronze', 'name' => 'Bronz Lig', 'icon' => 'fa-medal', 'color' => 'text-amber-600'];
+    private function calculate_level($score) {
+        if ($score >= 10000) return ['id' => 'level-8', 'name' => 'Transform', 'level' => 8, 'slug' => 'transform', 'icon' => 'fa-star', 'color' => 'text-purple-600', 'description' => 'Kalıcı değişim. Yeni bir denge, yeni bir sen.'];
+        if ($score >= 6000) return ['id' => 'level-7', 'name' => 'Mastery', 'level' => 7, 'slug' => 'mastery', 'icon' => 'fa-crown', 'color' => 'text-yellow-500', 'description' => 'Bilinçli seçimler yaparsın. Ne yaptığını ve neden yaptığını bilerek ilerlersin.'];
+        if ($score >= 4000) return ['id' => 'level-6', 'name' => 'Sustain', 'level' => 6, 'slug' => 'sustain', 'icon' => 'fa-infinity', 'color' => 'text-teal-500', 'description' => 'Bu bir rejim olmaktan çıkar, yaşam tarzına dönüşür. Devam etmek zor gelmez.'];
+        if ($score >= 2000) return ['id' => 'level-5', 'name' => 'Strengthen', 'level' => 5, 'slug' => 'strengthen', 'icon' => 'fa-dumbbell', 'color' => 'text-red-500', 'description' => 'Fiziksel ve zihinsel olarak güçlenme başlar. Gelişim artık net şekilde hissedilir.'];
+        if ($score >= 1000) return ['id' => 'level-4', 'name' => 'Balance', 'level' => 4, 'slug' => 'balance', 'icon' => 'fa-scale-balanced', 'color' => 'text-blue-500', 'description' => 'Beslenme, hareket ve zihin dengelenir. Kendini daha kontrollü ve rahat hissedersin.'];
+        if ($score >= 500) return ['id' => 'level-3', 'name' => 'Commit', 'level' => 3, 'slug' => 'commit', 'icon' => 'fa-check-circle', 'color' => 'text-green-500', 'description' => 'İstikrar burada doğar. Düzenli devam etmek artık bir tercih değil, alışkanlık.'];
+        if ($score >= 300) return ['id' => 'level-2', 'name' => 'Adapt', 'level' => 2, 'slug' => 'adapt', 'icon' => 'fa-sync', 'color' => 'text-orange-500', 'description' => 'Vücut ve zihin yeni rutine alışmaya başlar. Küçük değişimler büyük farklar yaratır.'];
+        return ['id' => 'level-1', 'name' => 'Begin', 'level' => 1, 'slug' => 'begin', 'icon' => 'fa-seedling', 'color' => 'text-gray-500', 'description' => 'Her yolculuk bir adımla başlar. Burada beklenti yok, sadece başlamak var.'];
     }
 
     /**

@@ -17,7 +17,7 @@ class CoreSettings {
         'read_blog'         => ['points' => 10, 'limit' => 5,  'label' => 'Makale Okuma'],
         'complete_workout'  => ['points' => 50, 'limit' => 1,  'label' => 'Antrenman Tamamlama'],
         'update_weight'     => ['points' => 20, 'limit' => 1,  'label' => 'Kilo Güncelleme'],
-        'join_clan'         => ['points' => 100,'limit' => 1,  'label' => 'Klana Katılma'],
+        'join_circle'       => ['points' => 100,'limit' => 1,  'label' => 'Circle\'a Katılma'],
         'invite_expert'     => ['points' => 50, 'limit' => 5,  'label' => 'Uzman Daveti'],
     ];
 
