@@ -37,6 +37,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php';
         // YENİ: Progress Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProgressController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProgressController.php';
+        // YENİ: Favorites Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/FavoritesController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/FavoritesController.php';
         // YENİ: Comment Sınıfları
         if (file_exists(REJIMDE_PATH . 'includes/Core/CommentMeta.php')) require_once REJIMDE_PATH . 'includes/Core/CommentMeta.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CommentController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CommentController.php';
@@ -83,6 +85,7 @@ class Loader {
             // YENİ: Comment Routes
             if (class_exists('Rejimde\\Api\\V1\\CommentController')) (new \Rejimde\Api\V1\CommentController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\FavoritesController')) (new \Rejimde\Api\V1\FavoritesController())->register_routes();
         });
 
         // CPT Kayıtları

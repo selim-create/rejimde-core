@@ -52,10 +52,12 @@ class UserMeta {
             'services',        // Hizmetler
             'client_types',    // Danışan türü
             'consultation_types', // Online/Yüz yüze
+            'career_start_date',  // Mesleğe başlama tarihi
             
             // Lokasyon & İletişim
             'city',            // İl
             'district',        // İlçe
+            'country',         // Ülke
             'address',         // Açık adres
             'phone',
             'brand_name',      // Kurum adı
@@ -64,6 +66,8 @@ class UserMeta {
             'certificate_url', // Dosya URL
             'certificate_status', // pending, approved, rejected
             'is_verified',     // true/false (Genel onay)
+            'is_featured',     // Öne çıkarılmış mı
+            'last_online',     // Son online zamanı
             'rating',
             'score_impact'
         ];

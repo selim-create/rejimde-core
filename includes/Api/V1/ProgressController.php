@@ -48,6 +48,27 @@ class ProgressController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_auth'],
         ]);
 
+        // POST /rejimde/v1/progress/{content_type}/{content_id}/complete-item - Complete individual item
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<content_type>[a-z]+)/(?P<content_id>\d+)/complete-item', [
+            'methods' => 'POST',
+            'callback' => [$this, 'complete_item'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        // POST /rejimde/v1/progress/blog/{content_id}/claim - Claim blog reading reward
+        register_rest_route($this->namespace, '/' . $this->base . '/blog/(?P<content_id>\d+)/claim', [
+            'methods' => 'POST',
+            'callback' => [$this, 'claim_blog_reward'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        // POST /rejimde/v1/progress/calculator/{calculator_type}/save - Save calculator result
+        register_rest_route($this->namespace, '/' . $this->base . '/calculator/(?P<calculator_type>[a-z_]+)/save', [
+            'methods' => 'POST',
+            'callback' => [$this, 'save_calculator_result'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
         // POST /rejimde/v1/progress/{content_type}/{content_id}/claim-reward - Claim reward
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<content_type>[a-z]+)/(?P<content_id>\d+)/claim-reward', [
             'methods' => 'POST',
@@ -282,6 +303,14 @@ class ProgressController extends WP_REST_Controller {
             ]);
         }
 
+        // Post meta'ya da kaydet (başlayanlar listesi için)
+        $started_users = get_post_meta($content_id, 'started_users', true);
+        if (!is_array($started_users)) $started_users = [];
+        if (!in_array($user_id, $started_users)) {
+            $started_users[] = $user_id;
+            update_post_meta($content_id, 'started_users', $started_users);
+        }
+
         return $this->success([
             'message' => 'Content marked as started',
             'content_type' => $content_type,
@@ -342,6 +371,14 @@ class ProgressController extends WP_REST_Controller {
                 'started_at' => current_time('mysql'),
                 'completed_at' => current_time('mysql')
             ]);
+        }
+
+        // Post meta'ya da kaydet (tamamlayanlar listesi için)
+        $completed_users = get_post_meta($content_id, 'completed_users', true);
+        if (!is_array($completed_users)) $completed_users = [];
+        if (!in_array($user_id, $completed_users)) {
+            $completed_users[] = $user_id;
+            update_post_meta($content_id, 'completed_users', $completed_users);
         }
 
         return $this->success([
@@ -480,5 +517,150 @@ class ProgressController extends WP_REST_Controller {
             'message' => $message,
             'error_data' => $data
         ], $code);
+    }
+
+    /**
+     * POST /rejimde/v1/progress/{content_type}/{content_id}/complete-item
+     * Complete individual item (meal, exercise day, etc.)
+     */
+    public function complete_item($request) {
+        $content_type = $request['content_type'];
+        $content_id = (int) $request['content_id'];
+        $user_id = get_current_user_id();
+        $params = $request->get_json_params();
+        $item_id = sanitize_text_field($params['item_id'] ?? '');
+
+        if (empty($item_id)) {
+            return new WP_Error('missing_item', 'Öğe ID gerekli', ['status' => 400]);
+        }
+
+        if (!$this->validate_content_type($content_type)) {
+            return $this->error('Invalid content_type. Allowed values: ' . implode(', ', $this->allowed_content_types), 400);
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_user_progress';
+
+        // Get existing progress
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, progress_data, is_started FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+            $user_id, $content_type, $content_id
+        ));
+
+        if (!$existing || !$existing->is_started) {
+            return new WP_Error('not_started', 'Önce başlamalısınız', ['status' => 400]);
+        }
+
+        $progress_data = json_decode($existing->progress_data ?: '{}', true);
+        if (!isset($progress_data['completed_items'])) {
+            $progress_data['completed_items'] = [];
+        }
+
+        if (!in_array($item_id, $progress_data['completed_items'])) {
+            $progress_data['completed_items'][] = $item_id;
+            
+            $wpdb->update(
+                $table,
+                ['progress_data' => json_encode($progress_data)],
+                ['id' => $existing->id]
+            );
+        }
+
+        return $this->success([
+            'message' => 'Öğe tamamlandı!',
+            'completed_items' => $progress_data['completed_items']
+        ]);
+    }
+
+    /**
+     * POST /rejimde/v1/progress/blog/{content_id}/claim
+     * Claim blog reading reward
+     */
+    public function claim_blog_reward($request) {
+        $user_id = get_current_user_id();
+        $content_id = (int) $request->get_param('content_id');
+
+        $meta_key = "rejimde_blog_read_{$content_id}";
+        $existing = get_user_meta($user_id, $meta_key, true);
+
+        if ($existing && isset($existing['reward_claimed']) && $existing['reward_claimed']) {
+            return $this->success([
+                'already_claimed' => true,
+                'message' => 'Bu yazının puanını zaten aldınız!'
+            ]);
+        }
+
+        // Sticky mi kontrol et
+        $is_sticky = is_sticky($content_id);
+        $score_reward = $is_sticky ? 50 : 10;
+
+        // Puanı ekle
+        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+        $new_total = $current_total + $score_reward;
+        update_user_meta($user_id, 'rejimde_total_score', $new_total);
+
+        // Kaydet
+        $read_data = [
+            'read_at' => current_time('mysql'),
+            'reward_claimed' => true,
+            'reward_amount' => $score_reward
+        ];
+        update_user_meta($user_id, $meta_key, $read_data);
+
+        // Okuyanlar listesine ekle
+        $readers = get_post_meta($content_id, 'rejimde_readers', true);
+        if (!is_array($readers)) $readers = [];
+        if (!in_array($user_id, $readers)) {
+            $readers[] = $user_id;
+            update_post_meta($content_id, 'rejimde_readers', $readers);
+        }
+
+        return $this->success([
+            'message' => 'Puanını kaptın! 🎉',
+            'earned_points' => $score_reward,
+            'new_total' => $new_total,
+            'is_sticky' => $is_sticky
+        ]);
+    }
+
+    /**
+     * POST /rejimde/v1/progress/calculator/{calculator_type}/save
+     * Save calculator result
+     */
+    public function save_calculator_result($request) {
+        $user_id = get_current_user_id();
+        $calculator_type = $request->get_param('calculator_type');
+        $params = $request->get_json_params();
+
+        $meta_key = "rejimde_calculator_{$calculator_type}";
+        $existing = get_user_meta($user_id, $meta_key, true);
+
+        if ($existing && isset($existing['saved']) && $existing['saved']) {
+            return $this->success([
+                'already_saved' => true,
+                'message' => 'Bu hesaplamayı zaten kaydettin!'
+            ]);
+        }
+
+        // Sonucu kaydet
+        $result_data = [
+            'saved' => true,
+            'saved_at' => current_time('mysql'),
+            'result' => $params['result'] ?? null,
+            'reward_claimed' => true
+        ];
+
+        // +50 puan ver
+        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+        $new_total = $current_total + 50;
+        update_user_meta($user_id, 'rejimde_total_score', $new_total);
+
+        update_user_meta($user_id, $meta_key, $result_data);
+
+        return $this->success([
+            'message' => 'Sonuç kaydedildi, 50 puan kazandın! 🎉',
+            'earned_points' => 50,
+            'new_total' => $new_total
+        ]);
     }
 }
