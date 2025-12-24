@@ -182,6 +182,24 @@ class ExerciseController extends WP_REST_Controller {
         
         $author_id = $post->post_author;
         $author_user = get_userdata($author_id);
+
+        // Onaylayan Uzmanlar (Çoklu)
+        $approved_by_users = get_post_meta($post_id, 'approved_by_users', true);
+        $approvers = [];
+        if (is_array($approved_by_users)) {
+            foreach ($approved_by_users as $approver_id) {
+                $approver = get_userdata($approver_id);
+                if ($approver) {
+                    $approvers[] = [
+                        'id' => $approver_id,
+                        'name' => $approver->display_name,
+                        'avatar' => get_user_meta($approver_id, 'avatar_url', true) ?: get_avatar_url($approver_id),
+                        'slug' => $approver->user_nicename,
+                        'profession' => get_user_meta($approver_id, 'profession', true)
+                    ];
+                }
+            }
+        }
         
         $data = [
             'id' => $post->ID,
@@ -206,6 +224,7 @@ class ExerciseController extends WP_REST_Controller {
                 'slug' => $author_user->user_nicename,
                 'is_expert' => in_array('rejimde_pro', (array) $author_user->roles) || in_array('administrator', (array) $author_user->roles)
             ],
+            'approvers' => $approvers,
             'date' => get_the_date('d F Y', $post_id)
         ];
 
@@ -213,13 +232,50 @@ class ExerciseController extends WP_REST_Controller {
     }
 
     public function approve_plan($request) {
-        update_post_meta($request['id'], 'is_verified', true);
-        update_post_meta($request['id'], 'approved_by', get_current_user_id());
-        return $this->success(['message' => 'Onaylandı.']);
+        $post_id = (int) $request['id'];
+        $user_id = get_current_user_id();
+        
+        // Mevcut onaylayanları al
+        $approvers = get_post_meta($post_id, 'approved_by_users', true);
+        if (!is_array($approvers)) {
+            $approvers = [];
+        }
+        
+        // Zaten onaylamış mı?
+        if (in_array($user_id, $approvers)) {
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Bu içeriği zaten onayladınız.'
+            ], 400);
+        }
+        
+        // Yeni onay ekle
+        $approvers[] = $user_id;
+        update_post_meta($post_id, 'approved_by_users', $approvers);
+        
+        // İlk onayda is_verified'ı true yap (gelecekte minimum onay sayısı artırılabilir)
+        if (count($approvers) >= 1) {
+            update_post_meta($post_id, 'is_verified', true);
+            update_post_meta($post_id, 'approved_by', $user_id); // Geriye uyumluluk
+            update_post_meta($post_id, 'approval_date', current_time('mysql'));
+        }
+        
+        return $this->success([
+            'message' => 'Onayınız kaydedildi.',
+            'approver_count' => count($approvers),
+            'is_verified' => true
+        ]);
     }
 
     public function check_permission() { return current_user_can('edit_posts'); }
-    public function check_expert_permission() { return current_user_can('edit_others_posts'); }
+    public function check_expert_permission() { 
+        if (!is_user_logged_in()) {
+            return false;
+        }
+        $user = wp_get_current_user();
+        $allowed_roles = ['administrator', 'editor', 'rejimde_pro'];
+        return !empty(array_intersect($allowed_roles, (array) $user->roles));
+    }
     
     protected function success($data) {
         return new WP_REST_Response(['status' => 'success', 'data' => $data], 200);

@@ -68,6 +68,14 @@ class ProfileController extends WP_REST_Controller {
             'is_expert' => $is_expert,
         ];
 
+        // Frontend uyumu için eksik alanlar
+        $profile_data['slug'] = $user->user_nicename;
+        $profile_data['name'] = $user->display_name;
+        $profile_data['description'] = $user->description ?: get_user_meta($user_id, 'description', true) ?: '';
+        $profile_data['registered_date'] = $user->user_registered;
+        $profile_data['location'] = get_user_meta($user_id, 'location', true) ?: '';
+        $profile_data['gender'] = get_user_meta($user_id, 'gender', true) ?: '';
+
         // Avatar
         $custom_avatar = get_user_meta($user_id, 'avatar_url', true);
         $profile_data['avatar_url'] = $custom_avatar ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_login);
@@ -95,6 +103,14 @@ class ProfileController extends WP_REST_Controller {
         $profile_data['total_score'] = (int) get_user_meta($user_id, 'rejimde_total_score', true) ?: 0;
         $profile_data['current_streak'] = (int) get_user_meta($user_id, 'current_streak', true) ?: 0;
 
+        // League bilgisi (Frontend bunu bekliyor)
+        $total_score = $profile_data['total_score'];
+        $profile_data['league'] = $this->calculate_league($total_score);
+
+        // Gamification alanlarını frontend'in beklediği isimlerle de dön
+        $profile_data['rejimde_level'] = $profile_data['level'];
+        $profile_data['rejimde_total_score'] = $profile_data['total_score'];
+
         // Social data
         $followers = get_user_meta($user_id, 'rejimde_followers', true);
         $profile_data['followers_count'] = is_array($followers) ? count($followers) : 0;
@@ -115,6 +131,7 @@ class ProfileController extends WP_REST_Controller {
         // Badges
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         $profile_data['earned_badges'] = is_array($earned_badges) ? array_map('intval', $earned_badges) : [];
+        $profile_data['rejimde_earned_badges'] = $profile_data['earned_badges'];
 
         // Clan info
         $clan_id = get_user_meta($user_id, 'clan_id', true);
@@ -225,5 +242,17 @@ class ProfileController extends WP_REST_Controller {
             'count' => $count + 1,
             'message' => 'Beşlik gönderildi! ✋'
         ], 200);
+    }
+
+    /**
+     * Calculate league based on score
+     */
+    private function calculate_league($score) {
+        if ($score >= 10000) return ['id' => 'diamond', 'name' => 'Elmas Lig', 'slug' => 'diamond', 'icon' => 'fa-gem', 'color' => 'text-purple-600'];
+        if ($score >= 5000) return ['id' => 'ruby', 'name' => 'Yakut Lig', 'slug' => 'ruby', 'icon' => 'fa-gem', 'color' => 'text-red-600'];
+        if ($score >= 2000) return ['id' => 'sapphire', 'name' => 'Safir Lig', 'slug' => 'sapphire', 'icon' => 'fa-gem', 'color' => 'text-blue-600'];
+        if ($score >= 1000) return ['id' => 'gold', 'name' => 'Altın Lig', 'slug' => 'gold', 'icon' => 'fa-crown', 'color' => 'text-yellow-600'];
+        if ($score >= 500) return ['id' => 'silver', 'name' => 'Gümüş Lig', 'slug' => 'silver', 'icon' => 'fa-medal', 'color' => 'text-slate-500'];
+        return ['id' => 'bronze', 'name' => 'Bronz Lig', 'slug' => 'bronze', 'icon' => 'fa-medal', 'color' => 'text-amber-700'];
     }
 }

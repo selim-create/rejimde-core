@@ -23,6 +23,8 @@ class UserMeta {
             'goals', 
             'notifications',
             'avatar_url',
+            'location',
+            'description',
 
             // Oyunlaştırma
             'rejimde_total_score', 
@@ -34,6 +36,9 @@ class UserMeta {
             'rejimde_followers', // Takipçi ID listesi
             'rejimde_following', // Takip edilen ID listesi
             'rejimde_high_fives', // Alınan beşlik sayısı
+            'followers_count',
+            'following_count',
+            'high_fives',
 
             // KLAN (YENİ)
             'clan_id',      // Kullanıcının üye olduğu klan ID'si
@@ -66,9 +71,21 @@ class UserMeta {
         foreach ($fields as $field) {
             register_rest_field('user', $field, [
                 'get_callback' => function ($user) use ($field) {
-                    return get_user_meta($user['id'], $field, true);
+                    $value = get_user_meta($user['id'], $field, true);
+                    // JSON alanları için decode
+                    if (in_array($field, ['goals', 'notifications', 'rejimde_earned_badges'])) {
+                        if (is_string($value)) {
+                            $decoded = json_decode($value, true);
+                            return $decoded !== null ? $decoded : $value;
+                        }
+                    }
+                    return $value;
                 },
                 'update_callback' => function ($value, $user, $field) {
+                    // JSON alanları için encode
+                    if (in_array($field, ['goals', 'notifications', 'rejimde_earned_badges']) && is_array($value)) {
+                        $value = json_encode($value);
+                    }
                     return update_user_meta($user->ID, $field, $value);
                 },
                 'schema' => [
@@ -78,6 +95,15 @@ class UserMeta {
                 ],
             ]);
         }
+
+        // Roles alanını da expose et
+        register_rest_field('user', 'roles', [
+            'get_callback' => function($user) {
+                $user_obj = get_userdata($user['id']);
+                return $user_obj ? (array) $user_obj->roles : [];
+            },
+            'schema' => ['type' => 'array', 'context' => ['view', 'edit']]
+        ]);
     }
 
     /**
