@@ -11,6 +11,13 @@ class BlogController extends WP_REST_Controller {
     protected $base = 'blog';
 
     public function register_routes() {
+        // Get blog post by slug
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<slug>[a-zA-Z0-9-]+)', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_item'],
+            'permission_callback' => '__return_true',
+        ]);
+
         // Oluşturma
         register_rest_route($this->namespace, '/' . $this->base . '/create', [
             'methods' => 'POST',
@@ -38,6 +45,78 @@ class BlogController extends WP_REST_Controller {
      */
     public function update_item($request) {
         return $this->handle_save($request, 'update');
+    }
+
+    /**
+     * GET BLOG POST BY SLUG
+     */
+    public function get_item($request) {
+        $slug = $request->get_param('slug');
+        
+        $posts = get_posts([
+            'name' => $slug,
+            'post_type' => 'post',
+            'post_status' => 'publish',
+            'numberposts' => 1
+        ]);
+
+        if (empty($posts)) {
+            return new WP_Error('not_found', 'Yazı bulunamadı.', ['status' => 404]);
+        }
+
+        $post = $posts[0];
+        $post_id = $post->ID;
+
+        // Yazar bilgisi
+        $author_id = $post->post_author;
+        $author_user = get_userdata($author_id);
+        $author_data = [
+            'id' => $author_id,
+            'name' => $author_user->display_name,
+            'avatar' => get_user_meta($author_id, 'avatar_url', true) ?: get_avatar_url($author_id),
+            'slug' => $author_user->user_nicename,
+            'is_expert' => in_array('rejimde_pro', (array) $author_user->roles) || in_array('administrator', (array) $author_user->roles)
+        ];
+
+        // Okuyanlar listesi (son 5)
+        $readers = get_post_meta($post_id, 'rejimde_readers', true);
+        $readers_info = [];
+        if (is_array($readers)) {
+            $count = 0;
+            foreach (array_reverse($readers) as $reader_id) {
+                if ($count >= 5) break;
+                $reader = get_userdata($reader_id);
+                if ($reader) {
+                    $readers_info[] = [
+                        'id' => $reader_id,
+                        'name' => $reader->display_name,
+                        'avatar' => get_user_meta($reader_id, 'avatar_url', true) ?: get_avatar_url($reader_id),
+                        'slug' => $reader->user_nicename
+                    ];
+                    $count++;
+                }
+            }
+        }
+
+        $data = [
+            'id' => $post->ID,
+            'title' => $post->post_title,
+            'content' => $post->post_content,
+            'excerpt' => $post->post_excerpt,
+            'slug' => $post->post_name,
+            'image' => get_the_post_thumbnail_url($post->ID, 'large') ?: '',
+            'date' => $post->post_date,
+            'author' => $author_data,
+            'readers' => $readers_info,
+            'readers_count' => is_array($readers) ? count($readers) : 0,
+            'is_sticky' => is_sticky($post_id),
+            'score_reward' => is_sticky($post_id) ? 50 : 10,
+            'comment_count' => (int) get_comments_number($post_id),
+            'categories' => wp_get_post_categories($post_id),
+            'tags' => wp_get_post_tags($post_id, ['fields' => 'names'])
+        ];
+
+        return $this->success($data);
     }
 
     /**
