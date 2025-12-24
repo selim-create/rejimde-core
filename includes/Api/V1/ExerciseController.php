@@ -253,7 +253,7 @@ class ExerciseController extends WP_REST_Controller {
         $approvers[] = $user_id;
         update_post_meta($post_id, 'approved_by_users', $approvers);
         
-        // İlk onayda is_verified'ı true yap
+        // İlk onayda is_verified'ı true yap (gelecekte minimum onay sayısı artırılabilir)
         if (count($approvers) >= 1) {
             update_post_meta($post_id, 'is_verified', true);
             update_post_meta($post_id, 'approved_by', $user_id); // Geriye uyumluluk

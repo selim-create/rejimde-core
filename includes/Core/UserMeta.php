@@ -83,7 +83,7 @@ class UserMeta {
                 },
                 'update_callback' => function ($value, $user, $field) {
                     // JSON alanları için encode
-                    if (in_array($field, ['goals', 'notifications']) && is_array($value)) {
+                    if (in_array($field, ['goals', 'notifications', 'rejimde_earned_badges']) && is_array($value)) {
                         $value = json_encode($value);
                     }
                     return update_user_meta($user->ID, $field, $value);

@@ -126,11 +126,12 @@ class GamificationController extends WP_REST_Controller {
      * PUANA GÖRE LİG HESAPLAMA (YARDIMCI)
      */
     private function calculate_league($score) {
-        if ($score >= 10000) return ['id' => 'diamond', 'name' => 'Elmas Lig', 'color' => 'from-blue-400 to-cyan-300'];
-        if ($score >= 5000) return ['id' => 'platinum', 'name' => 'Platin Lig', 'color' => 'from-slate-300 to-slate-100'];
-        if ($score >= 2000) return ['id' => 'gold', 'name' => 'Altın Lig', 'color' => 'from-yellow-400 to-yellow-200'];
-        if ($score >= 500) return ['id' => 'silver', 'name' => 'Gümüş Lig', 'color' => 'from-gray-400 to-gray-200'];
-        return ['id' => 'bronze', 'name' => 'Bronz Lig', 'color' => 'from-orange-400 to-orange-200'];
+        if ($score >= 10000) return ['id' => 'diamond', 'name' => 'Elmas Lig', 'slug' => 'diamond', 'icon' => 'fa-gem', 'color' => 'text-purple-600'];
+        if ($score >= 5000) return ['id' => 'ruby', 'name' => 'Yakut Lig', 'slug' => 'ruby', 'icon' => 'fa-gem', 'color' => 'text-red-600'];
+        if ($score >= 2000) return ['id' => 'sapphire', 'name' => 'Safir Lig', 'slug' => 'sapphire', 'icon' => 'fa-gem', 'color' => 'text-blue-600'];
+        if ($score >= 1000) return ['id' => 'gold', 'name' => 'Altın Lig', 'slug' => 'gold', 'icon' => 'fa-crown', 'color' => 'text-yellow-600'];
+        if ($score >= 500) return ['id' => 'silver', 'name' => 'Gümüş Lig', 'slug' => 'silver', 'icon' => 'fa-medal', 'color' => 'text-slate-500'];
+        return ['id' => 'bronze', 'name' => 'Bronz Lig', 'slug' => 'bronze', 'icon' => 'fa-medal', 'color' => 'text-amber-700'];
     }
 
     /**
