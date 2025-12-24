@@ -325,8 +325,12 @@ class PlanController extends WP_REST_Controller {
 
     public function check_permission() { return current_user_can('edit_posts'); }
     public function check_expert_permission() { 
+        if (!is_user_logged_in()) {
+            return false;
+        }
         $user = wp_get_current_user();
-        return in_array('rejimde_pro', (array) $user->roles) || in_array('administrator', (array) $user->roles);
+        $allowed_roles = ['administrator', 'editor', 'rejimde_pro'];
+        return !empty(array_intersect($allowed_roles, (array) $user->roles));
     }
     public function check_auth_permission() { return is_user_logged_in(); }
 

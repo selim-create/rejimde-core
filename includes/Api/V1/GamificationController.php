@@ -101,7 +101,7 @@ class GamificationController extends WP_REST_Controller {
                 'orderby' => 'meta_value_num',
                 'order' => 'DESC',
                 'number' => $limit,
-                'role__not_in' => ['administrator'], // Adminleri gizle
+                'role__not_in' => ['administrator', 'rejimde_pro'], // Pro kullanıcılar liglere katılmaz
                 'fields' => 'all_with_meta' // Performans için
             ]);
             
@@ -196,6 +196,13 @@ class GamificationController extends WP_REST_Controller {
 
     public function earn_points($request) {
         $user_id = get_current_user_id();
+        
+        // Pro kullanıcılar score kazanamaz
+        $user = wp_get_current_user();
+        if (in_array('rejimde_pro', (array) $user->roles)) {
+            return $this->error('Uzman hesaplar puan sistemi dışındadır.', 403);
+        }
+        
         $params = $request->get_json_params();
         $action = sanitize_text_field($params['action'] ?? '');
         $ref_id = isset($params['ref_id']) ? sanitize_text_field($params['ref_id']) : null;

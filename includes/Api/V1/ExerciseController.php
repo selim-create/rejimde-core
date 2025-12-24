@@ -219,7 +219,14 @@ class ExerciseController extends WP_REST_Controller {
     }
 
     public function check_permission() { return current_user_can('edit_posts'); }
-    public function check_expert_permission() { return current_user_can('edit_others_posts'); }
+    public function check_expert_permission() { 
+        if (!is_user_logged_in()) {
+            return false;
+        }
+        $user = wp_get_current_user();
+        $allowed_roles = ['administrator', 'editor', 'rejimde_pro'];
+        return !empty(array_intersect($allowed_roles, (array) $user->roles));
+    }
     
     protected function success($data) {
         return new WP_REST_Response(['status' => 'success', 'data' => $data], 200);
