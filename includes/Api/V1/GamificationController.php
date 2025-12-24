@@ -19,7 +19,7 @@ class GamificationController extends WP_REST_Controller {
             'read_blog'         => ['points' => 10, 'limit' => 5,  'label' => 'Makale Okuma'],
             'complete_workout'  => ['points' => 50, 'limit' => 1,  'label' => 'Antrenman'],
             'update_weight'     => ['points' => 50, 'limit' => 1,  'label' => 'Profil Güncelleme'],
-            'join_clan'         => ['points' => 100,'limit' => 1,  'label' => 'Klana Katılma'],
+            'join_circle'       => ['points' => 100,'limit' => 1,  'label' => 'Circle\'a Katılma'],
         ];
     }
 
@@ -61,8 +61,8 @@ class GamificationController extends WP_REST_Controller {
     }
 
     /**
-     * LİDERLİK TABLOSU VE LİGLER (YENİ)
-     * type=users (varsayılan) veya type=clans parametresi alır.
+     * LİDERLİK TABLOSU VE SEVİYELER (YENİ)
+     * type=users (varsayılan) veya type=circles parametresi alır.
      */
     public function get_leaderboard($request) {
         $type = $request->get_param('type') ?: 'users';
@@ -70,10 +70,10 @@ class GamificationController extends WP_REST_Controller {
         
         $data = [];
 
-        if ($type === 'clans') {
-            // --- KLAN SIRALAMASI ---
+        if ($type === 'circles') {
+            // --- CIRCLE SIRALAMASI ---
             $args = [
-                'post_type' => 'rejimde_clan',
+                'post_type' => 'rejimde_circle',
                 'posts_per_page' => $limit,
                 'post_status' => 'publish',
                 'meta_key' => 'total_score',
@@ -89,7 +89,7 @@ class GamificationController extends WP_REST_Controller {
                     'name' => $post->post_title,
                     'slug' => $post->post_name,
                     'score' => $score,
-                    'league' => $this->calculate_league($score), // Lig bilgisi
+                    'level' => $this->calculate_level($score), // Seviye bilgisi
                     'logo' => get_the_post_thumbnail_url($post->ID, 'thumbnail') ?: null
                 ];
             }
@@ -101,7 +101,7 @@ class GamificationController extends WP_REST_Controller {
                 'orderby' => 'meta_value_num',
                 'order' => 'DESC',
                 'number' => $limit,
-                'role__not_in' => ['administrator', 'rejimde_pro'], // Pro kullanıcılar liglere katılmaz
+                'role__not_in' => ['administrator', 'rejimde_pro'], // Pro kullanıcılar seviyelere katılmaz
                 'fields' => 'all_with_meta' // Performans için
             ]);
             
@@ -114,7 +114,7 @@ class GamificationController extends WP_REST_Controller {
                     'name' => $user->display_name ?: $user->user_login,
                     'avatar' => get_user_meta($user->ID, 'avatar_url', true),
                     'score' => $score,
-                    'league' => $this->calculate_league($score) // Lig bilgisi
+                    'level' => $this->calculate_level($score) // Seviye bilgisi
                 ];
             }
         }
@@ -123,15 +123,17 @@ class GamificationController extends WP_REST_Controller {
     }
 
     /**
-     * PUANA GÖRE LİG HESAPLAMA (YARDIMCI)
+     * PUANA GÖRE SEVİYE HESAPLAMA (YARDIMCI)
      */
-    private function calculate_league($score) {
-        if ($score >= 10000) return ['id' => 'diamond', 'name' => 'Elmas Lig', 'slug' => 'diamond', 'icon' => 'fa-gem', 'color' => 'text-purple-600'];
-        if ($score >= 5000) return ['id' => 'ruby', 'name' => 'Yakut Lig', 'slug' => 'ruby', 'icon' => 'fa-gem', 'color' => 'text-red-600'];
-        if ($score >= 2000) return ['id' => 'sapphire', 'name' => 'Safir Lig', 'slug' => 'sapphire', 'icon' => 'fa-gem', 'color' => 'text-blue-600'];
-        if ($score >= 1000) return ['id' => 'gold', 'name' => 'Altın Lig', 'slug' => 'gold', 'icon' => 'fa-crown', 'color' => 'text-yellow-600'];
-        if ($score >= 500) return ['id' => 'silver', 'name' => 'Gümüş Lig', 'slug' => 'silver', 'icon' => 'fa-medal', 'color' => 'text-slate-500'];
-        return ['id' => 'bronze', 'name' => 'Bronz Lig', 'slug' => 'bronze', 'icon' => 'fa-medal', 'color' => 'text-amber-700'];
+    private function calculate_level($score) {
+        if ($score >= 10000) return ['id' => 'level-8', 'name' => 'Transform', 'level' => 8, 'slug' => 'transform', 'icon' => 'fa-star', 'color' => 'text-purple-600', 'description' => 'Kalıcı değişim. Yeni bir denge, yeni bir sen.'];
+        if ($score >= 6000) return ['id' => 'level-7', 'name' => 'Mastery', 'level' => 7, 'slug' => 'mastery', 'icon' => 'fa-crown', 'color' => 'text-yellow-500', 'description' => 'Bilinçli seçimler yaparsın. Ne yaptığını ve neden yaptığını bilerek ilerlersin.'];
+        if ($score >= 4000) return ['id' => 'level-6', 'name' => 'Sustain', 'level' => 6, 'slug' => 'sustain', 'icon' => 'fa-infinity', 'color' => 'text-teal-500', 'description' => 'Bu bir rejim olmaktan çıkar, yaşam tarzına dönüşür. Devam etmek zor gelmez.'];
+        if ($score >= 2000) return ['id' => 'level-5', 'name' => 'Strengthen', 'level' => 5, 'slug' => 'strengthen', 'icon' => 'fa-dumbbell', 'color' => 'text-red-500', 'description' => 'Fiziksel ve zihinsel olarak güçlenme başlar. Gelişim artık net şekilde hissedilir.'];
+        if ($score >= 1000) return ['id' => 'level-4', 'name' => 'Balance', 'level' => 4, 'slug' => 'balance', 'icon' => 'fa-scale-balanced', 'color' => 'text-blue-500', 'description' => 'Beslenme, hareket ve zihin dengelenir. Kendini daha kontrollü ve rahat hissedersin.'];
+        if ($score >= 500) return ['id' => 'level-3', 'name' => 'Commit', 'level' => 3, 'slug' => 'commit', 'icon' => 'fa-check-circle', 'color' => 'text-green-500', 'description' => 'İstikrar burada doğar. Düzenli devam etmek artık bir tercih değil, alışkanlık.'];
+        if ($score >= 300) return ['id' => 'level-2', 'name' => 'Adapt', 'level' => 2, 'slug' => 'adapt', 'icon' => 'fa-sync', 'color' => 'text-orange-500', 'description' => 'Vücut ve zihin yeni rutine alışmaya başlar. Küçük değişimler büyük farklar yaratır.'];
+        return ['id' => 'level-1', 'name' => 'Begin', 'level' => 1, 'slug' => 'begin', 'icon' => 'fa-seedling', 'color' => 'text-gray-500', 'description' => 'Her yolculuk bir adımla başlar. Burada beklenti yok, sadece başlamak var.', 'points_required' => 200];
     }
 
     /**
@@ -151,8 +153,8 @@ class GamificationController extends WP_REST_Controller {
 
         $total_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
         
-        // Seviye yerine Lig bilgisini dönelim
-        $league = $this->calculate_league($total_score);
+        // Seviye bilgisini dönelim
+        $level = $this->calculate_level($total_score);
         
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
@@ -160,7 +162,7 @@ class GamificationController extends WP_REST_Controller {
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
-            'league' => $league, // Seviye yerine Lig
+            'level' => $level, // Seviye bilgisi
             'earned_badges' => $earned_badges
         ]);
     }
@@ -251,11 +253,11 @@ class GamificationController extends WP_REST_Controller {
         $new_total = $current_total + $rule['points'];
         update_user_meta($user_id, 'rejimde_total_score', $new_total);
         
-        // Eğer klanı varsa, klan puanını da artır
-        $clan_id = get_user_meta($user_id, 'clan_id', true);
-        if ($clan_id) {
-            $clan_score = (int) get_post_meta($clan_id, 'total_score', true);
-            update_post_meta($clan_id, 'total_score', $clan_score + $rule['points']);
+        // Eğer circle'ı varsa, circle puanını da artır
+        $circle_id = get_user_meta($user_id, 'circle_id', true);
+        if ($circle_id) {
+            $circle_score = (int) get_post_meta($circle_id, 'total_score', true);
+            update_post_meta($circle_id, 'total_score', $circle_score + $rule['points']);
         }
 
         return $this->success([

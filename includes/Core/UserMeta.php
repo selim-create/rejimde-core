@@ -40,9 +40,9 @@ class UserMeta {
             'following_count',
             'high_fives',
 
-            // KLAN (YENİ)
-            'clan_id',      // Kullanıcının üye olduğu klan ID'si
-            'clan_role',    // 'leader', 'member'
+            // CIRCLE (YENİ)
+            'circle_id',      // Kullanıcının üye olduğu circle ID'si
+            'circle_role',    // 'mentor', 'member'
             
             // Uzman (Pro)
             'profession',      // Meslek (dietitian, pt...)
@@ -150,15 +150,15 @@ class UserMeta {
         $data['is_expert'] = in_array('rejimde_pro', (array) $user->roles);
         $data['username'] = $user->user_login;
         
-        $clan_id = get_user_meta($user->ID, 'clan_id', true);
-        if ($clan_id) {
-            $clan = get_post($clan_id);
-            if ($clan && $clan->post_status === 'publish') {
-                $data['clan'] = [
-                    'id' => $clan->ID,
-                    'name' => $clan->post_title,
-                    'slug' => $clan->post_name,
-                    'logo' => get_post_meta($clan->ID, 'clan_logo_url', true)
+        $circle_id = get_user_meta($user->ID, 'circle_id', true);
+        if ($circle_id) {
+            $circle = get_post($circle_id);
+            if ($circle && $circle->post_status === 'publish') {
+                $data['circle'] = [
+                    'id' => $circle->ID,
+                    'name' => $circle->post_title,
+                    'slug' => $circle->post_name,
+                    'logo' => get_post_meta($circle->ID, 'circle_logo_url', true)
                 ];
             }
         }
