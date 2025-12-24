@@ -234,36 +234,54 @@ class ExerciseController extends WP_REST_Controller {
     public function approve_plan($request) {
         $post_id = (int) $request['id'];
         $user_id = get_current_user_id();
-        
+        $user = get_userdata($user_id);
+
+        // Yetki kontrolü
+        $roles = (array) $user->roles;
+        if (!in_array('rejimde_pro', $roles) && !in_array('administrator', $roles)) {
+            return new WP_Error('forbidden', 'Bu işlem için yetkiniz yok.', ['status' => 403]);
+        }
+
         // Mevcut onaylayanları al
-        $approvers = get_post_meta($post_id, 'approved_by_users', true);
-        if (!is_array($approvers)) {
-            $approvers = [];
+        $approved_by = get_post_meta($post_id, 'approved_by', true);
+        if (!is_array($approved_by)) {
+            // Eski format (tek kişi) - yeni formata çevir
+            $old_approver = $approved_by;
+            $approved_by = $old_approver ? [$old_approver] : [];
         }
-        
-        // Zaten onaylamış mı?
-        if (in_array($user_id, $approvers)) {
-            return new WP_REST_Response([
-                'status' => 'error',
-                'message' => 'Bu içeriği zaten onayladınız.'
-            ], 400);
+
+        // Bu uzman zaten onaylamış mı?
+        if (in_array($user_id, $approved_by)) {
+            return new WP_Error('already_approved', 'Bu içeriği zaten onayladınız.', ['status' => 400]);
         }
-        
-        // Yeni onay ekle
-        $approvers[] = $user_id;
-        update_post_meta($post_id, 'approved_by_users', $approvers);
-        
-        // İlk onayda is_verified'ı true yap (gelecekte minimum onay sayısı artırılabilir)
-        if (count($approvers) >= 1) {
-            update_post_meta($post_id, 'is_verified', true);
-            update_post_meta($post_id, 'approved_by', $user_id); // Geriye uyumluluk
-            update_post_meta($post_id, 'approval_date', current_time('mysql'));
+
+        // Onaylayanlara ekle
+        $approved_by[] = $user_id;
+        update_post_meta($post_id, 'approved_by', $approved_by);
+        update_post_meta($post_id, 'is_verified', true);
+
+        // Onaylayan bilgilerini hazırla
+        $approvers_info = [];
+        foreach ($approved_by as $approver_id) {
+            $approver = get_userdata($approver_id);
+            if ($approver) {
+                $approvers_info[] = [
+                    'id' => $approver_id,
+                    'name' => $approver->display_name,
+                    'avatar' => get_user_meta($approver_id, 'avatar_url', true) ?: get_avatar_url($approver_id),
+                    'slug' => $approver->user_nicename,
+                    'title' => get_user_meta($approver_id, 'title', true) ?: 'Uzman'
+                ];
+            }
         }
-        
+
+        // Geriye uyumluluk için approved_by_users meta'sını da güncelle
+        update_post_meta($post_id, 'approved_by_users', $approved_by);
+
         return $this->success([
-            'message' => 'Onayınız kaydedildi.',
-            'approver_count' => count($approvers),
-            'is_verified' => true
+            'message' => 'İçerik başarıyla onaylandı!',
+            'approved_by' => $approvers_info,
+            'approval_count' => count($approved_by)
         ]);
     }
 
