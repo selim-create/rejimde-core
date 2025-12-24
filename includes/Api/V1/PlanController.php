@@ -208,11 +208,39 @@ class PlanController extends WP_REST_Controller {
 
     // ... (approve, start, complete, get_item metodları aynı kalıyor) ...
     public function approve_plan($request) {
-        $post_id = $request['id'];
+        $post_id = (int) $request['id'];
         $user_id = get_current_user_id();
-        update_post_meta($post_id, 'is_verified', true);
-        update_post_meta($post_id, 'approved_by', $user_id);
-        return $this->success(['message' => 'Plan başarıyla onaylandı.']);
+        
+        // Mevcut onaylayanları al
+        $approvers = get_post_meta($post_id, 'approved_by_users', true);
+        if (!is_array($approvers)) {
+            $approvers = [];
+        }
+        
+        // Zaten onaylamış mı?
+        if (in_array($user_id, $approvers)) {
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Bu içeriği zaten onayladınız.'
+            ], 400);
+        }
+        
+        // Yeni onay ekle
+        $approvers[] = $user_id;
+        update_post_meta($post_id, 'approved_by_users', $approvers);
+        
+        // İlk onayda is_verified'ı true yap
+        if (count($approvers) >= 1) {
+            update_post_meta($post_id, 'is_verified', true);
+            update_post_meta($post_id, 'approved_by', $user_id); // Geriye uyumluluk
+            update_post_meta($post_id, 'approval_date', current_time('mysql'));
+        }
+        
+        return $this->success([
+            'message' => 'Onayınız kaydedildi.',
+            'approver_count' => count($approvers),
+            'is_verified' => true
+        ]);
     }
 
     public function start_plan($request) {
@@ -277,6 +305,24 @@ class PlanController extends WP_REST_Controller {
                 ];
             }
         }
+
+        // Onaylayan Uzmanlar (Çoklu)
+        $approved_by_users = get_post_meta($post_id, 'approved_by_users', true);
+        $approvers = [];
+        if (is_array($approved_by_users)) {
+            foreach ($approved_by_users as $approver_id) {
+                $approver = get_userdata($approver_id);
+                if ($approver) {
+                    $approvers[] = [
+                        'id' => $approver_id,
+                        'name' => $approver->display_name,
+                        'avatar' => get_user_meta($approver_id, 'avatar_url', true) ?: get_avatar_url($approver_id),
+                        'slug' => $approver->user_nicename,
+                        'profession' => get_user_meta($approver_id, 'profession', true)
+                    ];
+                }
+            }
+        }
         
         // Tamamlayan Kullanıcılar (Son 5 - Avatar için)
         $completed_users_ids = json_decode(get_post_meta($post_id, 'completed_users', true)) ?: [];
@@ -315,6 +361,7 @@ class PlanController extends WP_REST_Controller {
             ],
             'author' => $author_data,
             'approved_by' => $approved_by,
+            'approvers' => $approvers,
             'completed_users' => $completed_users,
             'completed_count' => count($completed_users_ids),
             'date' => get_the_date('d F Y', $post_id)
