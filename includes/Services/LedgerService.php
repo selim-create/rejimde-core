@@ -21,8 +21,17 @@ class LedgerService {
      * @return array|false Ledger entry or false on failure
      */
     public static function addPoints($user_id, $points, $reason, $event_id = null, $metadata = []) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'rejimde_points_ledger';
+        try {
+            // Check if tables exist
+            if (class_exists('Rejimde\\Utils\\DatabaseHelper')) {
+                if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
+                    error_log("Rejimde LedgerService: Tables not ready");
+                    return false;
+                }
+            }
+            
+            global $wpdb;
+            $table = $wpdb->prefix . 'rejimde_points_ledger';
         
         // Get current balance
         $current_balance = self::getBalance($user_id);
@@ -60,6 +69,10 @@ class LedgerService {
             'balance_after' => $new_balance,
             'created_at' => TimezoneHelper::formatForDB()
         ];
+        } catch (\Exception $e) {
+            error_log('LedgerService::addPoints error: ' . $e->getMessage());
+            return false;
+        }
     }
     
     /**
