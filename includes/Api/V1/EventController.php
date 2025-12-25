@@ -127,7 +127,7 @@ class EventController extends BaseController {
      * @param string $param Parameter name
      * @return bool True if valid, false otherwise
      */
-    public function validate_event_type($value, $request, $param) {
+    protected function validate_event_type($value, $request, $param) {
         // Type check - ensure value is a string
         if (!is_string($value)) {
             return false;
