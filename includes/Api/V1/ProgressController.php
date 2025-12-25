@@ -768,7 +768,7 @@ class ProgressController extends WP_REST_Controller {
         }
         
         // Use EventService to award points
-        $points_earned = 10;
+        $points_earned = 10; // Default points if EventService fails
         $new_total = 0;
         
         if (class_exists('Rejimde\\Services\\EventService')) {

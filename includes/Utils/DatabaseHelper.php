@@ -19,7 +19,7 @@ class DatabaseHelper {
     public static function tableExists($table_name) {
         global $wpdb;
         
-        // Cache kontrolü
+        // Check cache
         if (isset(self::$checked_tables[$table_name])) {
             return self::$checked_tables[$table_name];
         }
