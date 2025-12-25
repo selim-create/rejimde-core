@@ -24,6 +24,29 @@ class EventService {
      */
     public static function ingestEvent($user_id, $event_type, $entity_type = null, $entity_id = null, $metadata = [], $source = 'web') {
         try {
+            // Check if tables exist
+            if (class_exists('Rejimde\\Utils\\DatabaseHelper')) {
+                if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
+                    // Fallback: log to error_log and return graceful response
+                    error_log("Rejimde Gamification: Tables not ready, attempting to create...");
+                    \Rejimde\Utils\DatabaseHelper::ensureTablesExist();
+                    
+                    // Recheck
+                    if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
+                        return [
+                            'status' => 'error',
+                            'event_id' => 0,
+                            'awarded_points_total' => 0,
+                            'awarded_ledger_items' => [],
+                            'messages' => ['Sistem henüz hazır değil. Lütfen daha sonra tekrar deneyin.'],
+                            'daily_remaining' => null,
+                            'current_balance' => 0,
+                            'code' => 503
+                        ];
+                    }
+                }
+            }
+            
             global $wpdb;
             $events_table = $wpdb->prefix . 'rejimde_events';
             
@@ -149,7 +172,12 @@ class EventService {
             error_log('EventService::ingestEvent error: ' . $e->getMessage());
             return [
                 'status' => 'error',
-                'message' => 'Event işlenirken hata oluştu.',
+                'event_id' => 0,
+                'awarded_points_total' => 0,
+                'awarded_ledger_items' => [],
+                'messages' => ['Bir hata oluştu. Lütfen tekrar deneyin.'],
+                'daily_remaining' => null,
+                'current_balance' => 0,
                 'code' => 500
             ];
         }

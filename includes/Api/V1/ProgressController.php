@@ -313,22 +313,27 @@ class ProgressController extends WP_REST_Controller {
         
         // Log event to gamification system
         if (class_exists('Rejimde\\Services\\EventService')) {
-            $event_type = null;
-            if ($content_type === 'diet') {
-                $event_type = 'diet_started';
-            } elseif ($content_type === 'exercise') {
-                $event_type = 'exercise_started';
-            }
-            
-            if ($event_type) {
-                \Rejimde\Services\EventService::ingestEvent(
-                    $user_id,
-                    $event_type,
-                    $content_type,
-                    $content_id,
-                    [],
-                    'web'
-                );
+            try {
+                $event_type = null;
+                if ($content_type === 'diet') {
+                    $event_type = 'diet_started';
+                } elseif ($content_type === 'exercise') {
+                    $event_type = 'exercise_started';
+                }
+                
+                if ($event_type) {
+                    \Rejimde\Services\EventService::ingestEvent(
+                        $user_id,
+                        $event_type,
+                        $content_type,
+                        $content_id,
+                        [],
+                        'web'
+                    );
+                }
+            } catch (\Exception $e) {
+                error_log('ProgressController::start_content EventService error: ' . $e->getMessage());
+                // Continue execution even if event logging fails
             }
         }
 
@@ -404,38 +409,43 @@ class ProgressController extends WP_REST_Controller {
         
         // Log event to gamification system and get points from metadata
         if (class_exists('Rejimde\\Services\\EventService')) {
-            $event_type = null;
-            $metadata = [];
-            
-            if ($content_type === 'diet') {
-                $event_type = 'diet_completed';
-                // Try 'points' first, then 'score_reward', with default value
-                $points = get_post_meta($content_id, 'points', true);
-                if (!$points) {
-                    $points = get_post_meta($content_id, 'score_reward', true);
+            try {
+                $event_type = null;
+                $metadata = [];
+                
+                if ($content_type === 'diet') {
+                    $event_type = 'diet_completed';
+                    // Try 'points' first, then 'score_reward', with default value
+                    $points = get_post_meta($content_id, 'points', true);
+                    if (!$points) {
+                        $points = get_post_meta($content_id, 'score_reward', true);
+                    }
+                    // Set diet_points with default value if still empty
+                    $metadata['diet_points'] = $points ? (int) $points : 10;
+                } elseif ($content_type === 'exercise') {
+                    $event_type = 'exercise_completed';
+                    // Try 'points' first, then 'score_reward', with default value
+                    $points = get_post_meta($content_id, 'points', true);
+                    if (!$points) {
+                        $points = get_post_meta($content_id, 'score_reward', true);
+                    }
+                    // Set exercise_points with default value if still empty
+                    $metadata['exercise_points'] = $points ? (int) $points : 10;
                 }
-                // Set diet_points with default value if still empty
-                $metadata['diet_points'] = $points ? (int) $points : 10;
-            } elseif ($content_type === 'exercise') {
-                $event_type = 'exercise_completed';
-                // Try 'points' first, then 'score_reward', with default value
-                $points = get_post_meta($content_id, 'points', true);
-                if (!$points) {
-                    $points = get_post_meta($content_id, 'score_reward', true);
+                
+                if ($event_type) {
+                    \Rejimde\Services\EventService::ingestEvent(
+                        $user_id,
+                        $event_type,
+                        $content_type,
+                        $content_id,
+                        $metadata,
+                        'web'
+                    );
                 }
-                // Set exercise_points with default value if still empty
-                $metadata['exercise_points'] = $points ? (int) $points : 10;
-            }
-            
-            if ($event_type) {
-                \Rejimde\Services\EventService::ingestEvent(
-                    $user_id,
-                    $event_type,
-                    $content_type,
-                    $content_id,
-                    $metadata,
-                    'web'
-                );
+            } catch (\Exception $e) {
+                error_log('ProgressController::complete_content EventService error: ' . $e->getMessage());
+                // Continue execution even if event logging fails
             }
         }
 
@@ -663,25 +673,45 @@ class ProgressController extends WP_REST_Controller {
             $new_total = 0;
             
             if (class_exists('Rejimde\\Services\\EventService')) {
-                $result = \Rejimde\Services\EventService::ingestEvent(
-                    $user_id,
-                    'blog_points_claimed',
-                    'blog',
-                    $content_id,
-                    ['is_sticky' => $is_sticky],
-                    'web'
-                );
-                
-                // If duplicate, return already claimed
-                if (isset($result['status']) && $result['status'] === 'duplicate') {
-                    return $this->success([
-                        'already_claimed' => true,
-                        'message' => 'Bu yazının puanını zaten aldınız!'
-                    ]);
+                try {
+                    $result = \Rejimde\Services\EventService::ingestEvent(
+                        $user_id,
+                        'blog_points_claimed',
+                        'blog',
+                        $content_id,
+                        ['is_sticky' => $is_sticky],
+                        'web'
+                    );
+                    
+                    // If duplicate, return already claimed
+                    if (isset($result['status']) && $result['status'] === 'duplicate') {
+                        return $this->success([
+                            'already_claimed' => true,
+                            'message' => 'Bu yazının puanını zaten aldınız!'
+                        ]);
+                    }
+                    
+                    // Handle error response
+                    if (isset($result['status']) && $result['status'] === 'error') {
+                        // Log the error but continue with fallback
+                        error_log('ProgressController::claim_blog_reward EventService returned error: ' . json_encode($result));
+                        // Use fallback system below
+                        $score_reward = $is_sticky ? 50 : 10;
+                        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+                        $new_total = $current_total + $score_reward;
+                        update_user_meta($user_id, 'rejimde_total_score', $new_total);
+                    } else {
+                        $score_reward = $result['awarded_points_total'];
+                        $new_total = $result['current_balance'];
+                    }
+                } catch (\Exception $e) {
+                    error_log('ProgressController::claim_blog_reward EventService exception: ' . $e->getMessage());
+                    // Fallback to old system
+                    $score_reward = $is_sticky ? 50 : 10;
+                    $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+                    $new_total = $current_total + $score_reward;
+                    update_user_meta($user_id, 'rejimde_total_score', $new_total);
                 }
-                
-                $score_reward = $result['awarded_points_total'];
-                $new_total = $result['current_balance'];
             } else {
                 // Fallback to old system
                 $score_reward = $is_sticky ? 50 : 10;
@@ -738,29 +768,47 @@ class ProgressController extends WP_REST_Controller {
         }
         
         // Use EventService to award points
-        $points_earned = 10;
+        $points_earned = 10; // Default points if EventService fails
         $new_total = 0;
         
         if (class_exists('Rejimde\\Services\\EventService')) {
-            $result = \Rejimde\Services\EventService::ingestEvent(
-                $user_id,
-                'calculator_saved',
-                'calculator',
-                null,
-                ['calculator_type' => $calculator_type],
-                'web'
-            );
-            
-            // If duplicate, return already saved
-            if (isset($result['status']) && $result['status'] === 'duplicate') {
-                return $this->success([
-                    'already_saved' => true,
-                    'message' => 'Bu hesaplamayı zaten kaydettin!'
-                ]);
+            try {
+                $result = \Rejimde\Services\EventService::ingestEvent(
+                    $user_id,
+                    'calculator_saved',
+                    'calculator',
+                    null,
+                    ['calculator_type' => $calculator_type],
+                    'web'
+                );
+                
+                // If duplicate, return already saved
+                if (isset($result['status']) && $result['status'] === 'duplicate') {
+                    return $this->success([
+                        'already_saved' => true,
+                        'message' => 'Bu hesaplamayı zaten kaydettin!'
+                    ]);
+                }
+                
+                // Handle error response
+                if (isset($result['status']) && $result['status'] === 'error') {
+                    // Log the error but continue with fallback
+                    error_log('ProgressController::save_calculator_result EventService returned error: ' . json_encode($result));
+                    // Use fallback system below
+                    $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+                    $new_total = $current_total + $points_earned;
+                    update_user_meta($user_id, 'rejimde_total_score', $new_total);
+                } else {
+                    $points_earned = $result['awarded_points_total'];
+                    $new_total = $result['current_balance'];
+                }
+            } catch (\Exception $e) {
+                error_log('ProgressController::save_calculator_result EventService exception: ' . $e->getMessage());
+                // Fallback to old system
+                $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+                $new_total = $current_total + $points_earned;
+                update_user_meta($user_id, 'rejimde_total_score', $new_total);
             }
-            
-            $points_earned = $result['awarded_points_total'];
-            $new_total = $result['current_balance'];
         } else {
             // Fallback to old system
             $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);

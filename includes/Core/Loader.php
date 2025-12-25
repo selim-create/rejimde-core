@@ -23,6 +23,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Utils/TimezoneHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/TimezoneHelper.php';
         if (file_exists(REJIMDE_PATH . 'includes/Utils/IdempotencyHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/IdempotencyHelper.php';
         if (file_exists(REJIMDE_PATH . 'includes/Utils/ConfigHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/ConfigHelper.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Utils/DatabaseHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/DatabaseHelper.php';
         
         // Services
         if (file_exists(REJIMDE_PATH . 'includes/Services/OpenAIService.php')) require_once REJIMDE_PATH . 'includes/Services/OpenAIService.php';
