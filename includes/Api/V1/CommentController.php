@@ -392,7 +392,7 @@ class CommentController extends WP_REST_Controller {
             $author_details['is_expert'] = $is_expert;
             $is_verified_meta = get_user_meta($user_id, 'is_verified_expert', true);
             $author_details['is_verified'] = ($is_verified_meta !== '') ? (bool) $is_verified_meta : $is_expert;
-            $author_details['level'] = get_user_meta($user_id, 'rejimde_level', true) ?: 1;
+            $author_details['rank'] = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
             $author_details['score'] = (int) get_user_meta($user_id, 'rejimde_total_score', true);
             $author_details['slug'] = $user_meta ? $user_meta->user_nicename : '';
         } else {

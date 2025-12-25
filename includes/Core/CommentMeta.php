@@ -53,7 +53,7 @@ class CommentMeta {
             'username' => '',
             'is_expert' => false,
             'role_label' => 'ANONIM',
-            'level' => 0,
+            'rank' => 0,
             'score' => 0,
             'title' => '',
             'avatar' => 'https://api.dicebear.com/9.x/personas/svg?seed=anonymous',
@@ -67,7 +67,7 @@ class CommentMeta {
             'username' => '',
             'is_expert' => false,
             'role_label' => 'SİLİNDİ',
-            'level' => 0,
+            'rank' => 0,
             'score' => 0,
             'title' => '',
             'avatar' => 'https://api.dicebear.com/9.x/personas/svg?seed=deleted',
@@ -103,7 +103,7 @@ class CommentMeta {
             'username' => $user->user_login,
             'is_expert' => $is_expert,
             'role_label' => $is_expert ? 'UZMAN' : 'ÜYE',
-            'level' => (int) get_user_meta($user_id, 'rejimde_level', true) ?: 1,
+            'rank' => (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1,
             'score' => $score ?: 0,
             'title' => get_user_meta($user_id, 'title', true) ?: '', // Dyt., Pt. vb.
             'avatar' => get_user_meta($user_id, 'avatar_url', true) 

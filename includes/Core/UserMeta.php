@@ -28,7 +28,7 @@ class UserMeta {
 
             // Oyunlaştırma
             'rejimde_total_score', 
-            'rejimde_level',       
+            'rejimde_rank',       
             'current_streak',
             'rejimde_earned_badges', // Rozetler (Array)
 

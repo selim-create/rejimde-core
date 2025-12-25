@@ -114,7 +114,8 @@ class GamificationController extends WP_REST_Controller {
                     'name' => $user->display_name ?: $user->user_login,
                     'avatar' => get_user_meta($user->ID, 'avatar_url', true),
                     'score' => $score,
-                    'level' => $this->calculate_level($score) // Seviye bilgisi
+                    'rank' => (int) get_user_meta($user->ID, 'rejimde_rank', true) ?: 1, // Kullanıcı rank'ı
+                    'level' => $this->calculate_level($score) // Puan bazlı level
                 ];
             }
         }
@@ -126,14 +127,94 @@ class GamificationController extends WP_REST_Controller {
      * PUANA GÖRE SEVİYE HESAPLAMA (YARDIMCI)
      */
     private function calculate_level($score) {
-        if ($score >= 10000) return ['id' => 'level-8', 'name' => 'Transform', 'level' => 8, 'slug' => 'transform', 'icon' => 'fa-star', 'color' => 'text-purple-600', 'description' => 'Kalıcı değişim. Yeni bir denge, yeni bir sen.'];
-        if ($score >= 6000) return ['id' => 'level-7', 'name' => 'Mastery', 'level' => 7, 'slug' => 'mastery', 'icon' => 'fa-crown', 'color' => 'text-yellow-500', 'description' => 'Bilinçli seçimler yaparsın. Ne yaptığını ve neden yaptığını bilerek ilerlersin.'];
-        if ($score >= 4000) return ['id' => 'level-6', 'name' => 'Sustain', 'level' => 6, 'slug' => 'sustain', 'icon' => 'fa-infinity', 'color' => 'text-teal-500', 'description' => 'Bu bir rejim olmaktan çıkar, yaşam tarzına dönüşür. Devam etmek zor gelmez.'];
-        if ($score >= 2000) return ['id' => 'level-5', 'name' => 'Strengthen', 'level' => 5, 'slug' => 'strengthen', 'icon' => 'fa-dumbbell', 'color' => 'text-red-500', 'description' => 'Fiziksel ve zihinsel olarak güçlenme başlar. Gelişim artık net şekilde hissedilir.'];
-        if ($score >= 1000) return ['id' => 'level-4', 'name' => 'Balance', 'level' => 4, 'slug' => 'balance', 'icon' => 'fa-scale-balanced', 'color' => 'text-blue-500', 'description' => 'Beslenme, hareket ve zihin dengelenir. Kendini daha kontrollü ve rahat hissedersin.'];
-        if ($score >= 500) return ['id' => 'level-3', 'name' => 'Commit', 'level' => 3, 'slug' => 'commit', 'icon' => 'fa-check-circle', 'color' => 'text-green-500', 'description' => 'İstikrar burada doğar. Düzenli devam etmek artık bir tercih değil, alışkanlık.'];
-        if ($score >= 300) return ['id' => 'level-2', 'name' => 'Adapt', 'level' => 2, 'slug' => 'adapt', 'icon' => 'fa-sync', 'color' => 'text-orange-500', 'description' => 'Vücut ve zihin yeni rutine alışmaya başlar. Küçük değişimler büyük farklar yaratır.'];
-        return ['id' => 'level-1', 'name' => 'Begin', 'level' => 1, 'slug' => 'begin', 'icon' => 'fa-seedling', 'color' => 'text-gray-500', 'description' => 'Her yolculuk bir adımla başlar. Burada beklenti yok, sadece başlamak var.'];
+        if ($score >= 6000) return [
+            'id' => 'level-8', 
+            'name' => 'Transform', 
+            'level' => 8, 
+            'slug' => 'transform', 
+            'icon' => 'fa-star', 
+            'color' => 'text-purple-600', 
+            'description' => 'Kalıcı değişim. Yeni bir denge, yeni bir sen.',
+            'min' => 6000,
+            'max' => 10000
+        ];
+        if ($score >= 4000) return [
+            'id' => 'level-7', 
+            'name' => 'Mastery', 
+            'level' => 7, 
+            'slug' => 'mastery', 
+            'icon' => 'fa-crown', 
+            'color' => 'text-yellow-500', 
+            'description' => 'Bilinçli seçimler yaparsın. Ne yaptığını ve neden yaptığını bilerek ilerlersin.',
+            'min' => 4000,
+            'max' => 6000
+        ];
+        if ($score >= 2000) return [
+            'id' => 'level-6', 
+            'name' => 'Sustain', 
+            'level' => 6, 
+            'slug' => 'sustain', 
+            'icon' => 'fa-infinity', 
+            'color' => 'text-teal-500', 
+            'description' => 'Bu bir rejim olmaktan çıkar, yaşam tarzına dönüşür. Devam etmek zor gelmez.',
+            'min' => 2000,
+            'max' => 4000
+        ];
+        if ($score >= 1000) return [
+            'id' => 'level-5', 
+            'name' => 'Strengthen', 
+            'level' => 5, 
+            'slug' => 'strengthen', 
+            'icon' => 'fa-dumbbell', 
+            'color' => 'text-red-500', 
+            'description' => 'Fiziksel ve zihinsel olarak güçlenme başlar. Gelişim artık net şekilde hissedilir.',
+            'min' => 1000,
+            'max' => 2000
+        ];
+        if ($score >= 500) return [
+            'id' => 'level-4', 
+            'name' => 'Balance', 
+            'level' => 4, 
+            'slug' => 'balance', 
+            'icon' => 'fa-scale-balanced', 
+            'color' => 'text-blue-500', 
+            'description' => 'Beslenme, hareket ve zihin dengelenir. Kendini daha kontrollü ve rahat hissedersin.',
+            'min' => 500,
+            'max' => 1000
+        ];
+        if ($score >= 300) return [
+            'id' => 'level-3', 
+            'name' => 'Commit', 
+            'level' => 3, 
+            'slug' => 'commit', 
+            'icon' => 'fa-check-circle', 
+            'color' => 'text-green-500', 
+            'description' => 'İstikrar burada doğar. Düzenli devam etmek artık bir tercih değil, alışkanlık.',
+            'min' => 300,
+            'max' => 500
+        ];
+        if ($score >= 200) return [
+            'id' => 'level-2', 
+            'name' => 'Adapt', 
+            'level' => 2, 
+            'slug' => 'adapt', 
+            'icon' => 'fa-sync', 
+            'color' => 'text-orange-500', 
+            'description' => 'Vücut ve zihin yeni rutine alışmaya başlar. Küçük değişimler büyük farklar yaratır.',
+            'min' => 200,
+            'max' => 300
+        ];
+        return [
+            'id' => 'level-1', 
+            'name' => 'Begin', 
+            'level' => 1, 
+            'slug' => 'begin', 
+            'icon' => 'fa-seedling', 
+            'color' => 'text-gray-500', 
+            'description' => 'Her yolculuk bir adımla başlar. Burada beklenti yok, sadece başlamak var.',
+            'min' => 0,
+            'max' => 200
+        ];
     }
 
     /**
@@ -153,8 +234,11 @@ class GamificationController extends WP_REST_Controller {
 
         $total_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
         
-        // Seviye bilgisini dönelim
+        // Level bilgisini hesapla (puan bazlı)
         $level = $this->calculate_level($total_score);
+        
+        // Rank bilgisini al (kullanıcı deneyim seviyesi)
+        $rank = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
         
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
@@ -162,7 +246,8 @@ class GamificationController extends WP_REST_Controller {
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
-            'level' => $level, // Seviye bilgisi
+            'rank' => $rank,           // Kullanıcı deneyim seviyesi
+            'level' => $level,         // Puan bazlı level
             'earned_badges' => $earned_badges
         ]);
     }
