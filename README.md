@@ -74,7 +74,12 @@ Rejimde Core is a WordPress plugin that provides the foundational API and gamifi
 - `GET /rejimde/v1/gamification/leaderboard` - Rankings
 - `GET /rejimde/v1/gamification/streak` - Streak information
 - `GET /rejimde/v1/gamification/milestones` - User milestones
+- `POST /rejimde/v1/gamification/milestones/log` - Log milestone achievement
 - `GET /rejimde/v1/gamification/events` - Event history
+- `GET /rejimde/v1/gamification/circle-account` - Circle membership and contribution
+
+### Events
+- `POST /rejimde/v1/events/dispatch` - Dispatch event for gamification
 
 ### Progress
 - `GET /rejimde/v1/progress/{type}/{id}` - Get progress
