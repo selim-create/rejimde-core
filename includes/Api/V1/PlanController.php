@@ -161,7 +161,7 @@ class PlanController extends WP_REST_Controller {
             $author_avatar = get_avatar_url($author_id); // Varsayılan WP avatarı, frontendde dicebear fallback var
 
             $completed_users_raw = get_post_meta($post->ID, 'completed_users', true);
-            $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
+            $completed_users = $this->safe_json_decode($completed_users_raw);
             
             // Son 3 tamamlayan (avatar için)
             $last_completed_avatars = [];
@@ -278,12 +278,7 @@ class PlanController extends WP_REST_Controller {
         
         // Get started users list
         $started_users_raw = get_post_meta($post_id, 'started_users', true);
-        $started_users = $started_users_raw ? json_decode($started_users_raw, true) : [];
-        
-        // Ensure started_users is an array
-        if (!is_array($started_users)) {
-            $started_users = [];
-        }
+        $started_users = $this->safe_json_decode($started_users_raw);
         
         // Check if user already started
         $already_started = in_array($user_id, $started_users);
@@ -338,11 +333,7 @@ class PlanController extends WP_REST_Controller {
         
         // Verify user has started the plan
         $started_users_raw = get_post_meta($post_id, 'started_users', true);
-        $started_users = $started_users_raw ? json_decode($started_users_raw, true) : [];
-        
-        if (!is_array($started_users)) {
-            $started_users = [];
-        }
+        $started_users = $this->safe_json_decode($started_users_raw);
         
         if (!in_array($user_id, $started_users)) {
             return new WP_Error('plan_not_started', 'Bu planı tamamlamadan önce başlatmalısınız.', ['status' => 400]);
@@ -350,12 +341,7 @@ class PlanController extends WP_REST_Controller {
         
         // Get completed users list
         $completed_users_raw = get_post_meta($post_id, 'completed_users', true);
-        $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
-        
-        // Ensure completed_users is an array
-        if (!is_array($completed_users)) {
-            $completed_users = [];
-        }
+        $completed_users = $this->safe_json_decode($completed_users_raw);
         
         // Check if user already completed
         $already_completed = in_array($user_id, $completed_users);
@@ -452,7 +438,7 @@ class PlanController extends WP_REST_Controller {
         }
         
         // Tamamlayan Kullanıcılar (Son 5 - Avatar için)
-        $completed_users_ids = json_decode(get_post_meta($post_id, 'completed_users', true)) ?: [];
+        $completed_users_ids = $this->safe_json_decode(get_post_meta($post_id, 'completed_users', true));
         $completed_users = [];
         $count = 0;
         foreach (array_reverse($completed_users_ids) as $uid) {
@@ -507,6 +493,23 @@ class PlanController extends WP_REST_Controller {
         return !empty(array_intersect($allowed_roles, (array) $user->roles));
     }
     public function check_auth_permission() { return is_user_logged_in(); }
+
+    /**
+     * Safely decode JSON data that might already be an array
+     * 
+     * @param mixed $value The value to decode (can be string, array, or other)
+     * @return array Always returns an array
+     */
+    private function safe_json_decode($value) {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (is_string($value) && !empty($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return [];
+    }
 
     protected function success($data) {
         return new WP_REST_Response([
