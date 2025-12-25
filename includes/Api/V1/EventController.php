@@ -70,37 +70,57 @@ class EventController extends BaseController {
             return $this->error('event_type is required', 400);
         }
         
-        // Process event through EventService
-        $result = EventService::ingestEvent(
-            $user_id,
-            $event_type,
-            $entity_type,
-            $entity_id,
-            $metadata,
-            $source
-        );
-        
-        // Handle duplicate events
-        if (isset($result['status']) && $result['status'] === 'duplicate') {
-            return $this->error(
-                $result['message'],
-                $result['code'],
-                [
-                    'event_id' => $result['event_id'],
-                    'points_awarded' => $result['points_awarded']
-                ]
-            );
+        // Check if user can earn points
+        if (!$this->can_earn_points($user_id)) {
+            return $this->error('Uzmanlar puan kazanamaz', 403);
         }
         
-        // Return successful response
-        return $this->success([
-            'event_id' => $result['event_id'],
-            'event_type' => $result['event_type'],
-            'awarded_points_total' => $result['awarded_points_total'],
-            'awarded_ledger_items' => $result['awarded_ledger_items'],
-            'messages' => $result['messages'],
-            'daily_remaining' => $result['daily_remaining'],
-            'current_balance' => $result['current_balance']
-        ], 'Event processed successfully', 200);
+        // Process event through EventService with error handling
+        try {
+            $result = EventService::ingestEvent(
+                $user_id,
+                $event_type,
+                $entity_type,
+                $entity_id,
+                $metadata,
+                $source
+            );
+            
+            // Handle error responses from EventService
+            if (isset($result['status']) && $result['status'] === 'error') {
+                $error_message = !empty($result['messages']) ? $result['messages'][0] : 'Bir hata oluştu';
+                return $this->error(
+                    $error_message,
+                    $result['code'] ?? 500
+                );
+            }
+            
+            // Handle duplicate events
+            if (isset($result['status']) && $result['status'] === 'duplicate') {
+                return $this->error(
+                    $result['message'],
+                    $result['code'],
+                    [
+                        'event_id' => $result['event_id'],
+                        'points_awarded' => $result['points_awarded']
+                    ]
+                );
+            }
+            
+            // Return successful response
+            return $this->success([
+                'event_id' => $result['event_id'],
+                'event_type' => $result['event_type'],
+                'awarded_points_total' => $result['awarded_points_total'],
+                'awarded_ledger_items' => $result['awarded_ledger_items'],
+                'messages' => $result['messages'],
+                'daily_remaining' => $result['daily_remaining'],
+                'current_balance' => $result['current_balance']
+            ], 'Event processed successfully', 200);
+        } catch (\Throwable $e) {
+            error_log('EventController::submit_event exception: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return $this->error('Bir hata oluştu. Lütfen tekrar deneyin.', 500);
+        }
     }
 }

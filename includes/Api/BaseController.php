@@ -42,4 +42,33 @@ abstract class BaseController extends WP_REST_Controller {
         // Şimdilik basit user check
         return is_user_logged_in();
     }
+
+    /**
+     * Check if user can earn points
+     * rejimde_pro users cannot earn points, all other roles can
+     * 
+     * @param int|null $user_id User ID (null = current user)
+     * @return bool True if user can earn points, false otherwise
+     */
+    protected function can_earn_points($user_id = null) {
+        if ($user_id === null) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return false;
+        }
+        
+        $user = get_userdata($user_id);
+        if (!$user) {
+            return false;
+        }
+        
+        // rejimde_pro users cannot earn points
+        if (in_array('rejimde_pro', (array) $user->roles)) {
+            return false;
+        }
+        
+        return true;
+    }
 }
