@@ -688,24 +688,25 @@ class ProgressController extends WP_REST_Controller {
             return 0;
         }
 
-        // For diet and exercise, we could get total items from post meta
-        // For now, return a simple calculation based on completed items count
-        // This can be enhanced based on actual content structure
-        
         $total_items = 0;
         
-        if ($content_type === 'diet' || $content_type === 'exercise') {
-            // Try to get total items from post meta
-            $total_items = (int) get_post_meta($content_id, 'total_items', true);
-            
-            // Fallback: use default values from configuration
-            if ($total_items === 0) {
-                $total_items = $this->default_total_items[$content_type] ?? 0;
-            }
+        // Try to get total items from post meta for all content types
+        $total_items = (int) get_post_meta($content_id, 'total_items', true);
+        
+        // Fallback: use default values from configuration
+        if ($total_items === 0 && isset($this->default_total_items[$content_type])) {
+            $total_items = $this->default_total_items[$content_type];
         }
 
+        // Guard against division by zero and log potential configuration issue
         if ($total_items === 0) {
-            // Can't calculate, return 0
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf(
+                    'ProgressController: Unable to calculate progress percentage for %s #%d - total_items is 0',
+                    $content_type,
+                    $content_id
+                ));
+            }
             return 0;
         }
 
