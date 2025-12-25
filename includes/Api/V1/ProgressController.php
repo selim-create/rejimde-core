@@ -11,6 +11,22 @@ class ProgressController extends WP_REST_Controller {
     protected $base = 'progress';
     
     private $allowed_content_types = ['blog', 'diet', 'exercise', 'dictionary'];
+    
+    // Default total items for progress calculation
+    private $default_total_items = [
+        'diet' => 21,      // 7 days x 3 meals
+        'exercise' => 7,   // 7 days
+        'blog' => 1,       // Single item
+        'dictionary' => 1  // Single item
+    ];
+    
+    // Content type to plural mapping for structured responses
+    private $type_plural_map = [
+        'blog' => 'blogs',
+        'diet' => 'diets',
+        'exercise' => 'exercises',
+        'dictionary' => 'dictionary'
+    ];
 
     public function register_routes() {
         // GET /rejimde/v1/progress/my - Get all progress for current user
@@ -168,14 +184,8 @@ class ProgressController extends WP_REST_Controller {
             }
             
             // Merge completed items
-            $completed_items = is_array($existing_data['completed_items'] ?? []) 
-                ? $existing_data['completed_items'] 
-                : [];
-            
-            $new_items = is_array($params['completed_items']) 
-                ? $params['completed_items'] 
-                : [$params['completed_items']];
-                
+            $completed_items = $this->normalize_array($existing_data['completed_items'] ?? []);
+            $new_items = $this->normalize_array($params['completed_items']);
             $completed_items = array_unique(array_merge($completed_items, $new_items));
             
             $data['progress_data'] = json_encode([
@@ -313,10 +323,9 @@ class ProgressController extends WP_REST_Controller {
             
             // Add to appropriate group
             $type = $row->content_type;
-            if (isset($grouped[$type . 's'])) {
-                $grouped[$type . 's'][] = $item;
-            } elseif (isset($grouped[$type])) {
-                $grouped[$type][] = $item;
+            $plural_key = $this->type_plural_map[$type] ?? $type;
+            if (isset($grouped[$plural_key])) {
+                $grouped[$plural_key][] = $item;
             }
         }
 
@@ -689,11 +698,9 @@ class ProgressController extends WP_REST_Controller {
             // Try to get total items from post meta
             $total_items = (int) get_post_meta($content_id, 'total_items', true);
             
-            // Fallback: estimate from content
+            // Fallback: use default values from configuration
             if ($total_items === 0) {
-                // For diets: assume 7 days x 3 meals = 21 items as default
-                // For exercises: assume 7 days as default
-                $total_items = $content_type === 'diet' ? 21 : 7;
+                $total_items = $this->default_total_items[$content_type] ?? 0;
             }
         }
 
@@ -704,6 +711,22 @@ class ProgressController extends WP_REST_Controller {
 
         $percentage = (count($completed_items) / $total_items) * 100;
         return min(100, round($percentage, 2));
+    }
+
+    /**
+     * Normalize value to array
+     * 
+     * @param mixed $value Value to normalize
+     * @return array Normalized array
+     */
+    private function normalize_array($value) {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (empty($value)) {
+            return [];
+        }
+        return [$value];
     }
 
     /**
