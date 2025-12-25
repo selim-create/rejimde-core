@@ -134,10 +134,13 @@ class ProfileController extends WP_REST_Controller {
             
             // Beşlik çakılmış mı?
             $last_high_five = get_user_meta($current_user_id, 'last_high_five_' . $user_id, true);
-            $profile_data['has_high_fived'] = $last_high_five && (time() - $last_high_five) < 86400; // 24 saat
+            $has_high_fived_today = $last_high_five && (time() - $last_high_five) < 86400; // 24 saat
+            $profile_data['has_high_fived'] = $has_high_fived_today;
+            $profile_data['has_high_fived_today'] = $has_high_fived_today; // Alias for frontend compatibility
         } else {
             $profile_data['is_following'] = false;
             $profile_data['has_high_fived'] = false;
+            $profile_data['has_high_fived_today'] = false;
         }
 
         // Badges

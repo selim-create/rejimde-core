@@ -95,6 +95,29 @@ class EventDispatcher {
         );
         
         if (!$canEarn['allowed']) {
+            // Handle "already earned" case with success response
+            if ($canEarn['reason'] === 'Already earned points for this entity') {
+                // Still log the event for tracking
+                $this->eventService->log(
+                    $userId,
+                    $eventType,
+                    0,
+                    $payload['entity_type'] ?? null,
+                    $payload['entity_id'] ?? null,
+                    $context
+                );
+                
+                return [
+                    'success' => true,
+                    'already_earned' => true,
+                    'event_type' => $eventType,
+                    'points_earned' => 0,
+                    'total_score' => (int) get_user_meta($userId, 'rejimde_total_score', true),
+                    'daily_score' => $this->scoreService->getDailyScore($userId),
+                    'message' => 'Bu içerik için zaten puan kazandınız.'
+                ];
+            }
+            
             return [
                 'success' => false,
                 'message' => $canEarn['reason'],

@@ -208,7 +208,7 @@ class ScoreService {
      * @param int $userId User ID
      * @return int
      */
-    private function getDailyScore(int $userId): int {
+    public function getDailyScore(int $userId): int {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_daily_logs';
         $today = date('Y-m-d');
