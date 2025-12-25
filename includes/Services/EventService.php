@@ -52,24 +52,18 @@ class EventService {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_events';
         
-        $query = $wpdb->prepare(
-            "SELECT COUNT(*) FROM $table WHERE user_id = %d AND event_type = %s",
-            $userId, $eventType
-        );
+        // Build query with proper parameter handling
+        $query = "SELECT COUNT(*) FROM $table WHERE user_id = %d AND event_type = %s";
+        $params = [$userId, $eventType];
         
-        // Add entity filters if provided
-        if ($entityType !== null) {
-            $query = $wpdb->prepare(
-                "SELECT COUNT(*) FROM $table WHERE user_id = %d AND event_type = %s AND entity_type = %s",
-                $userId, $eventType, $entityType
-            );
-            
-            if ($entityId !== null) {
-                $query = $wpdb->prepare(
-                    "SELECT COUNT(*) FROM $table WHERE user_id = %d AND event_type = %s AND entity_type = %s AND entity_id = %d",
-                    $userId, $eventType, $entityType, $entityId
-                );
-            }
+        // Add entity filters if provided (both entity_type and entity_id must be present for entity filtering)
+        if ($entityType !== null && $entityId !== null) {
+            $query .= " AND entity_type = %s AND entity_id = %d";
+            $params[] = $entityType;
+            $params[] = $entityId;
+        } elseif ($entityType !== null) {
+            $query .= " AND entity_type = %s";
+            $params[] = $entityType;
         }
         
         // Add date filter if provided
@@ -77,10 +71,11 @@ class EventService {
             if ($dateLimit === 'today') {
                 $dateLimit = date('Y-m-d');
             }
-            $query .= $wpdb->prepare(" AND DATE(created_at) = %s", $dateLimit);
+            $query .= " AND DATE(created_at) = %s";
+            $params[] = $dateLimit;
         }
         
-        $count = $wpdb->get_var($query);
+        $count = $wpdb->get_var($wpdb->prepare($query, ...$params));
         
         return $count > 0;
     }
