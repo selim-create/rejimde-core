@@ -28,6 +28,7 @@ class EventService {
             if (class_exists(\Rejimde\Utils\DatabaseHelper::class)) {
                 if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
                     // Fallback: log to error_log and return graceful response
+                    // Note: User ID and event type are logged for debugging. Ensure error logs are properly secured.
                     error_log("EventService: Tables not ready for user {$user_id}, event {$event_type}");
                     
                     try {
@@ -174,6 +175,8 @@ class EventService {
                 'code' => 200
             ];
         } catch (\Throwable $e) {
+            // Log detailed error information for debugging
+            // Note: User ID and event type are logged for troubleshooting. Ensure error logs are properly secured.
             error_log('EventService::ingestEvent CRITICAL: ' . $e->getMessage() . ' | User: ' . $user_id . ' | Event: ' . $event_type . ' | File: ' . $e->getFile() . ':' . $e->getLine());
             error_log('EventService::ingestEvent trace: ' . $e->getTraceAsString());
             return [

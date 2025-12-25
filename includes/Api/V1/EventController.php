@@ -128,6 +128,11 @@ class EventController extends BaseController {
      * @return bool True if valid, false otherwise
      */
     public function validate_event_type($value, $request, $param) {
+        // Type check - ensure value is a string
+        if (!is_string($value)) {
+            return false;
+        }
+        
         $allowed = [
             'login_success',
             'blog_points_claimed',
