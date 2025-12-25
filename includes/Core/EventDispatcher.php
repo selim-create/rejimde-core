@@ -5,6 +5,7 @@ use Rejimde\Services\EventService;
 use Rejimde\Services\ScoreService;
 use Rejimde\Services\StreakService;
 use Rejimde\Services\MilestoneService;
+use Rejimde\Services\NotificationService;
 
 /**
  * Event Dispatcher
@@ -19,6 +20,7 @@ class EventDispatcher {
     private $scoreService;
     private $streakService;
     private $milestoneService;
+    private $notificationService;
     private $config;
     
     private function __construct() {
@@ -26,6 +28,7 @@ class EventDispatcher {
         $this->scoreService = new ScoreService();
         $this->streakService = new StreakService();
         $this->milestoneService = new MilestoneService();
+        $this->notificationService = new NotificationService();
         $this->config = require __DIR__ . '/../Config/ScoringRules.php';
     }
     
@@ -236,7 +239,8 @@ class EventDispatcher {
         // Get rule label
         $label = $rule['label'] ?? $eventType;
         
-        return [
+        // Build result
+        $result = [
             'success' => true,
             'event_type' => $eventType,
             'points_earned' => $points,
@@ -246,6 +250,11 @@ class EventDispatcher {
             'milestone' => $milestoneData,
             'message' => $label . ' tamamlandı!' . ($points > 0 ? " +{$points} puan kazandın." : '')
         ];
+        
+        // Trigger notifications
+        $this->triggerNotifications($eventType, $payload, $result);
+        
+        return $result;
     }
     
     /**
@@ -315,13 +324,166 @@ class EventDispatcher {
             }
         }
         
-        return [
+        $result = [
             'success' => true,
             'event_type' => 'follow_accepted',
             'points_earned' => $totalPoints,
             'message' => 'Takip kabul edildi! Her iki taraf da puan kazandı.',
             'results' => $results
         ];
+        
+        // Trigger notifications for both users
+        $this->triggerNotifications('follow_accepted', $payload, $result);
+        
+        return $result;
+    }
+    
+    /**
+     * Trigger notifications based on event type
+     * 
+     * @param string $eventType Event type
+     * @param array $payload Event payload
+     * @param array $result Dispatch result
+     * @return void
+     */
+    private function triggerNotifications(string $eventType, array $payload, array $result): void {
+        $userId = $payload['user_id'] ?? get_current_user_id();
+        
+        // Map events to notification types
+        switch ($eventType) {
+            case 'login_success':
+                // Streak notifications
+                if (isset($result['streak'])) {
+                    $streak = $result['streak'];
+                    
+                    if ($streak['is_milestone'] && $streak['bonus'] > 0) {
+                        // Streak milestone notification
+                        $this->notificationService->create($userId, 'streak_milestone', [
+                            'streak_count' => $streak['current'],
+                            'bonus_points' => $streak['bonus'],
+                            'entity_type' => 'streak',
+                            'entity_id' => $streak['current']
+                        ]);
+                    } elseif ($streak['current'] > 1) {
+                        // Streak continued notification
+                        $this->notificationService->create($userId, 'streak_continued', [
+                            'streak_count' => $streak['current'],
+                            'entity_type' => 'streak',
+                            'entity_id' => $streak['current']
+                        ]);
+                    }
+                }
+                break;
+                
+            case 'follow_accepted':
+                // Notifications for both follower and followed
+                $followerId = $payload['follower_id'] ?? null;
+                $followedId = $payload['followed_id'] ?? null;
+                
+                if ($followerId && $followedId) {
+                    // Notify follower that their follow was accepted
+                    $this->notificationService->create($followerId, 'follow_accepted', [
+                        'actor_id' => $followedId,
+                        'entity_type' => 'follow',
+                        'entity_id' => $followedId
+                    ]);
+                    
+                    // Notify followed user about new follower
+                    $this->notificationService->create($followedId, 'new_follower', [
+                        'actor_id' => $followerId,
+                        'entity_type' => 'follow',
+                        'entity_id' => $followerId
+                    ]);
+                }
+                break;
+                
+            case 'highfive_sent':
+                // Notify the recipient
+                if (isset($payload['target_user_id'])) {
+                    $this->notificationService->create($payload['target_user_id'], 'highfive_received', [
+                        'actor_id' => $userId,
+                        'entity_type' => 'highfive',
+                        'entity_id' => $userId
+                    ]);
+                }
+                break;
+                
+            case 'comment_created':
+                // Check if it's a reply
+                if (isset($payload['parent_comment_id']) && $payload['parent_comment_id']) {
+                    $parentComment = get_comment($payload['parent_comment_id']);
+                    if ($parentComment && $parentComment->user_id != $userId) {
+                        $this->notificationService->create($parentComment->user_id, 'comment_reply', [
+                            'actor_id' => $userId,
+                            'entity_type' => $payload['entity_type'] ?? 'comment',
+                            'entity_id' => $payload['entity_id'] ?? null,
+                            'comment_id' => $payload['comment_id'] ?? null
+                        ]);
+                    }
+                }
+                break;
+                
+            case 'comment_like_milestone':
+                // Notify comment author about milestone
+                if (isset($result['milestone'])) {
+                    $milestone = $result['milestone'];
+                    if (isset($milestone['awarded_to'])) {
+                        $likeCount = $payload['context']['like_count'] ?? $milestone['value'];
+                        $this->notificationService->create($milestone['awarded_to'], 'comment_like_milestone', [
+                            'like_count' => $likeCount,
+                            'points' => $milestone['points'],
+                            'entity_type' => 'comment',
+                            'entity_id' => $payload['entity_id'] ?? null
+                        ]);
+                    }
+                }
+                break;
+                
+            case 'blog_points_claimed':
+            case 'diet_completed':
+            case 'exercise_completed':
+                // Content completion notification
+                if ($result['points_earned'] > 0) {
+                    $contentName = $payload['context']['content_name'] ?? 'İçerik';
+                    $this->notificationService->create($userId, 'content_completed', [
+                        'content_name' => $contentName,
+                        'points' => $result['points_earned'],
+                        'entity_type' => $payload['entity_type'] ?? null,
+                        'entity_id' => $payload['entity_id'] ?? null
+                    ]);
+                }
+                break;
+                
+            case 'circle_joined':
+                // Notify user about joining
+                if (isset($payload['circle_id'])) {
+                    $circle = get_post($payload['circle_id']);
+                    $circleName = $circle ? $circle->post_title : 'Circle';
+                    
+                    $this->notificationService->create($userId, 'circle_joined', [
+                        'circle_name' => $circleName,
+                        'entity_type' => 'circle',
+                        'entity_id' => $payload['circle_id']
+                    ]);
+                    
+                    // Notify circle members (optional - could be too spammy)
+                    // This could be implemented if needed
+                }
+                break;
+                
+            case 'rating_submitted':
+                // Notify expert about rating
+                if (isset($payload['expert_id'])) {
+                    $rating = $payload['context']['rating'] ?? 5;
+                    $this->notificationService->create($payload['expert_id'], 'rating_received', [
+                        'actor_id' => $userId,
+                        'rating' => $rating,
+                        'entity_type' => 'rating',
+                        'entity_id' => $userId
+                    ]);
+                }
+                break;
+        }
     }
     
     /**

@@ -25,12 +25,17 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/ScoreService.php')) require_once REJIMDE_PATH . 'includes/Services/ScoreService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/StreakService.php')) require_once REJIMDE_PATH . 'includes/Services/StreakService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/MilestoneService.php')) require_once REJIMDE_PATH . 'includes/Services/MilestoneService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/NotificationService.php')) require_once REJIMDE_PATH . 'includes/Services/NotificationService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ActivityLogService.php')) require_once REJIMDE_PATH . 'includes/Services/ActivityLogService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ExpertMetricsService.php')) require_once REJIMDE_PATH . 'includes/Services/ExpertMetricsService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ProfileViewService.php')) require_once REJIMDE_PATH . 'includes/Services/ProfileViewService.php';
         
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
         
         // Cron
         if (file_exists(REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php')) require_once REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Cron/NotificationJobs.php')) require_once REJIMDE_PATH . 'includes/Cron/NotificationJobs.php';
 
         // API Controllers
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/MascotController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/MascotController.php';
@@ -54,6 +59,10 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CommentController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CommentController.php';
         // YENİ: Event Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/EventController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/EventController.php';
+        // YENİ: Notification Controllers
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/NotificationController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/NotificationController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ActivityController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ActivityController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ExpertActivityController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ExpertActivityController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -98,6 +107,10 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\CommentController')) (new \Rejimde\Api\V1\CommentController())->register_routes();
             // YENİ: Event Routes
             if (class_exists('Rejimde\\Api\\V1\\EventController')) (new \Rejimde\Api\V1\EventController())->register_routes();
+            // YENİ: Notification Routes
+            if (class_exists('Rejimde\\Api\\V1\\NotificationController')) (new \Rejimde\Api\V1\NotificationController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\ActivityController')) (new \Rejimde\Api\V1\ActivityController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\ExpertActivityController')) (new \Rejimde\Api\V1\ExpertActivityController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\FavoritesController')) (new \Rejimde\Api\V1\FavoritesController())->register_routes();
         });
@@ -146,6 +159,12 @@ class Loader {
         if (class_exists('Rejimde\\Cron\\ScoreAggregator')) {
             $scoreAggregator = new \Rejimde\Cron\ScoreAggregator();
             $scoreAggregator->register();
+        }
+        
+        // YENİ: Cron Jobs (Notification Jobs)
+        if (class_exists('Rejimde\\Cron\\NotificationJobs')) {
+            $notificationJobs = new \Rejimde\Cron\NotificationJobs();
+            $notificationJobs->register();
         }
     }
 }
