@@ -277,13 +277,37 @@ class GamificationController extends WP_REST_Controller {
         
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
+        
+        // Check if user is pro
+        $user = wp_get_current_user();
+        $is_pro = in_array('rejimde_pro', (array) $user->roles);
+        
+        // Get circle info
+        $circle_id = get_user_meta($user_id, 'circle_id', true);
+        $circle_info = null;
+        if ($circle_id) {
+            $circle = get_post($circle_id);
+            if ($circle && $circle->post_type === 'rejimde_circle') {
+                $circle_info = [
+                    'id' => $circle_id,
+                    'name' => $circle->post_title,
+                    'role' => get_user_meta($user_id, 'circle_role', true)
+                ];
+            } else {
+                // Circle deleted, cleanup
+                delete_user_meta($user_id, 'circle_id');
+                delete_user_meta($user_id, 'circle_role');
+            }
+        }
 
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
             'rank' => $rank,           // Kullanıcı deneyim seviyesi
             'level' => $level,         // Puan bazlı level
-            'earned_badges' => $earned_badges
+            'earned_badges' => $earned_badges,
+            'is_pro' => $is_pro,       // Pro user status
+            'circle' => $circle_info   // Circle membership info
         ]);
     }
 

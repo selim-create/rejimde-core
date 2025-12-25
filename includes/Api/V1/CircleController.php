@@ -461,4 +461,31 @@ class CircleController extends WP_REST_Controller {
 
         return new WP_REST_Response(['message' => 'Ayarlar güncellendi!'], 200);
     }
+    
+    /**
+     * Recalculate and update circle total score
+     * 
+     * Helper method to ensure circle score accuracy
+     * 
+     * @param int $circle_id Circle ID
+     * @return int New total score
+     */
+    private function recalculate_circle_score($circle_id) {
+        // Get all members
+        $members = get_users([
+            'meta_key' => 'circle_id',
+            'meta_value' => $circle_id,
+            'fields' => 'ID'
+        ]);
+        
+        $total_score = 0;
+        foreach ($members as $member_id) {
+            $total_score += (int) get_user_meta($member_id, 'rejimde_total_score', true);
+        }
+        
+        // Update circle total score
+        update_post_meta($circle_id, 'total_score', $total_score);
+        
+        return $total_score;
+    }
 }
