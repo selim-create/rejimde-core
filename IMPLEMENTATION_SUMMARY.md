@@ -247,6 +247,19 @@ All changes maintain backward compatibility:
 - Event logging is asynchronous (doesn't block responses)
 - Cached user meta is used where appropriate
 
+**Recommended Database Indexes:**
+For optimal performance, especially with large user bases, consider adding these indexes:
+```sql
+-- Index for circle membership queries
+ALTER TABLE wp_usermeta ADD INDEX idx_circle_id (meta_key(20), meta_value(20));
+
+-- Index for event queries (if not already present)
+ALTER TABLE wp_rejimde_events ADD INDEX idx_user_event (user_id, event_type, created_at);
+ALTER TABLE wp_rejimde_events ADD INDEX idx_entity_event (entity_type, entity_id, created_at);
+```
+
+Note: WordPress typically handles meta_key indexing, but explicit indexes can improve performance for high-volume queries.
+
 ## Future Enhancements
 
 Potential areas for future improvement:

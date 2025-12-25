@@ -467,6 +467,10 @@ class CircleController extends WP_REST_Controller {
      * 
      * Helper method to ensure circle score accuracy
      * 
+     * Note: For optimal performance with large user bases, ensure wp_usermeta 
+     * table has an index on (meta_key, meta_value). This query is typically 
+     * cached and runs infrequently (only on manual recalculation).
+     * 
      * @param int $circle_id Circle ID
      * @return int New total score
      */
