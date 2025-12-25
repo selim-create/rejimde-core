@@ -114,7 +114,8 @@ class GamificationController extends WP_REST_Controller {
                     'name' => $user->display_name ?: $user->user_login,
                     'avatar' => get_user_meta($user->ID, 'avatar_url', true),
                     'score' => $score,
-                    'level' => $this->calculate_level($score) // Seviye bilgisi
+                    'rank' => (int) get_user_meta($user->ID, 'rejimde_rank', true) ?: 1, // Kullanıcı rank'ı
+                    'level' => $this->calculate_level($score) // Puan bazlı level
                 ];
             }
         }
@@ -153,8 +154,11 @@ class GamificationController extends WP_REST_Controller {
 
         $total_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
         
-        // Seviye bilgisini dönelim
+        // Level bilgisini hesapla (puan bazlı)
         $level = $this->calculate_level($total_score);
+        
+        // Rank bilgisini al (kullanıcı deneyim seviyesi)
+        $rank = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
         
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
@@ -162,7 +166,8 @@ class GamificationController extends WP_REST_Controller {
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
-            'level' => $level, // Seviye bilgisi
+            'rank' => $rank,           // Kullanıcı deneyim seviyesi
+            'level' => $level,         // Puan bazlı level
             'earned_badges' => $earned_badges
         ]);
     }

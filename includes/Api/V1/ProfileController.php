@@ -114,7 +114,7 @@ class ProfileController extends WP_REST_Controller {
         }
 
         // Gamification data
-        $profile_data['level'] = (int) get_user_meta($user_id, 'rejimde_level', true) ?: 1;
+        $profile_data['rank'] = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
         $profile_data['total_score'] = (int) get_user_meta($user_id, 'rejimde_total_score', true) ?: 0;
         $profile_data['current_streak'] = (int) get_user_meta($user_id, 'current_streak', true) ?: 0;
 
