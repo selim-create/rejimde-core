@@ -47,6 +47,43 @@ class ClanController extends WP_REST_Controller {
             'callback' => [$this, 'leave_clan'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+
+        // /circles ALIAS ROUTES (Frontend uyumluluğu için)
+        register_rest_route($this->namespace, '/circles', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_items'],
+            'permission_callback' => '__return_true',
+        ]);
+
+        register_rest_route($this->namespace, '/circles', [
+            'methods' => 'POST',
+            'callback' => [$this, 'create_item'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/circles/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'callback' => [$this, 'update_item'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/circles/(?P<slug>[a-zA-Z0-9-_]+)', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_item'],
+            'permission_callback' => '__return_true',
+        ]);
+
+        register_rest_route($this->namespace, '/circles/(?P<id>\d+)/join', [
+            'methods' => 'POST',
+            'callback' => [$this, 'join_clan'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/circles/leave', [
+            'methods' => 'POST',
+            'callback' => [$this, 'leave_clan'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
     }
 
     public function check_auth() {
@@ -97,15 +134,20 @@ class ClanController extends WP_REST_Controller {
         
         $current_clan = get_user_meta($user_id, 'clan_id', true);
         if ($current_clan) {
-            return new WP_Error('already_in_clan', 'Zaten bir klandasınız.', ['status' => 400]);
+            return new WP_Error('already_in_circle', 'Zaten bir Circle\'dasınız.', ['status' => 400]);
         }
 
         $params = $request->get_json_params();
         $name = sanitize_text_field($params['name'] ?? '');
         $desc = sanitize_textarea_field($params['description'] ?? '');
         
+        // Motto alanını da description'a ekle
+        if (empty($desc) && !empty($params['motto'])) {
+            $desc = sanitize_textarea_field($params['motto']);
+        }
+        
         if (empty($name)) {
-            return new WP_Error('missing_name', 'Klan adı zorunludur.', ['status' => 400]);
+            return new WP_Error('missing_name', 'Circle adı zorunludur.', ['status' => 400]);
         }
 
         $post_id = wp_insert_post([
@@ -132,7 +174,7 @@ class ClanController extends WP_REST_Controller {
         update_user_meta($user_id, 'clan_id', $post_id);
         update_user_meta($user_id, 'clan_role', 'leader');
 
-        return new WP_REST_Response(['id' => $post_id, 'message' => 'Klan kuruldu!', 'slug' => get_post_field('post_name', $post_id)], 201);
+        return new WP_REST_Response(['id' => $post_id, 'message' => 'Circle kuruldu!', 'slug' => get_post_field('post_name', $post_id)], 201);
     }
 
     public function update_item($request) {
@@ -142,7 +184,7 @@ class ClanController extends WP_REST_Controller {
 
         $clan = get_post($clan_id);
         if (!$clan || $clan->post_type !== 'rejimde_clan') {
-            return new WP_Error('not_found', 'Klan bulunamadı.', ['status' => 404]);
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
         }
 
         $leader_id = get_post_meta($clan_id, 'clan_leader_id', true);
@@ -165,7 +207,7 @@ class ClanController extends WP_REST_Controller {
         if (isset($params['privacy'])) update_post_meta($clan_id, 'privacy', sanitize_text_field($params['privacy']));
         if (isset($params['logo'])) update_post_meta($clan_id, 'clan_logo_url', esc_url_raw($params['logo']));
 
-        return new WP_REST_Response(['id' => $clan_id, 'message' => 'Klan güncellendi!'], 200);
+        return new WP_REST_Response(['id' => $clan_id, 'message' => 'Circle güncellendi!'], 200);
     }
 
     public function join_clan($request) {
@@ -173,12 +215,12 @@ class ClanController extends WP_REST_Controller {
         $clan_id = $request->get_param('id');
         
         if (get_user_meta($user_id, 'clan_id', true)) {
-            return new WP_Error('already_in_clan', 'Önce mevcut klandan ayrılmalısınız.', ['status' => 400]);
+            return new WP_Error('already_in_circle', 'Önce mevcut Circle\'dan ayrılmalısınız.', ['status' => 400]);
         }
 
         $clan = get_post($clan_id);
         if (!$clan || $clan->post_type !== 'rejimde_clan') {
-            return new WP_Error('not_found', 'Klan bulunamadı.', ['status' => 404]);
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
         }
 
         $count = (int) get_post_meta($clan_id, 'member_count', true);
@@ -187,7 +229,7 @@ class ClanController extends WP_REST_Controller {
         update_user_meta($user_id, 'clan_id', $clan_id);
         update_user_meta($user_id, 'clan_role', 'member');
 
-        return new WP_REST_Response(['message' => 'Klana katıldınız!'], 200);
+        return new WP_REST_Response(['message' => 'Circle\'a katıldınız!'], 200);
     }
 
     public function leave_clan($request) {
@@ -195,7 +237,7 @@ class ClanController extends WP_REST_Controller {
         $clan_id = get_user_meta($user_id, 'clan_id', true);
 
         if (!$clan_id) {
-            return new WP_Error('no_clan', 'Herhangi bir klanda değilsiniz.', ['status' => 400]);
+            return new WP_Error('no_circle', 'Herhangi bir Circle\'da değilsiniz.', ['status' => 400]);
         }
         
         $count = (int) get_post_meta($clan_id, 'member_count', true);
@@ -204,7 +246,7 @@ class ClanController extends WP_REST_Controller {
         delete_user_meta($user_id, 'clan_id');
         delete_user_meta($user_id, 'clan_role');
 
-        return new WP_REST_Response(['message' => 'Klandan ayrıldınız.'], 200);
+        return new WP_REST_Response(['message' => 'Circle\'dan ayrıldınız.'], 200);
     }
 
     public function get_item($request) {
@@ -219,7 +261,7 @@ class ClanController extends WP_REST_Controller {
         $query = new WP_Query($args);
         
         if (!$query->have_posts()) {
-            return new WP_Error('not_found', 'Klan bulunamadı', ['status' => 404]);
+            return new WP_Error('not_found', 'Circle bulunamadı', ['status' => 404]);
         }
 
         $query->the_post();
