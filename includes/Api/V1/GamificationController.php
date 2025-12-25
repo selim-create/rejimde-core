@@ -319,7 +319,7 @@ class GamificationController extends WP_REST_Controller {
 
     public function earn_points($request) {
         $params = $request->get_json_params();
-        $eventType = sanitize_text_field($params['action'] ?? '');
+        $eventType = sanitize_text_field($params['action'] ?? $params['event_type'] ?? '');
         
         if (empty($eventType)) {
             return $this->error('Event type is required', 400);
@@ -329,13 +329,26 @@ class GamificationController extends WP_REST_Controller {
         $payload = [
             'user_id' => get_current_user_id(),
             'entity_type' => sanitize_text_field($params['entity_type'] ?? null),
-            'entity_id' => isset($params['ref_id']) ? (int) $params['ref_id'] : null,
+            'entity_id' => isset($params['ref_id']) ? (int) $params['ref_id'] : (isset($params['entity_id']) ? (int) $params['entity_id'] : null),
             'context' => []
         ];
         
         // Add any additional context
         if (isset($params['context']) && is_array($params['context'])) {
             $payload['context'] = $params['context'];
+        }
+        
+        // Support for follow events
+        if (isset($params['follower_id'])) {
+            $payload['follower_id'] = (int) $params['follower_id'];
+        }
+        if (isset($params['followed_id'])) {
+            $payload['followed_id'] = (int) $params['followed_id'];
+        }
+        
+        // Support for comment events
+        if (isset($params['comment_id'])) {
+            $payload['comment_id'] = (int) $params['comment_id'];
         }
         
         // Dispatch event

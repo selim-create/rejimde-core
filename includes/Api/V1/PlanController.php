@@ -262,27 +262,136 @@ class PlanController extends WP_REST_Controller {
     }
 
     public function start_plan($request) {
-        $post_id = $request['id'];
+        $post_id = (int) $request['id'];
         $user_id = get_current_user_id();
+        
+        // Validate plan exists
+        $plan = get_post($post_id);
+        if (!$plan || $plan->post_type !== 'rejimde_plan') {
+            return new WP_Error('plan_not_found', 'Plan bulunamadı.', ['status' => 404]);
+        }
+        
+        // Check if plan is published
+        if ($plan->post_status !== 'publish') {
+            return new WP_Error('plan_not_available', 'Bu plan şu anda kullanılamıyor.', ['status' => 400]);
+        }
+        
+        // Get started users list
         $started_users_raw = get_post_meta($post_id, 'started_users', true);
         $started_users = $started_users_raw ? json_decode($started_users_raw, true) : [];
-        if (!in_array($user_id, $started_users)) {
+        
+        // Ensure started_users is an array
+        if (!is_array($started_users)) {
+            $started_users = [];
+        }
+        
+        // Check if user already started
+        $already_started = in_array($user_id, $started_users);
+        
+        // Add user to started list if not already there
+        if (!$already_started) {
             $started_users[] = $user_id;
             update_post_meta($post_id, 'started_users', json_encode($started_users));
+            
+            // Log start timestamp for user
+            $user_plan_data = get_user_meta($user_id, 'rejimde_plan_' . $post_id, true);
+            if (!is_array($user_plan_data)) {
+                $user_plan_data = [];
+            }
+            $user_plan_data['started_at'] = current_time('mysql');
+            update_user_meta($user_id, 'rejimde_plan_' . $post_id, $user_plan_data);
+            
+            // Dispatch event for gamification
+            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+            $dispatcher->dispatch('diet_started', [
+                'user_id' => $user_id,
+                'entity_type' => 'plan',
+                'entity_id' => $post_id
+            ]);
         }
-        return $this->success(['message' => 'Diyete başarıyla başladınız.']);
+        
+        return $this->success([
+            'message' => $already_started ? 'Bu plana zaten başlamıştınız.' : 'Plana başarıyla başladınız.',
+            'already_started' => $already_started,
+            'plan' => [
+                'id' => $post_id,
+                'title' => $plan->post_title,
+                'started_count' => count($started_users)
+            ]
+        ]);
     }
     
     public function complete_plan($request) {
-        $post_id = $request['id'];
+        $post_id = (int) $request['id'];
         $user_id = get_current_user_id();
+        
+        // Validate plan exists
+        $plan = get_post($post_id);
+        if (!$plan || $plan->post_type !== 'rejimde_plan') {
+            return new WP_Error('plan_not_found', 'Plan bulunamadı.', ['status' => 404]);
+        }
+        
+        // Check if plan is published
+        if ($plan->post_status !== 'publish') {
+            return new WP_Error('plan_not_available', 'Bu plan şu anda kullanılamıyor.', ['status' => 400]);
+        }
+        
+        // Verify user has started the plan
+        $started_users_raw = get_post_meta($post_id, 'started_users', true);
+        $started_users = $started_users_raw ? json_decode($started_users_raw, true) : [];
+        
+        if (!is_array($started_users)) {
+            $started_users = [];
+        }
+        
+        if (!in_array($user_id, $started_users)) {
+            return new WP_Error('plan_not_started', 'Bu planı tamamlamadan önce başlatmalısınız.', ['status' => 400]);
+        }
+        
+        // Get completed users list
         $completed_users_raw = get_post_meta($post_id, 'completed_users', true);
         $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
-        if (!in_array($user_id, $completed_users)) {
+        
+        // Ensure completed_users is an array
+        if (!is_array($completed_users)) {
+            $completed_users = [];
+        }
+        
+        // Check if user already completed
+        $already_completed = in_array($user_id, $completed_users);
+        
+        // Add user to completed list if not already there
+        if (!$already_completed) {
             $completed_users[] = $user_id;
             update_post_meta($post_id, 'completed_users', json_encode($completed_users));
+            
+            // Log completion timestamp for user
+            $user_plan_data = get_user_meta($user_id, 'rejimde_plan_' . $post_id, true);
+            if (!is_array($user_plan_data)) {
+                $user_plan_data = [];
+            }
+            $user_plan_data['completed_at'] = current_time('mysql');
+            update_user_meta($user_id, 'rejimde_plan_' . $post_id, $user_plan_data);
+            
+            // Dispatch event for gamification (diet_completed gives dynamic points based on plan meta)
+            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+            $dispatcher->dispatch('diet_completed', [
+                'user_id' => $user_id,
+                'entity_type' => 'plan',
+                'entity_id' => $post_id
+            ]);
         }
-        return $this->success(['message' => 'Diyet tamamlandı olarak işaretlendi.']);
+        
+        return $this->success([
+            'message' => $already_completed ? 'Bu planı zaten tamamlamıştınız.' : 'Plan tamamlandı! Tebrikler!',
+            'already_completed' => $already_completed,
+            'plan' => [
+                'id' => $post_id,
+                'title' => $plan->post_title,
+                'completed_count' => count($completed_users),
+                'reward_points' => (int) get_post_meta($post_id, 'score_reward', true) ?: 0
+            ]
+        ]);
     }
 
     public function get_item($request) {

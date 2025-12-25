@@ -224,22 +224,41 @@ class CircleController extends WP_REST_Controller {
 
     public function join_circle($request) {
         $user_id = get_current_user_id();
-        $circle_id = $request->get_param('id');
+        $circle_id = (int) $request->get_param('id');
         
-        if (get_user_meta($user_id, 'circle_id', true)) {
+        // Check if user is already in a circle
+        $current_circle_id = get_user_meta($user_id, 'circle_id', true);
+        if ($current_circle_id) {
             return new WP_Error('already_in_circle', 'Önce mevcut circle\'dan ayrılmalısınız.', ['status' => 400]);
         }
 
+        // Validate circle exists and is published
         $circle = get_post($circle_id);
         if (!$circle || $circle->post_type !== 'rejimde_circle') {
             return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
         }
-
+        
+        if ($circle->post_status !== 'publish') {
+            return new WP_Error('circle_not_available', 'Bu circle şu anda kullanılamıyor.', ['status' => 400]);
+        }
+        
+        // Check privacy settings (if private, may need approval in future)
+        $privacy = get_post_meta($circle_id, 'privacy', true);
+        
+        // Update member count
         $count = (int) get_post_meta($circle_id, 'member_count', true);
         update_post_meta($circle_id, 'member_count', $count + 1);
 
+        // Add user to circle
         update_user_meta($user_id, 'circle_id', $circle_id);
         update_user_meta($user_id, 'circle_role', 'member');
+        
+        // Get user's current score to contribute to circle
+        $user_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+        
+        // Update circle total score
+        $circle_score = (int) get_post_meta($circle_id, 'total_score', true);
+        update_post_meta($circle_id, 'total_score', $circle_score + $user_score);
         
         // Dispatch circle_joined event
         $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
@@ -249,7 +268,15 @@ class CircleController extends WP_REST_Controller {
             'entity_id' => $circle_id
         ]);
 
-        return new WP_REST_Response(['message' => 'Circle\'a katıldınız!'], 200);
+        return new WP_REST_Response([
+            'message' => 'Circle\'a katıldınız!',
+            'circle' => [
+                'id' => $circle_id,
+                'name' => $circle->post_title,
+                'member_count' => $count + 1,
+                'total_score' => $circle_score + $user_score
+            ]
+        ], 200);
     }
 
     public function leave_circle($request) {
@@ -260,13 +287,30 @@ class CircleController extends WP_REST_Controller {
             return new WP_Error('no_circle', 'Herhangi bir circle\'da değilsiniz.', ['status' => 400]);
         }
         
+        // Get user's score to subtract from circle total
+        $user_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+        
+        // Update circle total score
+        $circle_score = (int) get_post_meta($circle_id, 'total_score', true);
+        $new_circle_score = max(0, $circle_score - $user_score); // Ensure non-negative
+        update_post_meta($circle_id, 'total_score', $new_circle_score);
+        
+        // Update member count
         $count = (int) get_post_meta($circle_id, 'member_count', true);
         if ($count > 0) update_post_meta($circle_id, 'member_count', $count - 1);
 
+        // Remove user from circle
         delete_user_meta($user_id, 'circle_id');
         delete_user_meta($user_id, 'circle_role');
 
-        return new WP_REST_Response(['message' => 'Circle\'dan ayrıldınız.'], 200);
+        return new WP_REST_Response([
+            'message' => 'Circle\'dan ayrıldınız.',
+            'circle' => [
+                'id' => $circle_id,
+                'member_count' => max(0, $count - 1),
+                'total_score' => $new_circle_score
+            ]
+        ], 200);
     }
 
     public function get_item($request) {

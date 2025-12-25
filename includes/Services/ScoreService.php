@@ -37,7 +37,15 @@ class ScoreService {
             // Get points from entity meta
             if (isset($context['entity_id']) && isset($context['entity_type'])) {
                 $entityId = $context['entity_id'];
+                // Try multiple meta keys for compatibility
                 $points = (int) get_post_meta($entityId, 'reward_points', true);
+                
+                // Fallback to score_reward (used by plans)
+                if ($points === 0) {
+                    $points = (int) get_post_meta($entityId, 'score_reward', true);
+                }
+                
+                // Final fallback
                 if ($points === 0) {
                     $points = 10; // Default fallback
                 }

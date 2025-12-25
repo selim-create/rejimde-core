@@ -34,6 +34,11 @@ class MilestoneService {
             if ($points !== null) {
                 $milestoneValue = $currentValue;
             }
+        } elseif ($milestoneType === 'circle_level') {
+            $points = $this->getCircleLevelMilestonePoints($currentValue);
+            if ($points !== null) {
+                $milestoneValue = $currentValue;
+            }
         }
         
         if ($milestoneValue === null || $points === null) {
@@ -125,5 +130,26 @@ class MilestoneService {
         ));
         
         return (int) $total;
+    }
+    
+    /**
+     * Get milestone points for circle level achievements
+     * 
+     * @param int $level Circle level (1-8)
+     * @return int|null Points to award or null if not a milestone
+     */
+    public function getCircleLevelMilestonePoints(int $level): ?int {
+        // Circle level milestones - reward circle members when circle reaches level
+        $circleLevelMilestones = [
+            2 => 5,   // Level 2 (Adapt) - 200+ points
+            3 => 10,  // Level 3 (Commit) - 300+ points
+            4 => 20,  // Level 4 (Balance) - 500+ points
+            5 => 30,  // Level 5 (Strengthen) - 1000+ points
+            6 => 50,  // Level 6 (Sustain) - 2000+ points
+            7 => 75,  // Level 7 (Mastery) - 4000+ points
+            8 => 100  // Level 8 (Transform) - 6000+ points
+        ];
+        
+        return $circleLevelMilestones[$level] ?? null;
     }
 }
