@@ -72,16 +72,6 @@ class EventController extends BaseController {
             $metadata = $request->get_param('metadata') ?: [];
             $source = $request->get_param('source') ? sanitize_text_field($request->get_param('source')) : 'web';
             
-            // Validate event_type (already validated by validate_callback, but double-check for safety)
-            if (empty($event_type)) {
-                return $this->error('event_type is required', 400);
-            }
-            
-            // Role check (double-check even though check_can_earn permission callback should handle this)
-            if (!$this->can_earn_points($user_id)) {
-                return $this->error('Uzman hesapları puan kazanamaz.', 403);
-            }
-            
             // Process event through EventService with error handling
             $result = EventService::ingestEvent(
                 $user_id,
