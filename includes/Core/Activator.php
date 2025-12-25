@@ -62,5 +62,31 @@ class Activator {
             KEY idx_content (content_type, content_id)
         ) $charset_collate;";
         dbDelta( $sql_progress );
+        
+        // 4. Migrate rejimde_level to rejimde_rank (if needed)
+        self::migrate_level_to_rank();
+    }
+    
+    /**
+     * Migrate rejimde_level meta key to rejimde_rank
+     * This is a one-time migration for terminology fix
+     */
+    private static function migrate_level_to_rank() {
+        global $wpdb;
+        
+        // Check if migration has already been done
+        $migration_done = get_option('rejimde_level_to_rank_migration', false);
+        
+        if (!$migration_done) {
+            // Update all rejimde_level meta keys to rejimde_rank
+            $wpdb->query(
+                "UPDATE {$wpdb->usermeta} 
+                SET meta_key = 'rejimde_rank' 
+                WHERE meta_key = 'rejimde_level'"
+            );
+            
+            // Mark migration as complete
+            update_option('rejimde_level_to_rank_migration', true);
+        }
     }
 }
