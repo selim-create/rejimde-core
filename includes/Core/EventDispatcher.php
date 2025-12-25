@@ -412,8 +412,8 @@ class EventDispatcher {
                 // Check if it's a reply
                 if (isset($payload['parent_comment_id']) && $payload['parent_comment_id']) {
                     $parentComment = get_comment($payload['parent_comment_id']);
-                    if ($parentComment && $parentComment->user_id != $userId) {
-                        $this->notificationService->create($parentComment->user_id, 'comment_reply', [
+                    if ($parentComment && (int) $parentComment->user_id != $userId) {
+                        $this->notificationService->create((int) $parentComment->user_id, 'comment_reply', [
                             'actor_id' => $userId,
                             'entity_type' => $payload['entity_type'] ?? 'comment',
                             'entity_id' => $payload['entity_id'] ?? null,

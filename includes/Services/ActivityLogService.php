@@ -154,7 +154,8 @@ class ActivityLogService {
      */
     private function formatEvent(array $event): array {
         // Load scoring rules for labels
-        $config = require __DIR__ . '/../Config/ScoringRules.php';
+        $configPath = __DIR__ . '/../Config/ScoringRules.php';
+        $config = file_exists($configPath) ? require $configPath : [];
         $rule = $config[$event['event_type']] ?? null;
         
         $label = $rule['label'] ?? $event['event_type'];

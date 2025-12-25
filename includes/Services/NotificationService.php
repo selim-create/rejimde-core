@@ -220,7 +220,7 @@ class NotificationService {
             $result = $wpdb->rows_affected;
         }
         
-        return $result;
+        return $result === false ? 0 : (int) $result;
     }
     
     /**
@@ -263,6 +263,7 @@ class NotificationService {
     public function updatePreferences(int $userId, array $preferences): bool {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_notification_preferences';
+        $success = true;
         
         foreach ($preferences as $category => $settings) {
             $data = [
@@ -282,17 +283,23 @@ class NotificationService {
             ));
             
             if ($exists) {
-                $wpdb->update(
+                $result = $wpdb->update(
                     $table,
                     $data,
                     ['user_id' => $userId, 'category' => $category]
                 );
+                if ($result === false) {
+                    $success = false;
+                }
             } else {
-                $wpdb->insert($table, $data);
+                $result = $wpdb->insert($table, $data);
+                if (!$result) {
+                    $success = false;
+                }
             }
         }
         
-        return true;
+        return $success;
     }
     
     /**

@@ -52,7 +52,7 @@ class ExpertMetricsService {
                     $expertId, $viewerId, $today
                 ));
                 
-                if (!$viewedToday) {
+                if ((int) $viewedToday === 0) {
                     $wpdb->query($wpdb->prepare(
                         "UPDATE $table SET unique_viewers = unique_viewers + 1 
                         WHERE expert_id = %d AND metric_date = %s",

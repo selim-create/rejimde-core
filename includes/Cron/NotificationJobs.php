@@ -36,8 +36,6 @@ class NotificationJobs {
     
     /**
      * Clean up old notifications
-     * 
-     * @param int $daysToKeep Days to keep notifications
      */
     public function cleanupOldNotifications(int $daysToKeep = 30) {
         $deleted = $this->notificationService->cleanupOld($daysToKeep);

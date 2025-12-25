@@ -28,8 +28,19 @@ class ProfileViewService {
         // For anonymous users, use IP hash
         $viewerIpHash = null;
         if (!$viewerUserId) {
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-            $viewerIpHash = hash('sha256', $ip . date('Y-m-d')); // Daily IP hash for privacy
+            // Get IP address with proxy support
+            $ip = '';
+            if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+                $ip = $_SERVER['HTTP_CLIENT_IP'];
+            } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
+                $ip = $_SERVER['REMOTE_ADDR'];
+            }
+            
+            if ($ip) {
+                $viewerIpHash = hash('sha256', $ip . date('Y-m-d')); // Daily IP hash for privacy
+            }
         }
         
         // Record the view
