@@ -2,6 +2,102 @@
 
 This document describes the new API endpoints added to support full frontend gamification compatibility.
 
+## Updates (Latest)
+
+### Enhanced Plan Endpoints
+
+The plan start and complete endpoints now include:
+- Comprehensive validation (plan exists, published status, user prerequisites)
+- Proper error handling with descriptive messages
+- Event dispatching for gamification integration
+- Enhanced response structures with plan details and statistics
+- Idempotent behavior (safe to call multiple times)
+
+**Start Plan Example:**
+```bash
+curl -X POST https://rejimde.com/wp-json/rejimde/v1/plans/start/123 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "message": "Plana başarıyla başladınız.",
+    "already_started": false,
+    "plan": {
+      "id": 123,
+      "title": "Ketojenik Diyet",
+      "started_count": 42
+    }
+  }
+}
+```
+
+**Complete Plan Example:**
+```bash
+curl -X POST https://rejimde.com/wp-json/rejimde/v1/plans/complete/123 \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "message": "Plan tamamlandı! Tebrikler!",
+    "already_completed": false,
+    "plan": {
+      "id": 123,
+      "title": "Ketojenik Diyet",
+      "completed_count": 38,
+      "reward_points": 50
+    }
+  }
+}
+```
+
+### Enhanced Circle Endpoints
+
+Circle join and leave endpoints now include:
+- Validation for circle status and user eligibility
+- Automatic circle score updates when members join/leave
+- Enhanced response structures
+- Better error handling
+
+**Join Circle Example:**
+```bash
+curl -X POST https://rejimde.com/wp-json/rejimde/v1/circles/42/join \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:**
+```json
+{
+  "message": "Circle'a katıldınız!",
+  "circle": {
+    "id": 42,
+    "name": "Sağlıklı Yaşam Topluluğu",
+    "member_count": 26,
+    "total_score": 16600
+  }
+}
+```
+
+### Circle Milestone Rewards
+
+Circle members now receive bonus points when their circle reaches specific levels:
+- Level 2 (Adapt - 200+): +5 points per member
+- Level 3 (Commit - 300+): +10 points per member
+- Level 4 (Balance - 500+): +20 points per member
+- Level 5 (Strengthen - 1000+): +30 points per member
+- Level 6 (Sustain - 2000+): +50 points per member
+- Level 7 (Mastery - 4000+): +75 points per member
+- Level 8 (Transform - 6000+): +100 points per member
+
+These rewards are idempotent - awarded only once per level per user.
+
 ## Event Dispatch Endpoint
 
 ### POST `/rejimde/v1/events/dispatch`

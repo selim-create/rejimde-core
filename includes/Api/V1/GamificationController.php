@@ -277,13 +277,37 @@ class GamificationController extends WP_REST_Controller {
         
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
+        
+        // Check if user is pro
+        $user = wp_get_current_user();
+        $is_pro = in_array('rejimde_pro', (array) $user->roles);
+        
+        // Get circle info
+        $circle_id = get_user_meta($user_id, 'circle_id', true);
+        $circle_info = null;
+        if ($circle_id) {
+            $circle = get_post($circle_id);
+            if ($circle && $circle->post_type === 'rejimde_circle') {
+                $circle_info = [
+                    'id' => $circle_id,
+                    'name' => $circle->post_title,
+                    'role' => get_user_meta($user_id, 'circle_role', true)
+                ];
+            } else {
+                // Circle deleted, cleanup
+                delete_user_meta($user_id, 'circle_id');
+                delete_user_meta($user_id, 'circle_role');
+            }
+        }
 
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
             'rank' => $rank,           // Kullanıcı deneyim seviyesi
             'level' => $level,         // Puan bazlı level
-            'earned_badges' => $earned_badges
+            'earned_badges' => $earned_badges,
+            'is_pro' => $is_pro,       // Pro user status
+            'circle' => $circle_info   // Circle membership info
         ]);
     }
 
@@ -319,7 +343,7 @@ class GamificationController extends WP_REST_Controller {
 
     public function earn_points($request) {
         $params = $request->get_json_params();
-        $eventType = sanitize_text_field($params['action'] ?? '');
+        $eventType = sanitize_text_field($params['action'] ?? $params['event_type'] ?? '');
         
         if (empty($eventType)) {
             return $this->error('Event type is required', 400);
@@ -329,13 +353,26 @@ class GamificationController extends WP_REST_Controller {
         $payload = [
             'user_id' => get_current_user_id(),
             'entity_type' => sanitize_text_field($params['entity_type'] ?? null),
-            'entity_id' => isset($params['ref_id']) ? (int) $params['ref_id'] : null,
+            'entity_id' => isset($params['ref_id']) ? (int) $params['ref_id'] : (isset($params['entity_id']) ? (int) $params['entity_id'] : null),
             'context' => []
         ];
         
         // Add any additional context
         if (isset($params['context']) && is_array($params['context'])) {
             $payload['context'] = $params['context'];
+        }
+        
+        // Support for follow events
+        if (isset($params['follower_id'])) {
+            $payload['follower_id'] = (int) $params['follower_id'];
+        }
+        if (isset($params['followed_id'])) {
+            $payload['followed_id'] = (int) $params['followed_id'];
+        }
+        
+        // Support for comment events
+        if (isset($params['comment_id'])) {
+            $payload['comment_id'] = (int) $params['comment_id'];
         }
         
         // Dispatch event
