@@ -52,6 +52,8 @@ class Loader {
         // YENİ: Comment Sınıfları
         if (file_exists(REJIMDE_PATH . 'includes/Core/CommentMeta.php')) require_once REJIMDE_PATH . 'includes/Core/CommentMeta.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CommentController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CommentController.php';
+        // YENİ: Event Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/EventController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/EventController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -94,6 +96,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\CircleController')) (new \Rejimde\Api\V1\CircleController())->register_routes();
             // YENİ: Comment Routes
             if (class_exists('Rejimde\\Api\\V1\\CommentController')) (new \Rejimde\Api\V1\CommentController())->register_routes();
+            // YENİ: Event Routes
+            if (class_exists('Rejimde\\Api\\V1\\EventController')) (new \Rejimde\Api\V1\EventController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\FavoritesController')) (new \Rejimde\Api\V1\FavoritesController())->register_routes();
         });
