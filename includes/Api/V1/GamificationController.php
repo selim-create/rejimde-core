@@ -454,6 +454,18 @@ class GamificationController extends WP_REST_Controller {
             // Award points
             $scoreService = new \Rejimde\Services\ScoreService();
             $circleId = get_user_meta($user_id, 'circle_id', true);
+            
+            // Verify circle still exists before passing to awardPoints
+            if ($circleId) {
+                $circle = get_post($circleId);
+                if (!$circle || $circle->post_type !== 'rejimde_circle') {
+                    // Circle deleted, clean up user meta
+                    delete_user_meta($user_id, 'circle_id');
+                    delete_user_meta($user_id, 'circle_role');
+                    $circleId = null;
+                }
+            }
+            
             $scoreResult = $scoreService->awardPoints($user_id, $milestone['points'], $circleId ?: null);
             
             // Log milestone event
@@ -541,26 +553,26 @@ class GamificationController extends WP_REST_Controller {
         // Get user's total score (their contribution)
         $user_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
         
-        // Get all circle members
+        // Get all circle members with their meta data in one query
         $members = get_users([
             'meta_key' => 'circle_id',
             'meta_value' => $circle_id,
-            'fields' => ['ID', 'display_name']
+            'fields' => 'all_with_meta'
         ]);
         
         $members_data = [];
         $total_circle_score = 0;
         
         foreach ($members as $member) {
-            $member_score = (int) get_user_meta($member->ID, 'rejimde_total_score', true);
+            $member_score = isset($member->rejimde_total_score) ? (int) $member->rejimde_total_score : 0;
             $total_circle_score += $member_score;
             
             $members_data[] = [
                 'id' => $member->ID,
                 'name' => $member->display_name,
-                'avatar' => get_user_meta($member->ID, 'avatar_url', true),
+                'avatar' => isset($member->avatar_url) ? $member->avatar_url : null,
                 'score' => $member_score,
-                'role' => get_user_meta($member->ID, 'circle_role', true),
+                'role' => isset($member->circle_role) ? $member->circle_role : 'member',
                 'is_current_user' => $member->ID === $user_id
             ];
         }

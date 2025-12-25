@@ -49,7 +49,21 @@ class EventController extends WP_REST_Controller {
         
         // Add any additional context
         if (isset($params['context']) && is_array($params['context'])) {
-            $payload['context'] = $params['context'];
+            // Sanitize context data
+            $sanitized_context = [];
+            foreach ($params['context'] as $key => $value) {
+                $sanitized_key = sanitize_key($key);
+                if (is_array($value)) {
+                    $sanitized_context[$sanitized_key] = array_map('sanitize_text_field', $value);
+                } elseif (is_bool($value)) {
+                    $sanitized_context[$sanitized_key] = (bool) $value;
+                } elseif (is_numeric($value)) {
+                    $sanitized_context[$sanitized_key] = is_float($value) ? (float) $value : (int) $value;
+                } else {
+                    $sanitized_context[$sanitized_key] = sanitize_text_field($value);
+                }
+            }
+            $payload['context'] = $sanitized_context;
         }
         
         // Support for follow events
