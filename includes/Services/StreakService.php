@@ -142,8 +142,8 @@ class StreakService {
      * @param int $currentStreak Current streak count
      * @return int Bonus points (0 if not a milestone)
      */
-    public function checkStreakMilestone(int $currentStreak): ?int {
-        return $this->streakBonuses[$currentStreak] ?? null;
+    public function checkStreakMilestone(int $currentStreak): int {
+        return $this->streakBonuses[$currentStreak] ?? 0;
     }
     
     /**

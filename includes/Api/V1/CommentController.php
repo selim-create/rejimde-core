@@ -236,9 +236,6 @@ class CommentController extends WP_REST_Controller {
             $is_liked = true;
             
             // Only dispatch event when liking (not unliking)
-            // Update like count first
-            update_comment_meta($comment_id, 'like_count', count($likes));
-            
             // Dispatch event for comment liked
             $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
             $dispatcher->dispatch('comment_liked', [

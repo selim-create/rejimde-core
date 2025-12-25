@@ -235,7 +235,6 @@ class ScoreAggregator {
      * @return void
      */
     public function resetWeeklyGrace(): void {
-        require_once REJIMDE_PATH . 'includes/Services/StreakService.php';
         $streakService = new \Rejimde\Services\StreakService();
         $streakService->resetWeeklyGrace();
     }

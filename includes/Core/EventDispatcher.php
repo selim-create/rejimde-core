@@ -19,12 +19,14 @@ class EventDispatcher {
     private $scoreService;
     private $streakService;
     private $milestoneService;
+    private $config;
     
     private function __construct() {
         $this->eventService = new EventService();
         $this->scoreService = new ScoreService();
         $this->streakService = new StreakService();
         $this->milestoneService = new MilestoneService();
+        $this->config = require __DIR__ . '/../Config/ScoringRules.php';
     }
     
     /**
@@ -124,8 +126,7 @@ class EventDispatcher {
         
         // Check streak (for login_success)
         $streakData = null;
-        $config = require __DIR__ . '/../Config/ScoringRules.php';
-        $rule = $config[$eventType] ?? [];
+        $rule = $this->config[$eventType] ?? [];
         
         if (($rule['requires_streak'] ?? false) && $eventType === 'login_success') {
             $streakResult = $this->streakService->recordActivity($userId, 'daily_login');
