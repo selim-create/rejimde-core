@@ -65,12 +65,12 @@ class EventController extends BaseController {
         try {
             $user_id = get_current_user_id();
             
-            // Get parameters with proper sanitization
-            $event_type = sanitize_text_field($request->get_param('event_type'));
-            $entity_type = $request->get_param('entity_type') ? sanitize_text_field($request->get_param('entity_type')) : null;
-            $entity_id = $request->get_param('entity_id') ? absint($request->get_param('entity_id')) : null;
+            // Get parameters (already sanitized by WordPress REST API via sanitize_callback)
+            $event_type = $request->get_param('event_type');
+            $entity_type = $request->get_param('entity_type');
+            $entity_id = $request->get_param('entity_id');
             $metadata = $request->get_param('metadata') ?: [];
-            $source = $request->get_param('source') ? sanitize_text_field($request->get_param('source')) : 'web';
+            $source = $request->get_param('source') ?: 'web';
             
             // Process event through EventService with error handling
             $result = EventService::ingestEvent(
