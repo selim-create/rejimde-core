@@ -21,7 +21,7 @@ class CircleController extends WP_REST_Controller {
         register_rest_route($this->namespace, '/' . $this->base, [
             'methods' => 'POST',
             'callback' => [$this, 'create_item'],
-            'permission_callback' => [$this, 'check_auth'],
+            'permission_callback' => [$this, 'check_pro_permission'], // Sadece Pro kullanıcılar
         ]);
 
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)', [
@@ -65,6 +65,20 @@ class CircleController extends WP_REST_Controller {
     public function check_auth() {
         return is_user_logged_in();
     }
+    
+    /**
+     * Sadece rejimde_pro kullanıcılar Circle oluşturabilir
+     */
+    public function check_pro_permission() {
+        if (!is_user_logged_in()) {
+            return false;
+        }
+        
+        $user = wp_get_current_user();
+        $allowed_roles = ['administrator', 'editor', 'rejimde_pro'];
+        
+        return !empty(array_intersect($allowed_roles, (array) $user->roles));
+    }
 
     public function get_items($request) {
         $args = [
@@ -93,7 +107,6 @@ class CircleController extends WP_REST_Controller {
                     'name'         => get_the_title(),
                     'slug'         => get_post_field('post_name', $post_id),
                     'description'  => wp_trim_words(get_the_content(), 20),
-                    'motto'        => get_post_meta($post_id, 'circle_motto', true),
                     'logo'         => get_post_meta($post_id, 'circle_logo_url', true),
                     'total_score'  => (int) get_post_meta($post_id, 'total_score', true),
                     'member_count' => (int) get_post_meta($post_id, 'member_count', true),
@@ -108,16 +121,11 @@ class CircleController extends WP_REST_Controller {
 
     public function create_item($request) {
         $user_id = get_current_user_id();
-        $user = wp_get_current_user();
         
-        // Sadece rejimde_pro kullanıcıları circle oluşturabilir
-        if (!in_array('rejimde_pro', (array) $user->roles) && !current_user_can('manage_options')) {
-            return new WP_Error('permission_denied', 'Circle oluşturmak için Rejimde Uzmanı olmalısınız.', ['status' => 403]);
-        }
-        
+        // Kullanıcı zaten bir circle'da mı?
         $current_circle = get_user_meta($user_id, 'circle_id', true);
         if ($current_circle) {
-            return new WP_Error('already_in_circle', 'Zaten bir circle\'dasınız.', ['status' => 400]);
+            return new WP_Error('already_in_circle', 'Zaten bir Circle\'dasınız.', ['status' => 400]);
         }
 
         $params = $request->get_json_params();
@@ -125,13 +133,14 @@ class CircleController extends WP_REST_Controller {
         $desc = sanitize_textarea_field($params['description'] ?? '');
         $motto = sanitize_text_field($params['motto'] ?? '');
         
+        // Motto varsa description'a ekle
+        if (!empty($motto) && empty($desc)) {
+            $desc = $motto;
+        }
+        
         if (empty($name)) {
             return new WP_Error('missing_name', 'Circle adı zorunludur.', ['status' => 400]);
         }
-
-        // chat_status alanını comment_status'a çeviriyoruz
-        $chat_status = isset($params['chat_status']) ? sanitize_text_field($params['chat_status']) : 'open';
-        $comment_status = ($chat_status === 'closed') ? 'closed' : 'open';
 
         $post_id = wp_insert_post([
             'post_title'     => $name,
@@ -139,32 +148,31 @@ class CircleController extends WP_REST_Controller {
             'post_status'    => 'publish',
             'post_type'      => 'rejimde_circle',
             'post_author'    => $user_id,
-            'comment_status' => $comment_status, 
+            'comment_status' => ($params['chat_status'] ?? 'open') === 'open' ? 'open' : 'closed',
             'ping_status'    => 'closed'
         ]);
 
         if (is_wp_error($post_id)) return $post_id;
 
+        // Meta verileri kaydet
         update_post_meta($post_id, 'total_score', 0);
         update_post_meta($post_id, 'member_count', 1);
-        update_post_meta($post_id, 'circle_mentor_id', $user_id); // Circle Mentor
+        update_post_meta($post_id, 'circle_leader_id', $user_id);
+        update_post_meta($post_id, 'circle_mentor_id', $user_id); // Mentor = Leader
         update_post_meta($post_id, 'privacy', $params['privacy'] ?? 'public');
-        
-        if (!empty($motto)) {
-            update_post_meta($post_id, 'circle_motto', $motto);
-        }
+        update_post_meta($post_id, 'motto', $motto);
         
         if (!empty($params['logo'])) {
             update_post_meta($post_id, 'circle_logo_url', esc_url_raw($params['logo']));
         }
         
-        // Kullanıcıyı Circle'a ekle ve Circle Mentor yap
+        // Kullanıcıyı circle'a ekle
         update_user_meta($user_id, 'circle_id', $post_id);
-        update_user_meta($user_id, 'circle_role', 'mentor'); // mentor olarak değiştirdik
+        update_user_meta($user_id, 'circle_role', 'mentor'); // Oluşturan kişi Circle Mentor
 
         return new WP_REST_Response([
             'id' => $post_id, 
-            'message' => 'Circle kuruldu!', 
+            'message' => 'Circle kuruldu! Circle Mentor sensin.', 
             'slug' => get_post_field('post_name', $post_id)
         ], 201);
     }
@@ -179,8 +187,8 @@ class CircleController extends WP_REST_Controller {
             return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
         }
 
-        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
-        if ((int)$mentor_id !== $user_id && !current_user_can('manage_options')) {
+        $leader_id = get_post_meta($circle_id, 'circle_leader_id', true);
+        if ((int)$leader_id !== $user_id && !current_user_can('manage_options')) {
             return new WP_Error('forbidden', 'Bu işlemi yapmaya yetkiniz yok.', ['status' => 403]);
         }
 
@@ -189,21 +197,16 @@ class CircleController extends WP_REST_Controller {
         if (!empty($params['name'])) $update_data['post_title'] = sanitize_text_field($params['name']);
         if (isset($params['description'])) $update_data['post_content'] = sanitize_textarea_field($params['description']);
         
-        // chat_status parametresini comment_status'a çevir
-        if (isset($params['chat_status'])) {
-            $update_data['comment_status'] = $params['chat_status'] === 'closed' ? 'closed' : 'open';
-        }
-        
-        // YENİ: Yorum durumunu güncelle (eski uyumluluk için)
-        if (isset($params['comment_status'])) {
-            $update_data['comment_status'] = $params['comment_status'] === 'open' ? 'open' : 'closed';
+        if (isset($params['comment_status']) || isset($params['chat_status'])) {
+            $chat = $params['chat_status'] ?? $params['comment_status'];
+            $update_data['comment_status'] = $chat === 'open' ? 'open' : 'closed';
         }
 
         wp_update_post($update_data);
 
         if (isset($params['privacy'])) update_post_meta($circle_id, 'privacy', sanitize_text_field($params['privacy']));
         if (isset($params['logo'])) update_post_meta($circle_id, 'circle_logo_url', esc_url_raw($params['logo']));
-        if (isset($params['motto'])) update_post_meta($circle_id, 'circle_motto', sanitize_text_field($params['motto']));
+        if (isset($params['motto'])) update_post_meta($circle_id, 'motto', sanitize_text_field($params['motto']));
 
         return new WP_REST_Response(['id' => $circle_id, 'message' => 'Circle güncellendi!'], 200);
     }
@@ -265,7 +268,7 @@ class CircleController extends WP_REST_Controller {
         $query->the_post();
         $post = get_post();
         $post_id = get_the_ID();
-        $mentor_id = get_post_meta($post_id, 'circle_mentor_id', true);
+        $leader_id = get_post_meta($post_id, 'circle_leader_id', true);
         
         $members = get_users([
             'meta_key' => 'circle_id',
@@ -284,19 +287,19 @@ class CircleController extends WP_REST_Controller {
         }
 
         $data = [
-            'id'           => $post_id,
-            'name'         => get_the_title(),
-            'slug'         => get_post_field('post_name', $post_id),
-            'description'  => get_the_content(),
-            'motto'        => get_post_meta($post_id, 'circle_motto', true),
-            'logo'         => get_post_meta($post_id, 'circle_logo_url', true),
-            'total_score'  => (int) get_post_meta($post_id, 'total_score', true),
-            'member_count' => (int) get_post_meta($post_id, 'member_count', true),
-            'mentor_id'    => (int) $mentor_id,
-            'members'      => $members_data,
-            'privacy'      => get_post_meta($post_id, 'privacy', true) ?: 'public',
-            'chat_status'  => $post->comment_status === 'open' ? 'open' : 'closed', // comment_status'u chat_status olarak döndürür
-            'comment_status' => $post->comment_status // Eski uyumluluk için
+            'id'             => $post_id,
+            'name'           => get_the_title(),
+            'slug'           => get_post_field('post_name', $post_id),
+            'description'    => get_the_content(),
+            'motto'          => get_post_meta($post_id, 'motto', true),
+            'logo'           => get_post_meta($post_id, 'circle_logo_url', true),
+            'total_score'    => (int) get_post_meta($post_id, 'total_score', true),
+            'member_count'   => (int) get_post_meta($post_id, 'member_count', true),
+            'leader_id'      => (int) $leader_id,
+            'mentor_id'      => (int) $leader_id, // Circle Mentor = Leader
+            'members'        => $members_data,
+            'privacy'        => get_post_meta($post_id, 'privacy', true) ?: 'public',
+            'comment_status' => $post->comment_status
         ];
 
         return new WP_REST_Response($data, 200);

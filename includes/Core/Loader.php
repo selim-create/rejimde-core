@@ -32,7 +32,6 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/PlanController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/PlanController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ExerciseController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ExerciseController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AIController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AIController.php';
-        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ClanController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ClanController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CircleController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CircleController.php';
         // YENİ: Dictionary Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/DictionaryController.php';
@@ -49,7 +48,6 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Professional.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Professional.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Badge.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Badge.php';
         
-        if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Clan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Clan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Circle.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Circle.php';
         // YENİ: Dictionary Post Type
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Dictionary.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Dictionary.php';
@@ -83,7 +81,6 @@ class Loader {
             }
             if (class_exists('Rejimde\\Api\\V1\\DictionaryController')) (new \Rejimde\Api\V1\DictionaryController())->register_routes();
             
-            if (class_exists('Rejimde\\Api\\V1\\ClanController')) (new \Rejimde\Api\V1\ClanController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\CircleController')) (new \Rejimde\Api\V1\CircleController())->register_routes();
             // YENİ: Comment Routes
             if (class_exists('Rejimde\\Api\\V1\\CommentController')) (new \Rejimde\Api\V1\CommentController())->register_routes();
@@ -101,9 +98,6 @@ class Loader {
             // YENİ: Dictionary Post Type
             if (class_exists('Rejimde\\PostTypes\\Dictionary')) (new \Rejimde\PostTypes\Dictionary())->register();
 
-            // YENİ: Clan Post Type (Backward compatibility)
-            if (class_exists('Rejimde\\PostTypes\\Clan')) (new \Rejimde\PostTypes\Clan())->register();
-            
             // YENİ: Circle Post Type
             if (class_exists('Rejimde\\PostTypes\\Circle')) (new \Rejimde\PostTypes\Circle())->register();
         });
