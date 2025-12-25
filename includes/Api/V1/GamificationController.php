@@ -58,6 +58,27 @@ class GamificationController extends WP_REST_Controller {
             'callback' => [$this, 'get_leaderboard'],
             'permission_callback' => '__return_true', // Herkes görebilir
         ]);
+        
+        // YENİ: Streak Bilgisi
+        register_rest_route($this->namespace, '/' . $this->base . '/streak', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_streak'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+        
+        // YENİ: Milestones
+        register_rest_route($this->namespace, '/' . $this->base . '/milestones', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_milestones'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+        
+        // YENİ: Events
+        register_rest_route($this->namespace, '/' . $this->base . '/events', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_events'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
     }
 
     /**
@@ -283,74 +304,35 @@ class GamificationController extends WP_REST_Controller {
     }
 
     public function earn_points($request) {
-        $user_id = get_current_user_id();
-        
-        // Pro kullanıcılar score kazanamaz
-        $user = wp_get_current_user();
-        if (in_array('rejimde_pro', (array) $user->roles)) {
-            return $this->error('Uzman hesaplar puan sistemi dışındadır.', 403);
-        }
-        
         $params = $request->get_json_params();
-        $action = sanitize_text_field($params['action'] ?? '');
-        $ref_id = isset($params['ref_id']) ? sanitize_text_field($params['ref_id']) : null;
-
-        $rules_json = get_option('rejimde_gamification_rules');
-        $db_rules = !empty($rules_json) ? json_decode($rules_json, true) : [];
-        $rules = array_merge($this->get_default_rules(), $db_rules);
-
-        if (!isset($rules[$action])) {
-            return $this->error('Geçersiz işlem: ' . $action . ' kuralı bulunamadı.', 400);
-        }
-
-        $rule = $rules[$action];
-        $today = date('Y-m-d');
-        global $wpdb;
-        $table_logs = $wpdb->prefix . 'rejimde_daily_logs';
+        $eventType = sanitize_text_field($params['action'] ?? '');
         
-        $daily_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_logs WHERE user_id = %d AND log_date = %s", $user_id, $today));
-        $actions_data = $daily_row ? json_decode($daily_row->data_json, true) : [];
-        if (!is_array($actions_data)) $actions_data = [];
-
-        $current_count = $actions_data[$action]['count'] ?? 0;
+        if (empty($eventType)) {
+            return $this->error('Event type is required', 400);
+        }
         
-        if ($ref_id && isset($actions_data[$action]['refs']) && in_array($ref_id, $actions_data[$action]['refs'])) {
-             return $this->error('Bu işlemden zaten puan aldınız.', 409);
+        // Build payload for EventDispatcher
+        $payload = [
+            'user_id' => get_current_user_id(),
+            'entity_type' => sanitize_text_field($params['entity_type'] ?? null),
+            'entity_id' => isset($params['ref_id']) ? (int) $params['ref_id'] : null,
+            'context' => []
+        ];
+        
+        // Add any additional context
+        if (isset($params['context']) && is_array($params['context'])) {
+            $payload['context'] = $params['context'];
         }
-
-        if ($current_count >= $rule['limit']) {
-            return $this->error('Günlük işlem limitine ulaştınız.', 403);
-        }
-
-        if (!isset($actions_data[$action])) $actions_data[$action] = ['count' => 0, 'refs' => []];
-        $actions_data[$action]['count']++;
-        if ($ref_id) $actions_data[$action]['refs'][] = $ref_id;
-
-        if ($daily_row) {
-            $wpdb->update($table_logs, ['score_daily' => $daily_row->score_daily + $rule['points'], 'data_json' => json_encode($actions_data)], ['id' => $daily_row->id]);
-            $daily_score = $daily_row->score_daily + $rule['points'];
+        
+        // Dispatch event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $result = $dispatcher->dispatch($eventType, $payload);
+        
+        if ($result['success']) {
+            return $this->success($result);
         } else {
-            $wpdb->insert($table_logs, ['user_id' => $user_id, 'log_date' => $today, 'score_daily' => $rule['points'], 'data_json' => json_encode($actions_data)]);
-            $daily_score = $rule['points'];
+            return $this->error($result['message'], 400);
         }
-
-        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-        $new_total = $current_total + $rule['points'];
-        update_user_meta($user_id, 'rejimde_total_score', $new_total);
-        
-        // Eğer circle'ı varsa, circle puanını da artır
-        $circle_id = get_user_meta($user_id, 'circle_id', true);
-        if ($circle_id) {
-            $circle_score = (int) get_post_meta($circle_id, 'total_score', true);
-            update_post_meta($circle_id, 'total_score', $circle_score + $rule['points']);
-        }
-
-        return $this->success([
-            'earned' => $rule['points'],
-            'total_score' => $new_total,
-            'daily_score' => $daily_score,
-            'message' => $rule['label'] . ' tamamlandı!'
-        ]);
     }
 
     private function check_badges($user_id, $total_score) {
@@ -391,6 +373,45 @@ class GamificationController extends WP_REST_Controller {
         }
 
         return $this->success($history);
+    }
+    
+    /**
+     * Get user's streak information
+     */
+    public function get_streak($request) {
+        $user_id = get_current_user_id();
+        $streakService = new \Rejimde\Services\StreakService();
+        
+        $streak = $streakService->getStreak($user_id, 'daily_login');
+        
+        return $this->success($streak);
+    }
+    
+    /**
+     * Get user's milestones
+     */
+    public function get_milestones($request) {
+        $user_id = get_current_user_id();
+        $limit = (int) ($request->get_param('limit') ?: 50);
+        
+        $milestoneService = new \Rejimde\Services\MilestoneService();
+        $milestones = $milestoneService->getUserMilestones($user_id, $limit);
+        
+        return $this->success($milestones);
+    }
+    
+    /**
+     * Get user's events
+     */
+    public function get_events($request) {
+        $user_id = get_current_user_id();
+        $limit = (int) ($request->get_param('limit') ?: 50);
+        $offset = (int) ($request->get_param('offset') ?: 0);
+        
+        $eventService = new \Rejimde\Services\EventService();
+        $events = $eventService->getUserEvents($user_id, $limit, $offset);
+        
+        return $this->success($events);
     }
 
     public function check_auth($request) { return is_user_logged_in(); }

@@ -63,7 +63,68 @@ class Activator {
         ) $charset_collate;";
         dbDelta( $sql_progress );
         
-        // 4. Migrate rejimde_level to rejimde_rank (if needed)
+        // 4. Events Table (Event-Driven Logging)
+        $table_events = $wpdb->prefix . 'rejimde_events';
+        $sql_events = "CREATE TABLE $table_events (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            event_type VARCHAR(50) NOT NULL,
+            entity_type VARCHAR(30) DEFAULT NULL,
+            entity_id BIGINT UNSIGNED DEFAULT NULL,
+            points SMALLINT DEFAULT 0,
+            context JSON DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_date (user_id, created_at),
+            INDEX idx_event_type (event_type),
+            INDEX idx_entity (entity_type, entity_id)
+        ) $charset_collate;";
+        dbDelta( $sql_events );
+        
+        // 5. Streaks Table (Streak Tracking)
+        $table_streaks = $wpdb->prefix . 'rejimde_streaks';
+        $sql_streaks = "CREATE TABLE $table_streaks (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            streak_type VARCHAR(30) NOT NULL,
+            current_count SMALLINT UNSIGNED DEFAULT 0,
+            longest_count SMALLINT UNSIGNED DEFAULT 0,
+            last_activity_date DATE NOT NULL,
+            grace_used_this_week TINYINT UNSIGNED DEFAULT 0,
+            UNIQUE KEY unique_user_streak (user_id, streak_type),
+            INDEX idx_activity (last_activity_date)
+        ) $charset_collate;";
+        dbDelta( $sql_streaks );
+        
+        // 6. Milestones Table (Idempotent Rewards)
+        $table_milestones = $wpdb->prefix . 'rejimde_milestones';
+        $sql_milestones = "CREATE TABLE $table_milestones (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            milestone_type VARCHAR(50) NOT NULL,
+            entity_id BIGINT UNSIGNED DEFAULT NULL,
+            milestone_value INT UNSIGNED NOT NULL,
+            points_awarded SMALLINT NOT NULL,
+            awarded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_milestone (user_id, milestone_type, entity_id, milestone_value)
+        ) $charset_collate;";
+        dbDelta( $sql_milestones );
+        
+        // 7. Score Snapshots Table (Periodic Summaries)
+        $table_snapshots = $wpdb->prefix . 'rejimde_score_snapshots';
+        $sql_snapshots = "CREATE TABLE $table_snapshots (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            period_type ENUM('daily', 'weekly', 'monthly') NOT NULL,
+            period_key VARCHAR(10) NOT NULL,
+            score INT UNSIGNED DEFAULT 0,
+            rank_position SMALLINT UNSIGNED DEFAULT NULL,
+            event_counts JSON DEFAULT NULL,
+            UNIQUE KEY unique_snapshot (user_id, period_type, period_key),
+            INDEX idx_period_rank (period_type, period_key, score DESC)
+        ) $charset_collate;";
+        dbDelta( $sql_snapshots );
+        
+        // 8. Migrate rejimde_level to rejimde_rank (if needed)
         self::migrate_level_to_rank();
     }
     

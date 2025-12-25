@@ -310,6 +310,17 @@ class ProgressController extends WP_REST_Controller {
             $started_users[] = $user_id;
             update_post_meta($content_id, 'started_users', $started_users);
         }
+        
+        // Dispatch event for diet/exercise start
+        if (in_array($content_type, ['diet', 'exercise'])) {
+            $eventType = $content_type . '_started';
+            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+            $dispatcher->dispatch($eventType, [
+                'user_id' => $user_id,
+                'entity_type' => $content_type,
+                'entity_id' => $content_id
+            ]);
+        }
 
         return $this->success([
             'message' => 'Content marked as started',
@@ -379,6 +390,17 @@ class ProgressController extends WP_REST_Controller {
         if (!in_array($user_id, $completed_users)) {
             $completed_users[] = $user_id;
             update_post_meta($content_id, 'completed_users', $completed_users);
+        }
+        
+        // Dispatch event for diet/exercise completion
+        if (in_array($content_type, ['diet', 'exercise'])) {
+            $eventType = $content_type . '_completed';
+            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+            $dispatcher->dispatch($eventType, [
+                'user_id' => $user_id,
+                'entity_type' => $content_type,
+                'entity_id' => $content_id
+            ]);
         }
 
         return $this->success([
@@ -580,32 +602,26 @@ class ProgressController extends WP_REST_Controller {
         $user_id = get_current_user_id();
         $content_id = (int) $request->get_param('content_id');
 
-        $meta_key = "rejimde_blog_read_{$content_id}";
-        $existing = get_user_meta($user_id, $meta_key, true);
-
-        if ($existing && isset($existing['reward_claimed']) && $existing['reward_claimed']) {
-            return $this->success([
-                'already_claimed' => true,
-                'message' => 'Bu yazının puanını zaten aldınız!'
-            ]);
-        }
-
         // Sticky mi kontrol et
         $is_sticky = is_sticky($content_id);
-        $score_reward = $is_sticky ? 50 : 10;
-
-        // Puanı ekle
-        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-        $new_total = $current_total + $score_reward;
-        update_user_meta($user_id, 'rejimde_total_score', $new_total);
-
-        // Kaydet
-        $read_data = [
-            'read_at' => current_time('mysql'),
-            'reward_claimed' => true,
-            'reward_amount' => $score_reward
-        ];
-        update_user_meta($user_id, $meta_key, $read_data);
+        
+        // Dispatch blog_points_claimed event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $result = $dispatcher->dispatch('blog_points_claimed', [
+            'user_id' => $user_id,
+            'entity_type' => 'blog',
+            'entity_id' => $content_id,
+            'context' => [
+                'is_sticky' => $is_sticky
+            ]
+        ]);
+        
+        if (!$result['success']) {
+            return $this->success([
+                'already_claimed' => true,
+                'message' => $result['message']
+            ]);
+        }
 
         // Okuyanlar listesine ekle
         $readers = get_post_meta($content_id, 'rejimde_readers', true);
@@ -616,9 +632,9 @@ class ProgressController extends WP_REST_Controller {
         }
 
         return $this->success([
-            'message' => 'Puanını kaptın! 🎉',
-            'earned_points' => $score_reward,
-            'new_total' => $new_total,
+            'message' => $result['message'],
+            'earned_points' => $result['points_earned'],
+            'new_total' => $result['total_score'],
             'is_sticky' => $is_sticky
         ]);
     }

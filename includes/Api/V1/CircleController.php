@@ -172,6 +172,14 @@ class CircleController extends WP_REST_Controller {
         // Kullanıcıyı circle'a ekle
         update_user_meta($user_id, 'circle_id', $post_id);
         update_user_meta($user_id, 'circle_role', 'mentor'); // Oluşturan kişi Circle Mentor
+        
+        // Dispatch circle_created event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $dispatcher->dispatch('circle_created', [
+            'user_id' => $user_id,
+            'entity_type' => 'circle',
+            'entity_id' => $post_id
+        ]);
 
         return new WP_REST_Response([
             'id' => $post_id, 
@@ -232,6 +240,14 @@ class CircleController extends WP_REST_Controller {
 
         update_user_meta($user_id, 'circle_id', $circle_id);
         update_user_meta($user_id, 'circle_role', 'member');
+        
+        // Dispatch circle_joined event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $dispatcher->dispatch('circle_joined', [
+            'user_id' => $user_id,
+            'entity_type' => 'circle',
+            'entity_id' => $circle_id
+        ]);
 
         return new WP_REST_Response(['message' => 'Circle\'a katıldınız!'], 200);
     }

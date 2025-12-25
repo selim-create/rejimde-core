@@ -1,0 +1,30 @@
+# WordPress
+.htaccess
+wp-config.php
+wp-content/uploads/
+wp-content/cache/
+wp-content/backup/
+wp-content/advanced-cache.php
+wp-content/wp-cache-config.php
+sitemap.xml
+*.log
+
+# Plugin specific
+vendor/
+node_modules/
+*.zip
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+/tmp/
+*.tmp
