@@ -25,11 +25,16 @@ class EventService {
     public static function ingestEvent($user_id, $event_type, $entity_type = null, $entity_id = null, $metadata = [], $source = 'web') {
         try {
             // Check if tables exist
-            if (class_exists('Rejimde\\Utils\\DatabaseHelper')) {
+            if (class_exists(\Rejimde\Utils\DatabaseHelper::class)) {
                 if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
                     // Fallback: log to error_log and return graceful response
                     error_log("Rejimde Gamification: Tables not ready, attempting to create...");
-                    \Rejimde\Utils\DatabaseHelper::ensureTablesExist();
+                    
+                    try {
+                        \Rejimde\Utils\DatabaseHelper::ensureTablesExist();
+                    } catch (\Throwable $e) {
+                        error_log('EventService::ingestEvent - ensureTablesExist error: ' . $e->getMessage());
+                    }
                     
                     // Recheck
                     if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {

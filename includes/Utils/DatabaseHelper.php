@@ -64,10 +64,15 @@ class DatabaseHelper {
      */
     public static function ensureTablesExist() {
         if (!self::isGamificationReady()) {
-            if (class_exists('Rejimde\\Core\\Activator')) {
-                \Rejimde\Core\Activator::activate();
-                self::$checked_tables = []; // Clear cache
-                return self::isGamificationReady();
+            if (class_exists(\Rejimde\Core\Activator::class)) {
+                try {
+                    \Rejimde\Core\Activator::activate();
+                    self::$checked_tables = []; // Clear cache
+                    return self::isGamificationReady();
+                } catch (\Throwable $e) {
+                    error_log('DatabaseHelper::ensureTablesExist error: ' . $e->getMessage());
+                    return false;
+                }
             }
             return false;
         }

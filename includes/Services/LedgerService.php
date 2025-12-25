@@ -23,7 +23,7 @@ class LedgerService {
     public static function addPoints($user_id, $points, $reason, $event_id = null, $metadata = []) {
         try {
             // Check if tables exist
-            if (class_exists('Rejimde\\Utils\\DatabaseHelper')) {
+            if (class_exists(\Rejimde\Utils\DatabaseHelper::class)) {
                 if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
                     error_log("Rejimde LedgerService: Tables not ready");
                     return false;
