@@ -350,14 +350,24 @@ class ProgressController extends WP_REST_Controller {
 
         // Check if record exists
         $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, is_started FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+            "SELECT id, is_started, is_completed, started_at, progress_data FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
             $user_id, $content_type, $content_id
         ));
 
+        if ($existing && $existing->is_started) {
+            // Already started - return 200 with already_started flag
+            $progress_data = json_decode($existing->progress_data ?: '{}', true);
+            return $this->success([
+                'already_started' => true,
+                'message' => 'Bu içeriğe zaten başladınız.',
+                'is_started' => true,
+                'is_completed' => (bool) $existing->is_completed,
+                'started_at' => $existing->started_at,
+                'completed_items' => $progress_data['completed_items'] ?? []
+            ]);
+        }
+
         if ($existing) {
-            if ($existing->is_started) {
-                return $this->error('Content already started', 409);
-            }
             // Update existing record
             $wpdb->update(
                 $table,
@@ -399,8 +409,10 @@ class ProgressController extends WP_REST_Controller {
 
         return $this->success([
             'message' => 'Content marked as started',
-            'content_type' => $content_type,
-            'content_id' => $content_id
+            'is_started' => true,
+            'is_completed' => false,
+            'started_at' => current_time('mysql'),
+            'completed_items' => []
         ]);
     }
 
@@ -422,14 +434,25 @@ class ProgressController extends WP_REST_Controller {
 
         // Check if record exists
         $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, is_completed FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+            "SELECT id, is_completed, started_at, completed_at, progress_data FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
             $user_id, $content_type, $content_id
         ));
 
+        if ($existing && $existing->is_completed) {
+            // Already completed - return 200 with already_completed flag
+            $progress_data = json_decode($existing->progress_data ?: '{}', true);
+            return $this->success([
+                'already_completed' => true,
+                'message' => 'Bu içeriği zaten tamamladınız.',
+                'is_started' => true,
+                'is_completed' => true,
+                'started_at' => $existing->started_at,
+                'completed_at' => $existing->completed_at,
+                'completed_items' => $progress_data['completed_items'] ?? []
+            ]);
+        }
+
         if ($existing) {
-            if ($existing->is_completed) {
-                return $this->error('Content already completed', 409);
-            }
             // Check if started_at is already set
             $update_data = [
                 'is_started' => 1,
@@ -437,11 +460,7 @@ class ProgressController extends WP_REST_Controller {
                 'completed_at' => current_time('mysql')
             ];
             // Set started_at if not already set
-            $current = $wpdb->get_row($wpdb->prepare(
-                "SELECT started_at FROM $table WHERE id = %d",
-                $existing->id
-            ));
-            if (!$current->started_at) {
+            if (!$existing->started_at) {
                 $update_data['started_at'] = current_time('mysql');
             }
             // Update existing record
@@ -480,8 +499,9 @@ class ProgressController extends WP_REST_Controller {
 
         return $this->success([
             'message' => 'Content marked as completed',
-            'content_type' => $content_type,
-            'content_id' => $content_id
+            'is_started' => true,
+            'is_completed' => true,
+            'completed_at' => current_time('mysql')
         ]);
     }
 
@@ -619,6 +639,7 @@ class ProgressController extends WP_REST_Controller {
     /**
      * POST /rejimde/v1/progress/{content_type}/{content_id}/complete-item
      * Complete individual item (meal, exercise day, etc.)
+     * Toggle functionality: adds item if not present, removes if already present
      */
     public function complete_item($request) {
         $content_type = $request['content_type'];
@@ -653,25 +674,39 @@ class ProgressController extends WP_REST_Controller {
             $progress_data['completed_items'] = [];
         }
 
-        // Add item if not already completed
-        if (!in_array($item_id, $progress_data['completed_items'])) {
-            $progress_data['completed_items'][] = $item_id;
-            
-            $wpdb->update(
-                $table,
-                ['progress_data' => json_encode($progress_data)],
-                ['id' => $existing->id]
-            );
+        // TOGGLE LOGIC
+        $completed_items = $progress_data['completed_items'];
+        $item_index = array_search($item_id, $completed_items);
+        $was_completed = false;
+
+        if ($item_index !== false) {
+            // Item exists, remove it (uncomplete)
+            array_splice($completed_items, $item_index, 1);
+            $was_completed = false;
+        } else {
+            // Item doesn't exist, add it (complete)
+            $completed_items[] = $item_id;
+            $was_completed = true;
         }
 
-        $completed_items = $progress_data['completed_items'];
+        // Update progress_data with new completed_items
+        $progress_data['completed_items'] = $completed_items;
+
+        $wpdb->update(
+            $table,
+            ['progress_data' => json_encode($progress_data)],
+            ['id' => $existing->id]
+        );
+
         $progress_percentage = $this->calculate_progress_percentage($content_type, $content_id, $completed_items);
 
         return $this->success([
-            'message' => 'Item completed successfully',
-            'completed_items' => $completed_items,
+            'item_id' => $item_id,
+            'is_completed' => $was_completed,
+            'completed_items' => array_values($completed_items),
+            'total_completed' => count($completed_items),
             'progress_percentage' => $progress_percentage,
-            'is_completed' => (bool) $existing->is_completed
+            'message' => $was_completed ? 'Öğe tamamlandı.' : 'Öğe geri alındı.'
         ]);
     }
 
