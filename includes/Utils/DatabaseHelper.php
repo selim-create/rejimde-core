@@ -17,23 +17,28 @@ class DatabaseHelper {
      * @return bool True if table exists, false otherwise
      */
     public static function tableExists($table_name) {
-        global $wpdb;
-        
-        // Check cache
-        if (isset(self::$checked_tables[$table_name])) {
-            return self::$checked_tables[$table_name];
+        try {
+            global $wpdb;
+            
+            // Check cache
+            if (isset(self::$checked_tables[$table_name])) {
+                return self::$checked_tables[$table_name];
+            }
+            
+            $full_table = $wpdb->prefix . $table_name;
+            $result = $wpdb->get_var($wpdb->prepare(
+                "SHOW TABLES LIKE %s",
+                $full_table
+            ));
+            
+            $exists = ($result === $full_table);
+            self::$checked_tables[$table_name] = $exists;
+            
+            return $exists;
+        } catch (\Throwable $e) {
+            error_log('DatabaseHelper::tableExists error: ' . $e->getMessage());
+            return false;
         }
-        
-        $full_table = $wpdb->prefix . $table_name;
-        $result = $wpdb->get_var($wpdb->prepare(
-            "SHOW TABLES LIKE %s",
-            $full_table
-        ));
-        
-        $exists = ($result === $full_table);
-        self::$checked_tables[$table_name] = $exists;
-        
-        return $exists;
     }
     
     /**
@@ -42,19 +47,24 @@ class DatabaseHelper {
      * @return bool True if all required tables exist, false otherwise
      */
     public static function isGamificationReady() {
-        $required_tables = [
-            'rejimde_events',
-            'rejimde_points_ledger',
-            'rejimde_daily_counters'
-        ];
-        
-        foreach ($required_tables as $table) {
-            if (!self::tableExists($table)) {
-                return false;
+        try {
+            $required_tables = [
+                'rejimde_events',
+                'rejimde_points_ledger',
+                'rejimde_daily_counters'
+            ];
+            
+            foreach ($required_tables as $table) {
+                if (!self::tableExists($table)) {
+                    return false;
+                }
             }
+            
+            return true;
+        } catch (\Throwable $e) {
+            error_log('DatabaseHelper::isGamificationReady error: ' . $e->getMessage());
+            return false;
         }
-        
-        return true;
     }
     
     /**

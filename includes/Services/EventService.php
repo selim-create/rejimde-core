@@ -173,8 +173,10 @@ class EventService {
                 'current_balance' => $current_balance,
                 'code' => 200
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log('EventService::ingestEvent error: ' . $e->getMessage());
+            error_log('EventService::ingestEvent trace: ' . $e->getTraceAsString());
+            error_log('EventService::ingestEvent file: ' . $e->getFile() . ':' . $e->getLine());
             return [
                 'status' => 'error',
                 'event_id' => 0,

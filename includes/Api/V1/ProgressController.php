@@ -311,8 +311,8 @@ class ProgressController extends WP_REST_Controller {
             update_post_meta($content_id, 'started_users', $started_users);
         }
         
-        // Log event to gamification system
-        if (class_exists('Rejimde\\Services\\EventService')) {
+        // Log event to gamification system (only if user can earn points)
+        if ($this->can_earn_points($user_id) && class_exists('Rejimde\\Services\\EventService')) {
             try {
                 $event_type = null;
                 if ($content_type === 'diet') {
@@ -322,7 +322,7 @@ class ProgressController extends WP_REST_Controller {
                 }
                 
                 if ($event_type) {
-                    \Rejimde\Services\EventService::ingestEvent(
+                    $result = \Rejimde\Services\EventService::ingestEvent(
                         $user_id,
                         $event_type,
                         $content_type,
@@ -330,9 +330,15 @@ class ProgressController extends WP_REST_Controller {
                         [],
                         'web'
                     );
+                    
+                    // Log any errors but don't fail the request
+                    if (isset($result['status']) && $result['status'] === 'error') {
+                        error_log('ProgressController::start_content EventService returned error: ' . json_encode($result));
+                    }
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 error_log('ProgressController::start_content EventService error: ' . $e->getMessage());
+                error_log('Stack trace: ' . $e->getTraceAsString());
                 // Continue execution even if event logging fails
             }
         }
@@ -566,6 +572,35 @@ class ProgressController extends WP_REST_Controller {
     }
 
     /**
+     * Check if user can earn points
+     * rejimde_pro users cannot earn points, all other roles can
+     * 
+     * @param int|null $user_id User ID (null = current user)
+     * @return bool True if user can earn points, false otherwise
+     */
+    protected function can_earn_points($user_id = null) {
+        if ($user_id === null) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return false;
+        }
+        
+        $user = get_userdata($user_id);
+        if (!$user) {
+            return false;
+        }
+        
+        // rejimde_pro users cannot earn points
+        if (in_array('rejimde_pro', (array) $user->roles)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
      * Success response
      */
     protected function success($data = null, $message = 'Success', $code = 200) {
@@ -649,6 +684,11 @@ class ProgressController extends WP_REST_Controller {
             $user_id = get_current_user_id();
             $content_id = (int) $request->get_param('content_id');
 
+            // Check if user can earn points
+            if (!$this->can_earn_points($user_id)) {
+                return $this->error('Uzmanlar puan kazanamaz', 403);
+            }
+
             // Verify blog exists
             $post = get_post($content_id);
             if (!$post || $post->post_type !== 'post') {
@@ -712,8 +752,9 @@ class ProgressController extends WP_REST_Controller {
                         $score_reward = $result['awarded_points_total'];
                         $new_total = $result['current_balance'];
                     }
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     error_log('ProgressController::claim_blog_reward EventService exception: ' . $e->getMessage());
+                    error_log('Stack trace: ' . $e->getTraceAsString());
                     // Fallback to old system
                     $score_reward = $is_sticky ? 50 : 10;
                     $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
@@ -750,8 +791,9 @@ class ProgressController extends WP_REST_Controller {
                 'new_total' => $new_total,
                 'is_sticky' => $is_sticky
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log('claim_blog_reward error: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
             return $this->error('Bir hata oluştu. Lütfen tekrar deneyin.', 500);
         }
     }
@@ -764,6 +806,25 @@ class ProgressController extends WP_REST_Controller {
         $user_id = get_current_user_id();
         $calculator_type = $request->get_param('calculator_type');
         $params = $request->get_json_params();
+
+        // Check if user can earn points
+        if (!$this->can_earn_points($user_id)) {
+            // Still save the result, but don't award points
+            $result_data = [
+                'saved' => true,
+                'saved_at' => current_time('mysql'),
+                'result' => $params['result'] ?? null,
+                'reward_claimed' => false
+            ];
+            $meta_key = "rejimde_calculator_{$calculator_type}";
+            update_user_meta($user_id, $meta_key, $result_data);
+            
+            return $this->success([
+                'message' => "Sonuç kaydedildi! (Uzmanlar puan kazanamaz)",
+                'earned_points' => 0,
+                'new_total' => (int) get_user_meta($user_id, 'rejimde_total_score', true)
+            ]);
+        }
 
         $meta_key = "rejimde_calculator_{$calculator_type}";
         $existing = get_user_meta($user_id, $meta_key, true);
@@ -810,8 +871,9 @@ class ProgressController extends WP_REST_Controller {
                     $points_earned = $result['awarded_points_total'];
                     $new_total = $result['current_balance'];
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 error_log('ProgressController::save_calculator_result EventService exception: ' . $e->getMessage());
+                error_log('Stack trace: ' . $e->getTraceAsString());
                 // Fallback to old system
                 $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
                 $new_total = $current_total + $points_earned;
