@@ -161,7 +161,14 @@ class PlanController extends WP_REST_Controller {
             $author_avatar = get_avatar_url($author_id); // Varsayılan WP avatarı, frontendde dicebear fallback var
 
             $completed_users_raw = get_post_meta($post->ID, 'completed_users', true);
-            $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
+            // Handle both array and JSON string formats
+            if (is_array($completed_users_raw)) {
+                $completed_users = $completed_users_raw;
+            } elseif (is_string($completed_users_raw) && !empty($completed_users_raw)) {
+                $completed_users = json_decode($completed_users_raw, true) ?: [];
+            } else {
+                $completed_users = [];
+            }
             
             // Son 3 tamamlayan (avatar için)
             $last_completed_avatars = [];
@@ -265,7 +272,14 @@ class PlanController extends WP_REST_Controller {
         $post_id = $request['id'];
         $user_id = get_current_user_id();
         $started_users_raw = get_post_meta($post_id, 'started_users', true);
-        $started_users = $started_users_raw ? json_decode($started_users_raw, true) : [];
+        // Handle both array and JSON string formats
+        if (is_array($started_users_raw)) {
+            $started_users = $started_users_raw;
+        } elseif (is_string($started_users_raw) && !empty($started_users_raw)) {
+            $started_users = json_decode($started_users_raw, true) ?: [];
+        } else {
+            $started_users = [];
+        }
         if (!in_array($user_id, $started_users)) {
             $started_users[] = $user_id;
             update_post_meta($post_id, 'started_users', json_encode($started_users));
@@ -277,7 +291,14 @@ class PlanController extends WP_REST_Controller {
         $post_id = $request['id'];
         $user_id = get_current_user_id();
         $completed_users_raw = get_post_meta($post_id, 'completed_users', true);
-        $completed_users = $completed_users_raw ? json_decode($completed_users_raw, true) : [];
+        // Handle both array and JSON string formats
+        if (is_array($completed_users_raw)) {
+            $completed_users = $completed_users_raw;
+        } elseif (is_string($completed_users_raw) && !empty($completed_users_raw)) {
+            $completed_users = json_decode($completed_users_raw, true) ?: [];
+        } else {
+            $completed_users = [];
+        }
         if (!in_array($user_id, $completed_users)) {
             $completed_users[] = $user_id;
             update_post_meta($post_id, 'completed_users', json_encode($completed_users));
@@ -343,7 +364,14 @@ class PlanController extends WP_REST_Controller {
         }
         
         // Tamamlayan Kullanıcılar (Son 5 - Avatar için)
-        $completed_users_ids = json_decode(get_post_meta($post_id, 'completed_users', true)) ?: [];
+        $completed_users_raw = get_post_meta($post_id, 'completed_users', true);
+        if (is_array($completed_users_raw)) {
+            $completed_users_ids = $completed_users_raw;
+        } elseif (is_string($completed_users_raw) && !empty($completed_users_raw)) {
+            $completed_users_ids = json_decode($completed_users_raw, true) ?: [];
+        } else {
+            $completed_users_ids = [];
+        }
         $completed_users = [];
         $count = 0;
         foreach (array_reverse($completed_users_ids) as $uid) {

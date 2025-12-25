@@ -23,127 +23,136 @@ class EventService {
      * @return array Result with event_id, points, messages, etc.
      */
     public static function ingestEvent($user_id, $event_type, $entity_type = null, $entity_id = null, $metadata = [], $source = 'web') {
-        global $wpdb;
-        $events_table = $wpdb->prefix . 'rejimde_events';
-        
-        // Generate idempotency key
-        $params = array_merge($metadata, [
-            'entity_id' => $entity_id,
-            'entity_type' => $entity_type
-        ]);
-        $idempotency_key = IdempotencyHelper::generate($event_type, $user_id, $params);
-        
-        // Check for duplicate
-        $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, status, points_awarded FROM $events_table WHERE idempotency_key = %s",
-            $idempotency_key
-        ), ARRAY_A);
-        
-        if ($existing) {
-            // Return existing event info
-            return [
-                'status' => 'duplicate',
-                'event_id' => $existing['id'],
-                'points_awarded' => (int) $existing['points_awarded'],
-                'message' => 'Bu aksiyon daha önce kaydedilmiş.',
-                'code' => 409
-            ];
-        }
-        
-        // Check daily limits
-        $daily_limit = RuleEngine::getDailyLimit($event_type);
-        $limit_exceeded = false;
-        $daily_remaining = null;
-        
-        if ($daily_limit !== null) {
-            $today = TimezoneHelper::getTodayTR();
-            $count_today = self::getDailyCount($user_id, $event_type, $today);
+        try {
+            global $wpdb;
+            $events_table = $wpdb->prefix . 'rejimde_events';
             
-            if ($count_today >= $daily_limit) {
-                $limit_exceeded = true;
-                $daily_remaining = 0;
-            } else {
-                $daily_remaining = $daily_limit - $count_today - 1;
-            }
-        }
-        
-        // Calculate points
-        $points = 0;
-        $status = 'valid';
-        $rejection_reason = null;
-        
-        if ($limit_exceeded) {
-            $status = 'rejected';
-            $rejection_reason = 'daily_limit_exceeded';
-        } else {
-            $points = RuleEngine::calculatePoints($event_type, $metadata);
-        }
-        
-        // Insert event
-        $occurred_at = TimezoneHelper::formatForDB();
-        $wpdb->insert(
-            $events_table,
-            [
-                'user_id' => $user_id,
-                'event_type' => $event_type,
-                'entity_type' => $entity_type,
+            // Generate idempotency key
+            $params = array_merge($metadata, [
                 'entity_id' => $entity_id,
-                'occurred_at' => $occurred_at,
-                'metadata' => !empty($metadata) ? json_encode($metadata) : null,
-                'idempotency_key' => $idempotency_key,
-                'source' => $source,
-                'status' => $status,
-                'rejection_reason' => $rejection_reason,
-                'points_awarded' => $points,
-                'created_at' => $occurred_at
-            ],
-            ['%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s']
-        );
-        
-        $event_id = $wpdb->insert_id;
-        
-        // Award points if valid
-        $ledger_items = [];
-        if ($status === 'valid' && $points > 0) {
-            $ledger_entry = LedgerService::addPoints(
-                $user_id,
-                $points,
-                $event_type,
-                $event_id,
-                $metadata
+                'entity_type' => $entity_type
+            ]);
+            $idempotency_key = IdempotencyHelper::generate($event_type, $user_id, $params);
+            
+            // Check for duplicate
+            $existing = $wpdb->get_row($wpdb->prepare(
+                "SELECT id, status, points_awarded FROM $events_table WHERE idempotency_key = %s",
+                $idempotency_key
+            ), ARRAY_A);
+            
+            if ($existing) {
+                // Return existing event info
+                return [
+                    'status' => 'duplicate',
+                    'event_id' => $existing['id'],
+                    'points_awarded' => (int) $existing['points_awarded'],
+                    'message' => 'Bu aksiyon daha önce kaydedilmiş.',
+                    'code' => 409
+                ];
+            }
+            
+            // Check daily limits
+            $daily_limit = RuleEngine::getDailyLimit($event_type);
+            $limit_exceeded = false;
+            $daily_remaining = null;
+            
+            if ($daily_limit !== null) {
+                $today = TimezoneHelper::getTodayTR();
+                $count_today = self::getDailyCount($user_id, $event_type, $today);
+                
+                if ($count_today >= $daily_limit) {
+                    $limit_exceeded = true;
+                    $daily_remaining = 0;
+                } else {
+                    $daily_remaining = $daily_limit - $count_today - 1;
+                }
+            }
+            
+            // Calculate points
+            $points = 0;
+            $status = 'valid';
+            $rejection_reason = null;
+            
+            if ($limit_exceeded) {
+                $status = 'rejected';
+                $rejection_reason = 'daily_limit_exceeded';
+            } else {
+                $points = RuleEngine::calculatePoints($event_type, $metadata);
+            }
+            
+            // Insert event
+            $occurred_at = TimezoneHelper::formatForDB();
+            $wpdb->insert(
+                $events_table,
+                [
+                    'user_id' => $user_id,
+                    'event_type' => $event_type,
+                    'entity_type' => $entity_type,
+                    'entity_id' => $entity_id,
+                    'occurred_at' => $occurred_at,
+                    'metadata' => !empty($metadata) ? json_encode($metadata) : null,
+                    'idempotency_key' => $idempotency_key,
+                    'source' => $source,
+                    'status' => $status,
+                    'rejection_reason' => $rejection_reason,
+                    'points_awarded' => $points,
+                    'created_at' => $occurred_at
+                ],
+                ['%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s']
             );
             
-            if ($ledger_entry) {
-                $ledger_items[] = $ledger_entry;
+            $event_id = $wpdb->insert_id;
+            
+            // Award points if valid
+            $ledger_items = [];
+            if ($status === 'valid' && $points > 0) {
+                $ledger_entry = LedgerService::addPoints(
+                    $user_id,
+                    $points,
+                    $event_type,
+                    $event_id,
+                    $metadata
+                );
                 
-                // Update circle score if user is in a circle
-                self::updateCircleScore($user_id, $points);
+                if ($ledger_entry) {
+                    $ledger_items[] = $ledger_entry;
+                    
+                    // Update circle score if user is in a circle
+                    self::updateCircleScore($user_id, $points);
+                }
             }
+            
+            // Generate message
+            $message = '';
+            if ($status === 'valid' && $points > 0) {
+                $message = RuleEngine::getMessage($event_type, $points, $metadata);
+            } elseif ($limit_exceeded) {
+                $message = 'Günlük limit aşıldı.';
+            }
+            
+            // Get current balance
+            $current_balance = LedgerService::getBalance($user_id);
+            
+            return [
+                'status' => 'success',
+                'event_id' => $event_id,
+                'event_type' => $event_type,
+                'event_status' => $status,
+                'awarded_points_total' => $points,
+                'awarded_ledger_items' => $ledger_items,
+                'messages' => $message ? [$message] : [],
+                'daily_remaining' => $daily_remaining !== null ? [$event_type => $daily_remaining] : null,
+                'current_balance' => $current_balance,
+                'code' => 200
+            ];
+        } catch (\Exception $e) {
+            error_log('EventService::ingestEvent error: ' . $e->getMessage());
+            return [
+                'status' => 'error',
+                'message' => 'Event işlenirken hata oluştu.',
+                'code' => 500
+            ];
         }
-        
-        // Generate message
-        $message = '';
-        if ($status === 'valid' && $points > 0) {
-            $message = RuleEngine::getMessage($event_type, $points, $metadata);
-        } elseif ($limit_exceeded) {
-            $message = 'Günlük limit aşıldı.';
-        }
-        
-        // Get current balance
-        $current_balance = LedgerService::getBalance($user_id);
-        
-        return [
-            'status' => 'success',
-            'event_id' => $event_id,
-            'event_type' => $event_type,
-            'event_status' => $status,
-            'awarded_points_total' => $points,
-            'awarded_ledger_items' => $ledger_items,
-            'messages' => $message ? [$message] : [],
-            'daily_remaining' => $daily_remaining !== null ? [$event_type => $daily_remaining] : null,
-            'current_balance' => $current_balance,
-            'code' => 200
-        ];
     }
     
     /**
