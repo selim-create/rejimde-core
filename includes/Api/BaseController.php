@@ -71,4 +71,23 @@ abstract class BaseController extends WP_REST_Controller {
         
         return true;
     }
+
+    /**
+     * Permission callback for point-earning endpoints
+     * Checks if user is logged in and can earn points
+     * 
+     * @param WP_REST_Request $request Request object
+     * @return bool|WP_Error True if allowed, WP_Error otherwise
+     */
+    protected function check_can_earn($request) {
+        if (!is_user_logged_in()) {
+            return new \WP_Error('rest_not_logged_in', 'Giriş yapmanız gerekiyor.', ['status' => 401]);
+        }
+        
+        if (!$this->can_earn_points()) {
+            return new \WP_Error('rest_forbidden_role', 'Uzman hesapları puan kazanamaz.', ['status' => 403]);
+        }
+        
+        return true;
+    }
 }
