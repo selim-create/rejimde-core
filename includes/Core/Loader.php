@@ -19,8 +19,21 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Core/UserMeta.php')) require_once REJIMDE_PATH . 'includes/Core/UserMeta.php';
         if (file_exists(REJIMDE_PATH . 'includes/Core/PostMeta.php')) require_once REJIMDE_PATH . 'includes/Core/PostMeta.php';
        
+        // Utils (Gamification v2.0)
+        if (file_exists(REJIMDE_PATH . 'includes/Utils/TimezoneHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/TimezoneHelper.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Utils/IdempotencyHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/IdempotencyHelper.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Utils/ConfigHelper.php')) require_once REJIMDE_PATH . 'includes/Utils/ConfigHelper.php';
+        
         // Services
         if (file_exists(REJIMDE_PATH . 'includes/Services/OpenAIService.php')) require_once REJIMDE_PATH . 'includes/Services/OpenAIService.php';
+        // Gamification v2.0 Services
+        if (file_exists(REJIMDE_PATH . 'includes/Services/RuleEngine.php')) require_once REJIMDE_PATH . 'includes/Services/RuleEngine.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/LedgerService.php')) require_once REJIMDE_PATH . 'includes/Services/LedgerService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/EventService.php')) require_once REJIMDE_PATH . 'includes/Services/EventService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/MilestoneService.php')) require_once REJIMDE_PATH . 'includes/Services/MilestoneService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ScoreService.php')) require_once REJIMDE_PATH . 'includes/Services/ScoreService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/LevelService.php')) require_once REJIMDE_PATH . 'includes/Services/LevelService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ScheduledJobs.php')) require_once REJIMDE_PATH . 'includes/Services/ScheduledJobs.php';
 
         // API Controllers
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/MascotController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/MascotController.php';
@@ -42,6 +55,11 @@ class Loader {
         // YENİ: Comment Sınıfları
         if (file_exists(REJIMDE_PATH . 'includes/Core/CommentMeta.php')) require_once REJIMDE_PATH . 'includes/Core/CommentMeta.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CommentController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CommentController.php';
+        // Gamification v2.0 API Controllers
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/EventController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/EventController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ScoreController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ScoreController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/LevelController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/LevelController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AdminController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AdminController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -86,6 +104,11 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\CommentController')) (new \Rejimde\Api\V1\CommentController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\FavoritesController')) (new \Rejimde\Api\V1\FavoritesController())->register_routes();
+            // Gamification v2.0 Routes
+            if (class_exists('Rejimde\\Api\\V1\\EventController')) (new \Rejimde\Api\V1\EventController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\ScoreController')) (new \Rejimde\Api\V1\ScoreController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\LevelController')) (new \Rejimde\Api\V1\LevelController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\AdminController')) (new \Rejimde\Api\V1\AdminController())->register_routes();
         });
 
         // CPT Kayıtları
@@ -127,5 +150,10 @@ class Loader {
         
         // YENİ: Comment Meta
         if (class_exists('Rejimde\\Core\\CommentMeta')) (new \Rejimde\Core\CommentMeta())->register();
+        
+        // Initialize Gamification v2.0 Scheduled Jobs
+        if (class_exists('Rejimde\\Services\\ScheduledJobs')) {
+            \Rejimde\Services\ScheduledJobs::init();
+        }
     }
 }

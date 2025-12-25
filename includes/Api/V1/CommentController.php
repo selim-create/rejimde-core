@@ -189,14 +189,52 @@ class CommentController extends WP_REST_Controller {
             update_comment_meta($comment_id, 'rejimde_rating', $rating);
         }
 
-        $today = date('Ymd');
-        $daily_count = (int) get_user_meta($user_id, "daily_comments_$today", true);
+        // Use new event-based gamification system
         $points_earned = 0;
-        if ($daily_count < 5) {
-            $points_earned = ($context === 'expert' && $parent === 0) ? 20 : 5;
-            $current_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-            update_user_meta($user_id, 'rejimde_total_score', $current_score + $points_earned);
-            update_user_meta($user_id, "daily_comments_$today", $daily_count + 1);
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            // Log comment_created event
+            $event_result = \Rejimde\Services\EventService::ingestEvent(
+                $user_id,
+                'comment_created',
+                'comment',
+                $comment_id,
+                [
+                    'comment_id' => $comment_id,
+                    'context' => $context,
+                    'parent' => $parent,
+                    'post_id' => $post_id
+                ],
+                'web'
+            );
+            
+            $points_earned = $event_result['awarded_points_total'];
+            
+            // If this is an expert review (rating), also log rating_submitted event
+            if ($context === 'expert' && $rating > 0 && $parent === 0) {
+                $rating_result = \Rejimde\Services\EventService::ingestEvent(
+                    $user_id,
+                    'rating_submitted',
+                    'professional',
+                    $post_id,
+                    [
+                        'target_type' => 'professional',
+                        'target_id' => $post_id,
+                        'rating' => $rating
+                    ],
+                    'web'
+                );
+                $points_earned += $rating_result['awarded_points_total'];
+            }
+        } else {
+            // Fallback to old system
+            $today = date('Ymd');
+            $daily_count = (int) get_user_meta($user_id, "daily_comments_$today", true);
+            if ($daily_count < 5) {
+                $points_earned = ($context === 'expert' && $parent === 0) ? 20 : 5;
+                $current_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+                update_user_meta($user_id, 'rejimde_total_score', $current_score + $points_earned);
+                update_user_meta($user_id, "daily_comments_$today", $daily_count + 1);
+            }
         }
 
         $new_comment = get_comment($comment_id);
@@ -219,18 +257,79 @@ class CommentController extends WP_REST_Controller {
         $user_id = get_current_user_id();
         if (!$user_id) return new WP_Error('auth_required', 'Giriş yapmalısınız', ['status' => 401]);
         
+        global $wpdb;
+        $likes_table = $wpdb->prefix . 'rejimde_comment_likes';
+        
+        // Check if already liked
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $likes_table WHERE comment_id = %d AND liker_user_id = %d",
+            $comment_id, $user_id
+        ));
+        
+        $is_liked = false;
+        
+        if ($existing) {
+            // Unlike - remove from table
+            $wpdb->delete(
+                $likes_table,
+                ['id' => $existing],
+                ['%d']
+            );
+        } else {
+            // Like - add to table
+            $wpdb->insert(
+                $likes_table,
+                [
+                    'comment_id' => $comment_id,
+                    'liker_user_id' => $user_id,
+                    'created_at' => current_time('mysql')
+                ],
+                ['%d', '%d', '%s']
+            );
+            $is_liked = true;
+            
+            // Log event to gamification system
+            if (class_exists('Rejimde\\Services\\EventService')) {
+                \Rejimde\Services\EventService::ingestEvent(
+                    $user_id,
+                    'comment_liked',
+                    'comment',
+                    $comment_id,
+                    ['comment_id' => $comment_id],
+                    'web'
+                );
+            }
+        }
+        
+        // Get total likes
+        $likes_count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $likes_table WHERE comment_id = %d",
+            $comment_id
+        ));
+        
+        // Check for milestones (only on like, not unlike)
+        if ($is_liked && class_exists('Rejimde\\Services\\MilestoneService')) {
+            $milestone_result = \Rejimde\Services\MilestoneService::checkAndAwardMilestone($comment_id, $likes_count);
+        }
+        
+        // Update comment meta for backward compatibility
         $likes = get_comment_meta($comment_id, 'rejimde_likes', true) ?: [];
         if (!is_array($likes)) $likes = [];
-
-        $is_liked = false;
-        if (in_array($user_id, $likes)) {
-            $likes = array_diff($likes, [$user_id]);
+        
+        if ($is_liked) {
+            if (!in_array($user_id, $likes)) {
+                $likes[] = $user_id;
+            }
         } else {
-            $likes[] = $user_id;
-            $is_liked = true;
+            $likes = array_diff($likes, [$user_id]);
         }
         update_comment_meta($comment_id, 'rejimde_likes', array_values($likes));
-        return new WP_REST_Response(['success' => true, 'likes_count' => count($likes), 'is_liked' => $is_liked], 200);
+        
+        return new WP_REST_Response([
+            'success' => true, 
+            'likes_count' => (int) $likes_count, 
+            'is_liked' => $is_liked
+        ], 200);
     }
 
     public function get_my_reviews($request) {

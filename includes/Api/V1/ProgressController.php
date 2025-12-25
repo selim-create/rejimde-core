@@ -310,6 +310,27 @@ class ProgressController extends WP_REST_Controller {
             $started_users[] = $user_id;
             update_post_meta($content_id, 'started_users', $started_users);
         }
+        
+        // Log event to gamification system
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            $event_type = null;
+            if ($content_type === 'diet') {
+                $event_type = 'diet_started';
+            } elseif ($content_type === 'exercise') {
+                $event_type = 'exercise_started';
+            }
+            
+            if ($event_type) {
+                \Rejimde\Services\EventService::ingestEvent(
+                    $user_id,
+                    $event_type,
+                    $content_type,
+                    $content_id,
+                    [],
+                    'web'
+                );
+            }
+        }
 
         return $this->success([
             'message' => 'Content marked as started',
@@ -379,6 +400,39 @@ class ProgressController extends WP_REST_Controller {
         if (!in_array($user_id, $completed_users)) {
             $completed_users[] = $user_id;
             update_post_meta($content_id, 'completed_users', $completed_users);
+        }
+        
+        // Log event to gamification system and get points from metadata
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            $event_type = null;
+            $metadata = [];
+            
+            if ($content_type === 'diet') {
+                $event_type = 'diet_completed';
+                // Get points from post meta
+                $points = get_post_meta($content_id, 'points', true);
+                if ($points) {
+                    $metadata['points'] = (int) $points;
+                }
+            } elseif ($content_type === 'exercise') {
+                $event_type = 'exercise_completed';
+                // Get points from post meta
+                $points = get_post_meta($content_id, 'points', true);
+                if ($points) {
+                    $metadata['points'] = (int) $points;
+                }
+            }
+            
+            if ($event_type) {
+                \Rejimde\Services\EventService::ingestEvent(
+                    $user_id,
+                    $event_type,
+                    $content_type,
+                    $content_id,
+                    $metadata,
+                    'web'
+                );
+            }
         }
 
         return $this->success([
@@ -580,6 +634,12 @@ class ProgressController extends WP_REST_Controller {
         $user_id = get_current_user_id();
         $content_id = (int) $request->get_param('content_id');
 
+        // Verify blog exists
+        $post = get_post($content_id);
+        if (!$post || $post->post_type !== 'post') {
+            return $this->error('Blog yazısı bulunamadı!', 404);
+        }
+
         $meta_key = "rejimde_blog_read_{$content_id}";
         $existing = get_user_meta($user_id, $meta_key, true);
 
@@ -590,16 +650,42 @@ class ProgressController extends WP_REST_Controller {
             ]);
         }
 
-        // Sticky mi kontrol et
+        // Check if sticky
         $is_sticky = is_sticky($content_id);
-        $score_reward = $is_sticky ? 50 : 10;
+        
+        // Use EventService to award points
+        $score_reward = 0;
+        $new_total = 0;
+        
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            $result = \Rejimde\Services\EventService::ingestEvent(
+                $user_id,
+                'blog_points_claimed',
+                'blog',
+                $content_id,
+                ['is_sticky' => $is_sticky],
+                'web'
+            );
+            
+            // If duplicate, return already claimed
+            if (isset($result['status']) && $result['status'] === 'duplicate') {
+                return $this->success([
+                    'already_claimed' => true,
+                    'message' => 'Bu yazının puanını zaten aldınız!'
+                ]);
+            }
+            
+            $score_reward = $result['awarded_points_total'];
+            $new_total = $result['current_balance'];
+        } else {
+            // Fallback to old system
+            $score_reward = $is_sticky ? 50 : 10;
+            $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+            $new_total = $current_total + $score_reward;
+            update_user_meta($user_id, 'rejimde_total_score', $new_total);
+        }
 
-        // Puanı ekle
-        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-        $new_total = $current_total + $score_reward;
-        update_user_meta($user_id, 'rejimde_total_score', $new_total);
-
-        // Kaydet
+        // Save to user meta for backward compatibility
         $read_data = [
             'read_at' => current_time('mysql'),
             'reward_claimed' => true,
@@ -607,7 +693,7 @@ class ProgressController extends WP_REST_Controller {
         ];
         update_user_meta($user_id, $meta_key, $read_data);
 
-        // Okuyanlar listesine ekle
+        // Add to readers list
         $readers = get_post_meta($content_id, 'rejimde_readers', true);
         if (!is_array($readers)) $readers = [];
         if (!in_array($user_id, $readers)) {
@@ -641,25 +727,50 @@ class ProgressController extends WP_REST_Controller {
                 'message' => 'Bu hesaplamayı zaten kaydettin!'
             ]);
         }
+        
+        // Use EventService to award points
+        $points_earned = 10;
+        $new_total = 0;
+        
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            $result = \Rejimde\Services\EventService::ingestEvent(
+                $user_id,
+                'calculator_saved',
+                'calculator',
+                null,
+                ['calculator_type' => $calculator_type],
+                'web'
+            );
+            
+            // If duplicate, return already saved
+            if (isset($result['status']) && $result['status'] === 'duplicate') {
+                return $this->success([
+                    'already_saved' => true,
+                    'message' => 'Bu hesaplamayı zaten kaydettin!'
+                ]);
+            }
+            
+            $points_earned = $result['awarded_points_total'];
+            $new_total = $result['current_balance'];
+        } else {
+            // Fallback to old system
+            $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+            $new_total = $current_total + $points_earned;
+            update_user_meta($user_id, 'rejimde_total_score', $new_total);
+        }
 
-        // Sonucu kaydet
+        // Save result to user meta for backward compatibility
         $result_data = [
             'saved' => true,
             'saved_at' => current_time('mysql'),
             'result' => $params['result'] ?? null,
             'reward_claimed' => true
         ];
-
-        // +50 puan ver
-        $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-        $new_total = $current_total + 50;
-        update_user_meta($user_id, 'rejimde_total_score', $new_total);
-
         update_user_meta($user_id, $meta_key, $result_data);
 
         return $this->success([
-            'message' => 'Sonuç kaydedildi, 50 puan kazandın! 🎉',
-            'earned_points' => 50,
+            'message' => "Sonuç kaydedildi, {$points_earned} puan kazandın! 🎉",
+            'earned_points' => $points_earned,
             'new_total' => $new_total
         ]);
     }
