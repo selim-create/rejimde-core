@@ -211,6 +211,23 @@ class AuthController extends WP_REST_Controller {
             return $this->error('Kullanıcı adı veya şifre hatalı.', 401);
         }
 
+        // Trigger login event for gamification
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            try {
+                \Rejimde\Services\EventService::ingestEvent(
+                    $user->ID,
+                    'login_success',
+                    null,
+                    null,
+                    [],
+                    'web'
+                );
+            } catch (\Exception $e) {
+                // Login event error should not prevent login
+                error_log('Login event error: ' . $e->getMessage());
+            }
+        }
+
         $token_data = $this->generate_token($user);
         
         if (is_wp_error($token_data)) {
@@ -299,6 +316,23 @@ class AuthController extends WP_REST_Controller {
         
         if (is_wp_error($token_data)) {
             return $this->error($token_data->get_error_message(), 500);
+        }
+
+        // Trigger login event for gamification
+        if (class_exists('Rejimde\\Services\\EventService')) {
+            try {
+                \Rejimde\Services\EventService::ingestEvent(
+                    $user->ID,
+                    'login_success',
+                    null,
+                    null,
+                    [],
+                    'web'
+                );
+            } catch (\Exception $e) {
+                // Login event error should not prevent login
+                error_log('Login event error: ' . $e->getMessage());
+            }
         }
 
         return $this->success($token_data, 'Google ile giriş başarılı!');

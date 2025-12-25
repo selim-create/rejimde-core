@@ -409,18 +409,22 @@ class ProgressController extends WP_REST_Controller {
             
             if ($content_type === 'diet') {
                 $event_type = 'diet_completed';
-                // Get points from post meta
+                // Try 'points' first, then 'score_reward', with default value
                 $points = get_post_meta($content_id, 'points', true);
-                if ($points) {
-                    $metadata['points'] = (int) $points;
+                if (!$points) {
+                    $points = get_post_meta($content_id, 'score_reward', true);
                 }
+                // Set diet_points with default value if still empty
+                $metadata['diet_points'] = $points ? (int) $points : 10;
             } elseif ($content_type === 'exercise') {
                 $event_type = 'exercise_completed';
-                // Get points from post meta
+                // Try 'points' first, then 'score_reward', with default value
                 $points = get_post_meta($content_id, 'points', true);
-                if ($points) {
-                    $metadata['points'] = (int) $points;
+                if (!$points) {
+                    $points = get_post_meta($content_id, 'score_reward', true);
                 }
+                // Set exercise_points with default value if still empty
+                $metadata['exercise_points'] = $points ? (int) $points : 10;
             }
             
             if ($event_type) {
@@ -631,82 +635,87 @@ class ProgressController extends WP_REST_Controller {
      * Claim blog reading reward
      */
     public function claim_blog_reward($request) {
-        $user_id = get_current_user_id();
-        $content_id = (int) $request->get_param('content_id');
+        try {
+            $user_id = get_current_user_id();
+            $content_id = (int) $request->get_param('content_id');
 
-        // Verify blog exists
-        $post = get_post($content_id);
-        if (!$post || $post->post_type !== 'post') {
-            return $this->error('Blog yazısı bulunamadı!', 404);
-        }
+            // Verify blog exists
+            $post = get_post($content_id);
+            if (!$post || $post->post_type !== 'post') {
+                return $this->error('Blog yazısı bulunamadı!', 404);
+            }
 
-        $meta_key = "rejimde_blog_read_{$content_id}";
-        $existing = get_user_meta($user_id, $meta_key, true);
+            $meta_key = "rejimde_blog_read_{$content_id}";
+            $existing = get_user_meta($user_id, $meta_key, true);
 
-        if ($existing && isset($existing['reward_claimed']) && $existing['reward_claimed']) {
-            return $this->success([
-                'already_claimed' => true,
-                'message' => 'Bu yazının puanını zaten aldınız!'
-            ]);
-        }
-
-        // Check if sticky
-        $is_sticky = is_sticky($content_id);
-        
-        // Use EventService to award points
-        $score_reward = 0;
-        $new_total = 0;
-        
-        if (class_exists('Rejimde\\Services\\EventService')) {
-            $result = \Rejimde\Services\EventService::ingestEvent(
-                $user_id,
-                'blog_points_claimed',
-                'blog',
-                $content_id,
-                ['is_sticky' => $is_sticky],
-                'web'
-            );
-            
-            // If duplicate, return already claimed
-            if (isset($result['status']) && $result['status'] === 'duplicate') {
+            if ($existing && isset($existing['reward_claimed']) && $existing['reward_claimed']) {
                 return $this->success([
                     'already_claimed' => true,
                     'message' => 'Bu yazının puanını zaten aldınız!'
                 ]);
             }
+
+            // Check if sticky
+            $is_sticky = is_sticky($content_id);
             
-            $score_reward = $result['awarded_points_total'];
-            $new_total = $result['current_balance'];
-        } else {
-            // Fallback to old system
-            $score_reward = $is_sticky ? 50 : 10;
-            $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-            $new_total = $current_total + $score_reward;
-            update_user_meta($user_id, 'rejimde_total_score', $new_total);
+            // Use EventService to award points
+            $score_reward = 0;
+            $new_total = 0;
+            
+            if (class_exists('Rejimde\\Services\\EventService')) {
+                $result = \Rejimde\Services\EventService::ingestEvent(
+                    $user_id,
+                    'blog_points_claimed',
+                    'blog',
+                    $content_id,
+                    ['is_sticky' => $is_sticky],
+                    'web'
+                );
+                
+                // If duplicate, return already claimed
+                if (isset($result['status']) && $result['status'] === 'duplicate') {
+                    return $this->success([
+                        'already_claimed' => true,
+                        'message' => 'Bu yazının puanını zaten aldınız!'
+                    ]);
+                }
+                
+                $score_reward = $result['awarded_points_total'];
+                $new_total = $result['current_balance'];
+            } else {
+                // Fallback to old system
+                $score_reward = $is_sticky ? 50 : 10;
+                $current_total = (int) get_user_meta($user_id, 'rejimde_total_score', true);
+                $new_total = $current_total + $score_reward;
+                update_user_meta($user_id, 'rejimde_total_score', $new_total);
+            }
+
+            // Save to user meta for backward compatibility
+            $read_data = [
+                'read_at' => current_time('mysql'),
+                'reward_claimed' => true,
+                'reward_amount' => $score_reward
+            ];
+            update_user_meta($user_id, $meta_key, $read_data);
+
+            // Add to readers list
+            $readers = get_post_meta($content_id, 'rejimde_readers', true);
+            if (!is_array($readers)) $readers = [];
+            if (!in_array($user_id, $readers)) {
+                $readers[] = $user_id;
+                update_post_meta($content_id, 'rejimde_readers', $readers);
+            }
+
+            return $this->success([
+                'message' => 'Puanını kaptın! 🎉',
+                'earned_points' => $score_reward,
+                'new_total' => $new_total,
+                'is_sticky' => $is_sticky
+            ]);
+        } catch (\Exception $e) {
+            error_log('claim_blog_reward error: ' . $e->getMessage());
+            return $this->error('Bir hata oluştu. Lütfen tekrar deneyin.', 500);
         }
-
-        // Save to user meta for backward compatibility
-        $read_data = [
-            'read_at' => current_time('mysql'),
-            'reward_claimed' => true,
-            'reward_amount' => $score_reward
-        ];
-        update_user_meta($user_id, $meta_key, $read_data);
-
-        // Add to readers list
-        $readers = get_post_meta($content_id, 'rejimde_readers', true);
-        if (!is_array($readers)) $readers = [];
-        if (!in_array($user_id, $readers)) {
-            $readers[] = $user_id;
-            update_post_meta($content_id, 'rejimde_readers', $readers);
-        }
-
-        return $this->success([
-            'message' => 'Puanını kaptın! 🎉',
-            'earned_points' => $score_reward,
-            'new_total' => $new_total,
-            'is_sticky' => $is_sticky
-        ]);
     }
 
     /**

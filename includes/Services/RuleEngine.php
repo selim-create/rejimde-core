@@ -38,8 +38,9 @@ class RuleEngine {
                 break;
                 
             case 'diet_completed':
-                // Dynamic points from diet metadata
-                $points = isset($metadata['points']) ? (int) $metadata['points'] : 0;
+                // Dynamic points: Try diet_points first, then points, default to 10
+                $points = isset($metadata['diet_points']) ? (int) $metadata['diet_points'] : 
+                          (isset($metadata['points']) ? (int) $metadata['points'] : 10);
                 break;
                 
             case 'exercise_started':
@@ -48,8 +49,9 @@ class RuleEngine {
                 break;
                 
             case 'exercise_completed':
-                // Dynamic points from exercise metadata
-                $points = isset($metadata['points']) ? (int) $metadata['points'] : 0;
+                // Dynamic points: Try exercise_points first, then points, default to 10
+                $points = isset($metadata['exercise_points']) ? (int) $metadata['exercise_points'] : 
+                          (isset($metadata['points']) ? (int) $metadata['points'] : 10);
                 break;
                 
             case 'calculator_saved':
