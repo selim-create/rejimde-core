@@ -56,7 +56,9 @@ class EventService {
         $query = "SELECT COUNT(*) FROM $table WHERE user_id = %d AND event_type = %s";
         $params = [$userId, $eventType];
         
-        // Add entity filters if provided (both entity_type and entity_id must be present for entity filtering)
+        // Add entity filters if provided
+        // For per-entity limit checks, both entity_type and entity_id should be provided
+        // For entity_type-only filtering, just entity_type is sufficient
         if ($entityType !== null && $entityId !== null) {
             $query .= " AND entity_type = %s AND entity_id = %d";
             $params[] = $entityType;
