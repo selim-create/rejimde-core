@@ -88,8 +88,9 @@ class EventController extends BaseController {
             
             // Handle error responses from EventService
             if (isset($result['status']) && $result['status'] === 'error') {
+                $error_message = !empty($result['messages']) ? $result['messages'][0] : 'Bir hata oluştu';
                 return $this->error(
-                    $result['messages'][0] ?? 'Bir hata oluştu',
+                    $error_message,
                     $result['code'] ?? 500
                 );
             }
