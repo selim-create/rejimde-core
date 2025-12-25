@@ -28,7 +28,8 @@ class EventService {
             if (class_exists(\Rejimde\Utils\DatabaseHelper::class)) {
                 if (!\Rejimde\Utils\DatabaseHelper::isGamificationReady()) {
                     // Fallback: log to error_log and return graceful response
-                    error_log("Rejimde Gamification: Tables not ready, attempting to create...");
+                    // Note: User ID and event type are logged for debugging. Ensure error logs are properly secured.
+                    error_log("EventService: Tables not ready for user {$user_id}, event {$event_type}");
                     
                     try {
                         \Rejimde\Utils\DatabaseHelper::ensureTablesExist();
@@ -43,7 +44,7 @@ class EventService {
                             'event_id' => 0,
                             'awarded_points_total' => 0,
                             'awarded_ledger_items' => [],
-                            'messages' => ['Sistem henüz hazır değil. Lütfen daha sonra tekrar deneyin.'],
+                            'messages' => ['Sistem geçici olarak kullanılamıyor.'],
                             'daily_remaining' => null,
                             'current_balance' => 0,
                             'code' => 503
@@ -174,15 +175,16 @@ class EventService {
                 'code' => 200
             ];
         } catch (\Throwable $e) {
-            error_log('EventService::ingestEvent error: ' . $e->getMessage());
+            // Log detailed error information for debugging
+            // Note: User ID and event type are logged for troubleshooting. Ensure error logs are properly secured.
+            error_log('EventService::ingestEvent CRITICAL: ' . $e->getMessage() . ' | User: ' . $user_id . ' | Event: ' . $event_type . ' | File: ' . $e->getFile() . ':' . $e->getLine());
             error_log('EventService::ingestEvent trace: ' . $e->getTraceAsString());
-            error_log('EventService::ingestEvent file: ' . $e->getFile() . ':' . $e->getLine());
             return [
                 'status' => 'error',
                 'event_id' => 0,
                 'awarded_points_total' => 0,
                 'awarded_ledger_items' => [],
-                'messages' => ['Bir hata oluştu. Lütfen tekrar deneyin.'],
+                'messages' => ['Puan işleme hatası oluştu.'],
                 'daily_remaining' => null,
                 'current_balance' => 0,
                 'code' => 500
