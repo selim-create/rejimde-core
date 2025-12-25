@@ -124,7 +124,80 @@ class Activator {
         ) $charset_collate;";
         dbDelta( $sql_snapshots );
         
-        // 8. Migrate rejimde_level to rejimde_rank (if needed)
+        // 8. Notifications Table
+        $table_notifications = $wpdb->prefix . 'rejimde_notifications';
+        $sql_notifications = "CREATE TABLE $table_notifications (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            category ENUM('social', 'system', 'level', 'circle', 'points', 'expert') NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            body TEXT,
+            icon VARCHAR(50) DEFAULT 'fa-bell',
+            action_url VARCHAR(255) DEFAULT NULL,
+            actor_id BIGINT UNSIGNED DEFAULT NULL,
+            entity_type VARCHAR(30) DEFAULT NULL,
+            entity_id BIGINT UNSIGNED DEFAULT NULL,
+            meta JSON DEFAULT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            is_pushed TINYINT(1) DEFAULT 0,
+            is_emailed TINYINT(1) DEFAULT 0,
+            expires_at DATETIME DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_unread (user_id, is_read, created_at),
+            INDEX idx_user_category (user_id, category),
+            INDEX idx_type (type),
+            UNIQUE KEY unique_notification (user_id, type, entity_type, entity_id, DATE(created_at))
+        ) $charset_collate;";
+        dbDelta( $sql_notifications );
+        
+        // 9. Notification Preferences Table
+        $table_preferences = $wpdb->prefix . 'rejimde_notification_preferences';
+        $sql_preferences = "CREATE TABLE $table_preferences (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            category VARCHAR(50) NOT NULL,
+            channel_in_app TINYINT(1) DEFAULT 1,
+            channel_push TINYINT(1) DEFAULT 1,
+            channel_email TINYINT(1) DEFAULT 0,
+            dnd_start TIME DEFAULT NULL,
+            dnd_end TIME DEFAULT NULL,
+            UNIQUE KEY unique_pref (user_id, category)
+        ) $charset_collate;";
+        dbDelta( $sql_preferences );
+        
+        // 10. Expert Metrics Table
+        $table_expert_metrics = $wpdb->prefix . 'rejimde_expert_metrics';
+        $sql_expert_metrics = "CREATE TABLE $table_expert_metrics (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            metric_date DATE NOT NULL,
+            profile_views INT UNSIGNED DEFAULT 0,
+            unique_viewers INT UNSIGNED DEFAULT 0,
+            rating_count INT UNSIGNED DEFAULT 0,
+            rating_sum DECIMAL(10,2) DEFAULT 0,
+            content_views INT UNSIGNED DEFAULT 0,
+            client_completions INT UNSIGNED DEFAULT 0,
+            UNIQUE KEY unique_metric (expert_id, metric_date),
+            INDEX idx_expert_date (expert_id, metric_date DESC)
+        ) $charset_collate;";
+        dbDelta( $sql_expert_metrics );
+        
+        // 11. Profile Views Table
+        $table_profile_views = $wpdb->prefix . 'rejimde_profile_views';
+        $sql_profile_views = "CREATE TABLE $table_profile_views (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            profile_user_id BIGINT UNSIGNED NOT NULL,
+            viewer_user_id BIGINT UNSIGNED DEFAULT NULL,
+            viewer_ip_hash VARCHAR(64) DEFAULT NULL,
+            source VARCHAR(50) DEFAULT 'direct',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_profile_date (profile_user_id, created_at DESC),
+            INDEX idx_viewer (viewer_user_id)
+        ) $charset_collate;";
+        dbDelta( $sql_profile_views );
+        
+        // 12. Migrate rejimde_level to rejimde_rank (if needed)
         self::migrate_level_to_rank();
     }
     
