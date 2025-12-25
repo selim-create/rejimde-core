@@ -218,7 +218,12 @@ class ProfileController extends WP_REST_Controller {
             $is_following = true;
             $message = 'Takip edildi!';
             
-            // Bildirim oluşturulabilir...
+            // Dispatch follow_accepted event
+            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+            $dispatcher->dispatch('follow_accepted', [
+                'follower_id' => $current_user_id,
+                'followed_id' => $target_id
+            ]);
         }
 
         update_user_meta($target_id, 'rejimde_followers', array_values($followers));
@@ -243,18 +248,22 @@ class ProfileController extends WP_REST_Controller {
             return new WP_Error('invalid_action', 'Kendine beşlik çakamazsın :)', ['status' => 400]);
         }
         
-        // Spam kontrolü (Basit: Son 1 saatte gönderdi mi?)
-        $last_high_five = get_user_meta($current_user_id, 'last_high_five_' . $target_id, true);
-        if ($last_high_five && (time() - $last_high_five) < 3600) {
-             return new WP_Error('rate_limit', 'Biraz beklemen lazım.', ['status' => 429]);
+        // Dispatch highfive_sent event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $result = $dispatcher->dispatch('highfive_sent', [
+            'user_id' => $current_user_id,
+            'context' => [
+                'target_user_id' => $target_id
+            ]
+        ]);
+        
+        if (!$result['success']) {
+            return new WP_Error('rate_limit', $result['message'], ['status' => 429]);
         }
 
         // Sayacı artır
         $count = (int) get_user_meta($target_id, 'rejimde_high_fives', true);
         update_user_meta($target_id, 'rejimde_high_fives', $count + 1);
-        
-        // Zaman damgası kaydet
-        update_user_meta($current_user_id, 'last_high_five_' . $target_id, time());
 
         return new WP_REST_Response([
             'success' => true,

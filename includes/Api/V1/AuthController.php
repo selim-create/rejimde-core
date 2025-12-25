@@ -216,6 +216,12 @@ class AuthController extends WP_REST_Controller {
         if (is_wp_error($token_data)) {
             return $this->error($token_data->get_error_message(), 500);
         }
+        
+        // Dispatch login_success event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $dispatcher->dispatch('login_success', [
+            'user_id' => $user->ID
+        ]);
 
         return $this->success($token_data, 'Giriş başarılı.');
     }
@@ -300,6 +306,12 @@ class AuthController extends WP_REST_Controller {
         if (is_wp_error($token_data)) {
             return $this->error($token_data->get_error_message(), 500);
         }
+        
+        // Dispatch login_success event
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $dispatcher->dispatch('login_success', [
+            'user_id' => $user->ID
+        ]);
 
         return $this->success($token_data, 'Google ile giriş başarılı!');
     }

@@ -188,16 +188,22 @@ class CommentController extends WP_REST_Controller {
         if ($rating > 0) {
             update_comment_meta($comment_id, 'rejimde_rating', $rating);
         }
-
-        $today = date('Ymd');
-        $daily_count = (int) get_user_meta($user_id, "daily_comments_$today", true);
-        $points_earned = 0;
-        if ($daily_count < 5) {
-            $points_earned = ($context === 'expert' && $parent === 0) ? 20 : 5;
-            $current_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
-            update_user_meta($user_id, 'rejimde_total_score', $current_score + $points_earned);
-            update_user_meta($user_id, "daily_comments_$today", $daily_count + 1);
-        }
+        
+        // Dispatch event for comment creation or rating
+        $eventType = ($context === 'expert' && $parent === 0 && $rating > 0) ? 'rating_submitted' : 'comment_created';
+        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+        $eventResult = $dispatcher->dispatch($eventType, [
+            'user_id' => $user_id,
+            'entity_type' => 'comment',
+            'entity_id' => $comment_id,
+            'context' => [
+                'post_id' => $post_id,
+                'comment_context' => $context,
+                'rating' => $rating
+            ]
+        ]);
+        
+        $points_earned = $eventResult['points_earned'] ?? 0;
 
         $new_comment = get_comment($comment_id);
         $meta_helper = new \Rejimde\Core\CommentMeta();
@@ -228,8 +234,24 @@ class CommentController extends WP_REST_Controller {
         } else {
             $likes[] = $user_id;
             $is_liked = true;
+            
+            // Only dispatch event when liking (not unliking)
+            // Update like count first
+            update_comment_meta($comment_id, 'like_count', count($likes));
+            
+            // Dispatch event for comment liked
+            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+            $dispatcher->dispatch('comment_liked', [
+                'user_id' => $user_id,
+                'comment_id' => $comment_id,
+                'entity_type' => 'comment',
+                'entity_id' => $comment_id
+            ]);
         }
+        
         update_comment_meta($comment_id, 'rejimde_likes', array_values($likes));
+        update_comment_meta($comment_id, 'like_count', count($likes));
+        
         return new WP_REST_Response(['success' => true, 'likes_count' => count($likes), 'is_liked' => $is_liked], 200);
     }
 
