@@ -134,7 +134,7 @@ class ClanController extends WP_REST_Controller {
         
         $current_clan = get_user_meta($user_id, 'clan_id', true);
         if ($current_clan) {
-            return new WP_Error('already_in_circle', 'Zaten bir Circle\'dasınız.', ['status' => 400]);
+            return new WP_Error('already_in_circle', "Zaten bir Circle'dasınız.", ['status' => 400]);
         }
 
         $params = $request->get_json_params();
@@ -215,7 +215,7 @@ class ClanController extends WP_REST_Controller {
         $clan_id = $request->get_param('id');
         
         if (get_user_meta($user_id, 'clan_id', true)) {
-            return new WP_Error('already_in_circle', 'Önce mevcut Circle\'dan ayrılmalısınız.', ['status' => 400]);
+            return new WP_Error('already_in_circle', "Önce mevcut Circle'dan ayrılmalısınız.", ['status' => 400]);
         }
 
         $clan = get_post($clan_id);
@@ -229,7 +229,7 @@ class ClanController extends WP_REST_Controller {
         update_user_meta($user_id, 'clan_id', $clan_id);
         update_user_meta($user_id, 'clan_role', 'member');
 
-        return new WP_REST_Response(['message' => 'Circle\'a katıldınız!'], 200);
+        return new WP_REST_Response(['message' => "Circle'a katıldınız!"], 200);
     }
 
     public function leave_clan($request) {
@@ -237,7 +237,7 @@ class ClanController extends WP_REST_Controller {
         $clan_id = get_user_meta($user_id, 'clan_id', true);
 
         if (!$clan_id) {
-            return new WP_Error('no_circle', 'Herhangi bir Circle\'da değilsiniz.', ['status' => 400]);
+            return new WP_Error('no_circle', "Herhangi bir Circle'da değilsiniz.", ['status' => 400]);
         }
         
         $count = (int) get_post_meta($clan_id, 'member_count', true);
@@ -246,7 +246,7 @@ class ClanController extends WP_REST_Controller {
         delete_user_meta($user_id, 'clan_id');
         delete_user_meta($user_id, 'clan_role');
 
-        return new WP_REST_Response(['message' => 'Circle\'dan ayrıldınız.'], 200);
+        return new WP_REST_Response(['message' => "Circle'dan ayrıldınız."], 200);
     }
 
     public function get_item($request) {
