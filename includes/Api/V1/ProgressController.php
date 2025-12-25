@@ -11,6 +11,22 @@ class ProgressController extends WP_REST_Controller {
     protected $base = 'progress';
     
     private $allowed_content_types = ['blog', 'diet', 'exercise', 'dictionary'];
+    
+    // Default total items for progress calculation
+    private $default_total_items = [
+        'diet' => 21,      // 7 days x 3 meals
+        'exercise' => 7,   // 7 days
+        'blog' => 1,       // Single item
+        'dictionary' => 1  // Single item
+    ];
+    
+    // Content type to plural mapping for structured responses
+    private $type_plural_map = [
+        'blog' => 'blogs',
+        'diet' => 'diets',
+        'exercise' => 'exercises',
+        'dictionary' => 'dictionary'
+    ];
 
     public function register_routes() {
         // GET /rejimde/v1/progress/my - Get all progress for current user
@@ -104,20 +120,27 @@ class ProgressController extends WP_REST_Controller {
                 'content_type' => $content_type,
                 'content_id' => $content_id,
                 'progress_data' => [],
+                'completed_items' => [],
                 'is_started' => false,
                 'is_completed' => false,
-                'reward_claimed' => false
+                'reward_claimed' => false,
+                'progress_percentage' => 0
             ]);
         }
+
+        $progress_data = json_decode($progress->progress_data ?: '{}', true);
+        $completed_items = $progress_data['completed_items'] ?? [];
 
         return $this->success([
             'user_id' => (int) $progress->user_id,
             'content_type' => $progress->content_type,
             'content_id' => (int) $progress->content_id,
-            'progress_data' => json_decode($progress->progress_data ?: '[]', true),
+            'progress_data' => $progress_data,
+            'completed_items' => $completed_items,
             'is_started' => (bool) $progress->is_started,
             'is_completed' => (bool) $progress->is_completed,
             'reward_claimed' => (bool) $progress->reward_claimed,
+            'progress_percentage' => $this->calculate_progress_percentage($content_type, $content_id, $completed_items),
             'started_at' => $progress->started_at,
             'completed_at' => $progress->completed_at
         ]);
@@ -148,7 +171,28 @@ class ProgressController extends WP_REST_Controller {
 
         $data = [];
         
-        if (isset($params['progress_data'])) {
+        // Handle completed_items for diet/exercise
+        if (isset($params['completed_items'])) {
+            // Get existing progress_data
+            $existing_data = [];
+            if ($existing) {
+                $current = $wpdb->get_row($wpdb->prepare(
+                    "SELECT progress_data FROM $table WHERE id = %d",
+                    $existing->id
+                ));
+                $existing_data = $current->progress_data ? json_decode($current->progress_data, true) : [];
+            }
+            
+            // Merge completed items
+            $completed_items = $this->normalize_array($existing_data['completed_items'] ?? []);
+            $new_items = $this->normalize_array($params['completed_items']);
+            $completed_items = array_unique(array_merge($completed_items, $new_items));
+            
+            $data['progress_data'] = json_encode([
+                'completed_items' => array_values($completed_items)
+            ]);
+        }
+        elseif (isset($params['progress_data'])) {
             $data['progress_data'] = is_string($params['progress_data']) 
                 ? $params['progress_data'] 
                 : json_encode($params['progress_data']);
@@ -184,8 +228,20 @@ class ProgressController extends WP_REST_Controller {
             $data['reward_claimed'] = (bool) $params['reward_claimed'] ? 1 : 0;
         }
 
+        // Allow empty data if we're just checking/creating a progress record
+        // This is useful for frontend to initialize state
         if (empty($data)) {
-            return $this->error('No valid data provided', 400);
+            if ($existing) {
+                // Return existing progress without changes
+                return $this->get_progress($request);
+            } else {
+                // Create a minimal progress record
+                $data['user_id'] = $user_id;
+                $data['content_type'] = $content_type;
+                $data['content_id'] = $content_id;
+                $wpdb->insert($table, $data);
+                return $this->get_progress($request);
+            }
         }
 
         if ($existing) {
@@ -209,7 +265,7 @@ class ProgressController extends WP_REST_Controller {
 
     /**
      * GET /rejimde/v1/progress/my
-     * Returns all progress records for current user
+     * Returns all progress records for current user, grouped by type
      */
     public function get_my_progress($request) {
         $user_id = get_current_user_id();
@@ -237,24 +293,43 @@ class ProgressController extends WP_REST_Controller {
 
         $results = $wpdb->get_results($wpdb->prepare($sql, $values));
 
-        $progress_list = [];
+        // Group by content type for structured response
+        $grouped = [
+            'diets' => [],
+            'exercises' => [],
+            'blogs' => [],
+            'dictionary' => []
+        ];
+
         foreach ($results as $row) {
-            $progress_list[] = [
+            $progress_data = json_decode($row->progress_data ?: '{}', true);
+            $completed_items = $progress_data['completed_items'] ?? [];
+            
+            $item = [
                 'user_id' => (int) $row->user_id,
                 'content_type' => $row->content_type,
                 'content_id' => (int) $row->content_id,
-                'progress_data' => json_decode($row->progress_data ?: '[]', true),
+                'progress_data' => $progress_data,
+                'completed_items' => $completed_items,
                 'is_started' => (bool) $row->is_started,
                 'is_completed' => (bool) $row->is_completed,
                 'reward_claimed' => (bool) $row->reward_claimed,
+                'progress_percentage' => $this->calculate_progress_percentage($row->content_type, $row->content_id, $completed_items),
                 'started_at' => $row->started_at,
                 'completed_at' => $row->completed_at,
                 'created_at' => $row->created_at,
                 'updated_at' => $row->updated_at
             ];
+            
+            // Add to appropriate group
+            $type = $row->content_type;
+            $plural_key = $this->type_plural_map[$type] ?? $type;
+            if (isset($grouped[$plural_key])) {
+                $grouped[$plural_key][] = $item;
+            }
         }
 
-        return $this->success($progress_list);
+        return $this->success($grouped);
     }
 
     /**
@@ -553,7 +628,7 @@ class ProgressController extends WP_REST_Controller {
         $item_id = sanitize_text_field($params['item_id'] ?? '');
 
         if (empty($item_id)) {
-            return new WP_Error('missing_item', 'Öğe ID gerekli', ['status' => 400]);
+            return $this->error('item_id is required', 400);
         }
 
         if (!$this->validate_content_type($content_type)) {
@@ -565,12 +640,12 @@ class ProgressController extends WP_REST_Controller {
 
         // Get existing progress
         $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, progress_data, is_started FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+            "SELECT id, progress_data, is_started, is_completed FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
             $user_id, $content_type, $content_id
         ));
 
         if (!$existing || !$existing->is_started) {
-            return new WP_Error('not_started', 'Önce başlamalısınız', ['status' => 400]);
+            return $this->error('Content must be started before completing items', 400);
         }
 
         $progress_data = json_decode($existing->progress_data ?: '{}', true);
@@ -578,6 +653,7 @@ class ProgressController extends WP_REST_Controller {
             $progress_data['completed_items'] = [];
         }
 
+        // Add item if not already completed
         if (!in_array($item_id, $progress_data['completed_items'])) {
             $progress_data['completed_items'][] = $item_id;
             
@@ -588,10 +664,70 @@ class ProgressController extends WP_REST_Controller {
             );
         }
 
+        $completed_items = $progress_data['completed_items'];
+        $progress_percentage = $this->calculate_progress_percentage($content_type, $content_id, $completed_items);
+
         return $this->success([
-            'message' => 'Öğe tamamlandı!',
-            'completed_items' => $progress_data['completed_items']
+            'message' => 'Item completed successfully',
+            'completed_items' => $completed_items,
+            'progress_percentage' => $progress_percentage,
+            'is_completed' => (bool) $existing->is_completed
         ]);
+    }
+
+    /**
+     * Calculate progress percentage based on completed items
+     * 
+     * @param string $content_type Content type
+     * @param int $content_id Content ID
+     * @param array $completed_items Completed items array
+     * @return float Progress percentage (0-100)
+     */
+    private function calculate_progress_percentage($content_type, $content_id, $completed_items) {
+        if (empty($completed_items)) {
+            return 0;
+        }
+
+        $total_items = 0;
+        
+        // Try to get total items from post meta for all content types
+        $total_items = (int) get_post_meta($content_id, 'total_items', true);
+        
+        // Fallback: use default values from configuration
+        if ($total_items === 0 && isset($this->default_total_items[$content_type])) {
+            $total_items = $this->default_total_items[$content_type];
+        }
+
+        // Guard against division by zero and log potential configuration issue
+        if ($total_items === 0) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf(
+                    'ProgressController: Unable to calculate progress percentage for %s #%d - total_items is 0',
+                    $content_type,
+                    $content_id
+                ));
+            }
+            return 0;
+        }
+
+        $percentage = (count($completed_items) / $total_items) * 100;
+        return min(100, round($percentage, 2));
+    }
+
+    /**
+     * Normalize value to array
+     * 
+     * @param mixed $value Value to normalize
+     * @return array Normalized array
+     */
+    private function normalize_array($value) {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (empty($value)) {
+            return [];
+        }
+        return [$value];
     }
 
     /**
