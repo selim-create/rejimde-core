@@ -379,7 +379,8 @@ class GamificationController extends WP_REST_Controller {
         $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
         $result = $dispatcher->dispatch($eventType, $payload);
         
-        if ($result['success']) {
+        // Handle success or already_earned cases (both should return 200 OK)
+        if ($result['success'] || !empty($result['already_earned'])) {
             return $this->success($result);
         } else {
             return $this->error($result['message'], 400);
