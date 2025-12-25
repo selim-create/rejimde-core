@@ -21,6 +21,16 @@ class Loader {
        
         // Services
         if (file_exists(REJIMDE_PATH . 'includes/Services/OpenAIService.php')) require_once REJIMDE_PATH . 'includes/Services/OpenAIService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/EventService.php')) require_once REJIMDE_PATH . 'includes/Services/EventService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ScoreService.php')) require_once REJIMDE_PATH . 'includes/Services/ScoreService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/StreakService.php')) require_once REJIMDE_PATH . 'includes/Services/StreakService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/MilestoneService.php')) require_once REJIMDE_PATH . 'includes/Services/MilestoneService.php';
+        
+        // Core
+        if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
+        
+        // Cron
+        if (file_exists(REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php')) require_once REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php';
 
         // API Controllers
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/MascotController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/MascotController.php';
@@ -127,5 +137,11 @@ class Loader {
         
         // YENİ: Comment Meta
         if (class_exists('Rejimde\\Core\\CommentMeta')) (new \Rejimde\Core\CommentMeta())->register();
+        
+        // YENİ: Cron Jobs (Score Aggregator)
+        if (class_exists('Rejimde\\Cron\\ScoreAggregator')) {
+            $scoreAggregator = new \Rejimde\Cron\ScoreAggregator();
+            $scoreAggregator->register();
+        }
     }
 }
