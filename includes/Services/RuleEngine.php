@@ -11,6 +11,20 @@ use Rejimde\Utils\ConfigHelper;
 class RuleEngine {
     
     /**
+     * Extract and normalize is_sticky flag from metadata
+     * Supports boolean, string "true"/"false", "1"/"0"
+     * 
+     * @param array $metadata Event metadata
+     * @return bool Normalized sticky flag
+     */
+    private static function extractStickyFlag($metadata) {
+        if (isset($metadata['is_sticky'])) {
+            return filter_var($metadata['is_sticky'], FILTER_VALIDATE_BOOLEAN);
+        }
+        return false;
+    }
+    
+    /**
      * Calculate points for an event
      * 
      * @param string $event_type Event type
@@ -28,12 +42,7 @@ class RuleEngine {
                 
             case 'blog_points_claimed':
                 // Sticky: +50, Normal: +10
-                // Metadata'dan is_sticky al, çeşitli formatları destekle
-                $is_sticky = false;
-                if (isset($metadata['is_sticky'])) {
-                    // Boolean, string "true"/"false", "1"/"0" hepsini destekle
-                    $is_sticky = filter_var($metadata['is_sticky'], FILTER_VALIDATE_BOOLEAN);
-                }
+                $is_sticky = self::extractStickyFlag($metadata);
                 $points = $is_sticky ? 50 : 10;
                 break;
                 
@@ -183,11 +192,7 @@ class RuleEngine {
                 return "+{$points} puan kazandın! Hoş geldin!";
                 
             case 'blog_points_claimed':
-                // Metadata'dan is_sticky al, çeşitli formatları destekle
-                $is_sticky = false;
-                if (isset($metadata['is_sticky'])) {
-                    $is_sticky = filter_var($metadata['is_sticky'], FILTER_VALIDATE_BOOLEAN);
-                }
+                $is_sticky = self::extractStickyFlag($metadata);
                 $type = $is_sticky ? 'Sticky blog' : 'Blog okuma';
                 return "+{$points} puan kazandın! ({$type})";
                 
