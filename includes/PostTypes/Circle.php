@@ -47,7 +47,7 @@ class Circle {
      */
     private function maybe_migrate_old_clans() {
         // Migration yapılmış mı kontrol et
-        if (get_option('rejimde_clan_to_circle_migrated')) {
+        if (get_option('rejimde_clan_to_circle_migrated_v1')) {
             return;
         }
         
@@ -61,14 +61,14 @@ class Circle {
         );
         
         // User meta'ları güncelle: clan_id → circle_id
-        $wpdb->query("UPDATE {$wpdb->usermeta} SET meta_key = 'circle_id' WHERE meta_key = 'clan_id'");
-        $wpdb->query("UPDATE {$wpdb->usermeta} SET meta_key = 'circle_role' WHERE meta_key = 'clan_role'");
+        $wpdb->query($wpdb->prepare("UPDATE {$wpdb->usermeta} SET meta_key = %s WHERE meta_key = %s", 'circle_id', 'clan_id'));
+        $wpdb->query($wpdb->prepare("UPDATE {$wpdb->usermeta} SET meta_key = %s WHERE meta_key = %s", 'circle_role', 'clan_role'));
         
         // Post meta'ları güncelle
-        $wpdb->query("UPDATE {$wpdb->postmeta} SET meta_key = 'circle_leader_id' WHERE meta_key = 'clan_leader_id'");
-        $wpdb->query("UPDATE {$wpdb->postmeta} SET meta_key = 'circle_logo_url' WHERE meta_key = 'clan_logo_url'");
+        $wpdb->query($wpdb->prepare("UPDATE {$wpdb->postmeta} SET meta_key = %s WHERE meta_key = %s", 'circle_leader_id', 'clan_leader_id'));
+        $wpdb->query($wpdb->prepare("UPDATE {$wpdb->postmeta} SET meta_key = %s WHERE meta_key = %s", 'circle_logo_url', 'clan_logo_url'));
         
         // Migration tamamlandı olarak işaretle
-        update_option('rejimde_clan_to_circle_migrated', true);
+        update_option('rejimde_clan_to_circle_migrated_v1', true);
     }
 }

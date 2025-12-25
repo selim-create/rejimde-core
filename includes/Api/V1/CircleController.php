@@ -160,7 +160,10 @@ class CircleController extends WP_REST_Controller {
         update_post_meta($post_id, 'circle_leader_id', $user_id);
         update_post_meta($post_id, 'circle_mentor_id', $user_id); // Mentor = Leader
         update_post_meta($post_id, 'privacy', $params['privacy'] ?? 'public');
-        update_post_meta($post_id, 'motto', $motto);
+        
+        if (!empty($motto)) {
+            update_post_meta($post_id, 'motto', $motto);
+        }
         
         if (!empty($params['logo'])) {
             update_post_meta($post_id, 'circle_logo_url', esc_url_raw($params['logo']));
