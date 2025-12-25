@@ -665,8 +665,16 @@ class ProgressController extends WP_REST_Controller {
                 ]);
             }
 
-            // Check if sticky
-            $is_sticky = is_sticky($content_id);
+            // Check if sticky - safely handle is_sticky() function
+            $is_sticky = false;
+            try {
+                if (function_exists('is_sticky') && is_numeric($content_id) && $content_id > 0) {
+                    $is_sticky = is_sticky((int) $content_id);
+                }
+            } catch (\Throwable $e) {
+                error_log('ProgressController: is_sticky error for post ' . $content_id . ': ' . $e->getMessage());
+                $is_sticky = false;
+            }
             
             // Use EventService to award points
             $score_reward = 0;
