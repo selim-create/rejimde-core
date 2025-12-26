@@ -8,6 +8,14 @@ namespace Rejimde\Services;
  */
 class ScoreService {
     
+    // Error reason constants
+    const REASON_ALREADY_EARNED = 'Already earned points for this entity';
+    const REASON_DAILY_LIMIT = 'Daily limit reached';
+    const REASON_ALREADY_SENT_TODAY = 'Already sent to this user today';
+    const REASON_DAILY_CAP = 'Daily score cap reached';
+    const REASON_EVENT_NOT_FOUND = 'Event type not found';
+    const REASON_FEATURE_DISABLED = 'Feature is disabled';
+    
     private $rules;
     private $featureFlags;
     
@@ -80,7 +88,7 @@ class ScoreService {
     public function canEarnPoints(int $userId, string $eventType, ?int $entityId = null, array $context = []): array {
         // Check if event type exists
         if (!isset($this->rules[$eventType])) {
-            return ['allowed' => false, 'reason' => 'Event type not found'];
+            return ['allowed' => false, 'reason' => self::REASON_EVENT_NOT_FOUND];
         }
         
         $rule = $this->rules[$eventType];
@@ -89,7 +97,7 @@ class ScoreService {
         if (isset($rule['feature_flag'])) {
             $flagName = $rule['feature_flag'];
             if (!($this->featureFlags[$flagName] ?? false)) {
-                return ['allowed' => false, 'reason' => 'Feature is disabled'];
+                return ['allowed' => false, 'reason' => self::REASON_FEATURE_DISABLED];
             }
         }
         
@@ -104,7 +112,7 @@ class ScoreService {
         if (isset($rule['daily_limit'])) {
             $todayCount = $eventService->countTodayEvents($userId, $eventType);
             if ($todayCount >= $rule['daily_limit']) {
-                return ['allowed' => false, 'reason' => 'Daily limit reached'];
+                return ['allowed' => false, 'reason' => self::REASON_DAILY_LIMIT];
             }
         }
         
@@ -112,14 +120,14 @@ class ScoreService {
         if (isset($rule['per_entity_limit']) && $entityId !== null) {
             $entityType = $context['entity_type'] ?? null;
             if ($eventService->hasEvent($userId, $eventType, $entityType, $entityId)) {
-                return ['allowed' => false, 'reason' => 'Already earned points for this entity'];
+                return ['allowed' => false, 'reason' => self::REASON_ALREADY_EARNED];
             }
         }
         
         // Check daily pair limit (for highfive, etc.)
         if (isset($rule['daily_pair_limit']) && isset($context['target_user_id'])) {
             if ($eventService->hasDailyPairEvent($userId, $context['target_user_id'], $eventType)) {
-                return ['allowed' => false, 'reason' => 'Already sent to this user today'];
+                return ['allowed' => false, 'reason' => self::REASON_ALREADY_SENT_TODAY];
             }
         }
         
@@ -128,7 +136,7 @@ class ScoreService {
             $capValue = $this->featureFlags['daily_score_cap_value'] ?? 500;
             $dailyScore = $this->getDailyScore($userId);
             if ($dailyScore >= $capValue) {
-                return ['allowed' => false, 'reason' => 'Daily score cap reached'];
+                return ['allowed' => false, 'reason' => self::REASON_DAILY_CAP];
             }
         }
         
