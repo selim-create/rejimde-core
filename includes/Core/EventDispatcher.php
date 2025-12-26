@@ -100,10 +100,10 @@ class EventDispatcher {
         if (!$canEarn['allowed']) {
             // Determine if this is a "soft" failure (user-level, not an error) or a hard error
             $softFailureReasons = [
-                'Already earned points for this entity',
-                'Daily limit reached',
-                'Already sent to this user today',
-                'Daily score cap reached'
+                \Rejimde\Services\ScoreService::REASON_ALREADY_EARNED,
+                \Rejimde\Services\ScoreService::REASON_DAILY_LIMIT,
+                \Rejimde\Services\ScoreService::REASON_ALREADY_SENT_TODAY,
+                \Rejimde\Services\ScoreService::REASON_DAILY_CAP
             ];
             
             $isSoftFailure = in_array($canEarn['reason'], $softFailureReasons);
@@ -129,16 +129,16 @@ class EventDispatcher {
                 ];
                 
                 // Set specific flags based on reason
-                if ($canEarn['reason'] === 'Already earned points for this entity') {
+                if ($canEarn['reason'] === \Rejimde\Services\ScoreService::REASON_ALREADY_EARNED) {
                     $responseData['already_earned'] = true;
                     $responseData['message'] = 'Bu içerik için zaten puan kazandınız.';
-                } elseif ($canEarn['reason'] === 'Daily limit reached') {
+                } elseif ($canEarn['reason'] === \Rejimde\Services\ScoreService::REASON_DAILY_LIMIT) {
                     $responseData['daily_limit_reached'] = true;
                     $responseData['message'] = 'Günlük limit doldu.';
-                } elseif ($canEarn['reason'] === 'Already sent to this user today') {
+                } elseif ($canEarn['reason'] === \Rejimde\Services\ScoreService::REASON_ALREADY_SENT_TODAY) {
                     $responseData['already_sent_today'] = true;
                     $responseData['message'] = 'Bu kullanıcıya bugün zaten gönderdin.';
-                } elseif ($canEarn['reason'] === 'Daily score cap reached') {
+                } elseif ($canEarn['reason'] === \Rejimde\Services\ScoreService::REASON_DAILY_CAP) {
                     $responseData['daily_cap_reached'] = true;
                     $responseData['message'] = 'Günlük puan limitine ulaştın.';
                 }
