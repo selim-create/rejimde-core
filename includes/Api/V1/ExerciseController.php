@@ -209,12 +209,13 @@ class ExerciseController extends WP_REST_Controller {
         }
         return [];
     }
+
     // --- Detay ---
     public function get_item($request) {
         $slug = $request['slug'];
         $posts = get_posts(['name' => $slug, 'post_type' => 'rejimde_exercise', 'post_status' => 'publish', 'numberposts' => 1]);
 
-        if (empty($posts)) return new WP_Error('not_found', 'Plan bulunamadı.', ['status' => 404]);
+        if (empty($posts)) return new WP_Error('not_found', 'Plan bulunamadı. ', ['status' => 404]);
 
         $post = $posts[0];
         $post_id = $post->ID;
@@ -243,6 +244,28 @@ class ExerciseController extends WP_REST_Controller {
                 }
             }
         }
+
+        // ✅ EKLENEN: Tamamlayan Kullanıcılar (Son 5 - Avatar için)
+        $completed_users_raw = get_post_meta($post_id, 'completed_users', true);
+        $completed_users_ids = $this->safe_json_decode($completed_users_raw);
+        $completed_users = [];
+        $count = 0;
+        if (is_array($completed_users_ids)) {
+            foreach (array_reverse($completed_users_ids) as $uid) {
+                if ($count >= 5) break;
+                $u = get_userdata($uid);
+                if ($u) {
+                    $completed_users[] = [
+                        'id' => $uid,
+                        'name' => $u->display_name,
+                        'avatar' => get_user_meta($uid, 'avatar_url', true) ?: get_avatar_url($uid),
+                        'slug' => $u->user_nicename,
+                        'is_expert' => in_array('rejimde_pro', (array) $u->roles) || in_array('administrator', (array) $u->roles)
+                    ];
+                    $count++;
+                }
+            }
+        }
         
         $data = [
             'id' => $post->ID,
@@ -268,12 +291,14 @@ class ExerciseController extends WP_REST_Controller {
                 'is_expert' => in_array('rejimde_pro', (array) $author_user->roles) || in_array('administrator', (array) $author_user->roles)
             ],
             'approvers' => $approvers,
+            'completed_users' => $completed_users,     // ✅ EKLENDİ
+            'completed_count' => count($completed_users_ids), // ✅ EKLENDİ
             'date' => get_the_date('d F Y', $post_id)
         ];
 
         return $this->success($data);
     }
-
+    
     public function approve_plan($request) {
         $post_id = (int) $request['id'];
         $user_id = get_current_user_id();
