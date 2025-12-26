@@ -166,5 +166,23 @@ class Loader {
             $notificationJobs = new \Rejimde\Cron\NotificationJobs();
             $notificationJobs->register();
         }
+        
+        // Admin: Yorum listesine Şikayet kolonu ekle
+        add_filter('manage_edit-comments_columns', function($columns) {
+            $columns['report_count'] = 'Şikayet';
+            return $columns;
+        });
+
+        add_action('manage_comments_custom_column', function($column, $comment_ID) {
+            if ($column === 'report_count') {
+                $count = (int) get_comment_meta($comment_ID, 'report_count', true);
+                if ($count > 0) {
+                    $color = $count >= 3 ? 'red' : ($count >= 2 ? 'orange' : 'gray');
+                    echo '<span style="color:' . esc_attr($color) . '; font-weight:bold;">⚠️ ' . esc_html($count) . '</span>';
+                } else {
+                    echo '-';
+                }
+            }
+        }, 10, 2);
     }
 }
