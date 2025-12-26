@@ -465,8 +465,9 @@ class CommentController extends WP_REST_Controller {
             $roles = $user_meta ? $user_meta->roles : [];
             $is_expert = in_array('rejimde_expert', $roles) || in_array('rejimde_pro', $roles);
             $author_details['is_expert'] = $is_expert;
-            $is_verified_meta = get_user_meta($user_id, 'is_verified_expert', true);
-            $author_details['is_verified'] = !empty($is_verified_meta) && ($is_verified_meta === '1' || $is_verified_meta === true);
+            // is_verified meta'sını kontrol et (VerificationPage.php ile uyumlu)
+            $is_verified_meta = get_user_meta($user_id, 'is_verified', true);
+            $author_details['is_verified'] = ($is_verified_meta === '1' || $is_verified_meta === 1 || $is_verified_meta === true);
             $author_details['rank'] = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
             $author_details['score'] = (int) get_user_meta($user_id, 'rejimde_total_score', true);
             $author_details['slug'] = $user_meta ? $user_meta->user_nicename : '';
@@ -498,7 +499,8 @@ class CommentController extends WP_REST_Controller {
         return [
             'id' => (int) $comment->comment_ID,
             'content' => $comment->comment_content,
-            'date' => human_time_diff(strtotime($comment->comment_date), current_time('timestamp')) . ' önce',
+            'date' => $comment->comment_date,  // Raw date for sorting
+            'timeAgo' => human_time_diff(strtotime($comment->comment_date), current_time('timestamp')) . ' önce',
             'rating' => (int) get_comment_meta($comment->comment_ID, 'rejimde_rating', true),
             'context' => get_comment_meta($comment->comment_ID, 'rejimde_context', true),
             'status'  => $comment->comment_approved == '1' ? 'approved' : 'pending',
