@@ -3,10 +3,7 @@ namespace Rejimde\Admin;
 
 class CoreSettings {
 
-    // Option Grubu (Tüm ayarlar bu grupta toplanacak ama her biri kendi ismiyle saklanacak)
-    // NOT: options.php'de her alan için register_setting çağırmazsanız veriler kaydedilmez.
-    // Ancak tek bir option_name altında array olarak saklamak daha temizdir.
-    // Fakat eski verileri korumak için tek tek register_setting kullanacağız.
+    // Option Grubu
     private $option_group = 'rejimde_core_settings_group';
 
     // Varsayılan Puan Kuralları (Eski veriyi korumak için)
@@ -51,9 +48,6 @@ class CoreSettings {
 
     public function register_settings() {
         // --- GRUP 1: GENEL (rejimde_group_general) ---
-        // Her grubu ayrı bir option_group ismine bağlarsak tab'lar arası kaybolma sorunu çözülür.
-        
-        // Genel Ayarlar Grubu
         register_setting('rejimde_group_general', 'rejimde_maintenance_mode', 'absint');
         
         register_setting('rejimde_group_general', 'rejimde_gamification_rules', [
@@ -61,7 +55,7 @@ class CoreSettings {
             'sanitize_callback' => [$this, 'sanitize_json']
         ]);
 
-        // Maskot Ayarları (MascotSettings.php'den gelen) - BURASI EKLENDİ
+        // Maskot Ayarları (MascotSettings.php'den gelen) - KORUNDU
         register_setting('rejimde_group_general', 'rejimde_mascot_config', [
             'type' => 'string',
             'sanitize_callback' => [$this, 'sanitize_json']
@@ -72,7 +66,7 @@ class CoreSettings {
         add_settings_field('rejimde_maintenance_mode', 'Bakım Modu', [$this, 'render_checkbox_field'], 'rejimde-core-general', 'rejimde_general_section', ['label_for' => 'rejimde_maintenance_mode', 'desc' => 'API erişimini geçici olarak durdurur.']);
         add_settings_field('rejimde_gamification_rules', 'Puan Kuralları (JSON)', [$this, 'render_textarea_field'], 'rejimde-core-general', 'rejimde_general_section', ['label_for' => 'rejimde_gamification_rules', 'desc' => 'Format: "action": {"points": 10, "limit": 1}']);
         
-        // Maskot Alanı
+        // Maskot Alanı - KORUNDU
         add_settings_field(
             'rejimde_mascot_config', 
             'Maskot Ayarları (JSON)', 
@@ -105,8 +99,16 @@ class CoreSettings {
         // --- GRUP 3: GÖRSEL (rejimde_group_images) ---
         register_setting('rejimde_group_images', 'rejimde_pexels_api_key', 'sanitize_text_field');
         register_setting('rejimde_group_images', 'rejimde_unsplash_api_key', 'sanitize_text_field');
+        register_setting('rejimde_group_images', 'rejimde_image_provider', 'sanitize_text_field'); // YENİ: Sağlayıcı Seçimi
 
         add_settings_section('rejimde_images_section', 'Görsel API', null, 'rejimde-core-images');
+
+        // YENİ ALAN: Hangi servisi kullanalım?
+        add_settings_field('rejimde_image_provider', 'Varsayılan Görsel Kaynağı', [$this, 'render_select_field'], 'rejimde-core-images', 'rejimde_images_section', [
+            'label_for' => 'rejimde_image_provider',
+            'options' => ['pexels' => 'Pexels (Önerilen)', 'unsplash' => 'Unsplash'],
+            'desc' => 'Diyet görselleri hangi servisten çekilsin? (Hibrit yapıda önce seçilen denenir, başarısız olursa diğerine geçilir)'
+        ]);
 
         add_settings_field('rejimde_pexels_api_key', 'Pexels API Key', [$this, 'render_text_field'], 'rejimde-core-images', 'rejimde_images_section', ['label_for' => 'rejimde_pexels_api_key', 'type' => 'password']);
         add_settings_field('rejimde_unsplash_api_key', 'Unsplash Access Key', [$this, 'render_text_field'], 'rejimde-core-images', 'rejimde_images_section', ['label_for' => 'rejimde_unsplash_api_key', 'type' => 'password']);
@@ -126,44 +128,22 @@ class CoreSettings {
         if (empty($input)) {
             return '';
         }
-
-        // Önce stripslashes uygulayalım (WP bazen slash ekler)
         $clean_input = stripslashes($input);
-
-        // JSON geçerli mi diye kontrol edelim
         $json = json_decode($clean_input, true);
 
         if ($json === null && json_last_error() !== JSON_ERROR_NONE) {
-            // Eğer stripslashes sonrası hala hata varsa, orijinal input'u deneyelim
-            // (Bazen stripslashes gereksiz yere tırnakları bozabilir)
             $json = json_decode($input, true);
-            
             if ($json === null && json_last_error() !== JSON_ERROR_NONE) {
-                // Hata durumunda, veriyi olduğu gibi döndürebiliriz VEYA hata mesajı ekleyip eski değeri koruyabiliriz.
-                // Veriyi kaybetmemek adına, eğer JSON decode edilemiyorsa input'u olduğu gibi kaydedelim.
-                // Ancak bu, veritabanında bozuk JSON saklanmasına neden olabilir.
-                // En güvenlisi: Hata mesajı ekleyip, veritabanındaki ESKİ değeri döndürmek.
-                
-                add_settings_error('rejimde_json_error', 'invalid_json', 'Hatalı JSON formatı! Ayarlar kaydedilmedi. Lütfen JSON formatınızı kontrol edin (tırnaklar, virgüller vb.).');
-                
-                // Hangi ayarın hatalı olduğunu bulup onun eski değerini döndürmemiz gerekirdi ama
-                // burada basitçe boş string veya input'u dönmek zorundayız çünkü hangi field olduğunu bilmiyoruz.
-                // Kullanıcıya hata mesajı göstermek ve veriyi kaydetmemek en doğrusu.
-                
-                // Geriye dönük uyumluluk veya "zorla kaydet" istenirse: return $input;
-                // Ama biz güvenli olanı seçelim:
-                return ''; // Veya get_option(...) ile eski değeri çekebilirsiniz.
+                add_settings_error('rejimde_json_error', 'invalid_json', 'Hatalı JSON formatı! Ayarlar kaydedilmedi. Lütfen JSON formatınızı kontrol edin.');
+                return ''; 
             }
         }
-        
-        // Geçerli JSON ise, güzel formatta tekrar encode edip saklayalım
         return json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
 
     public function render_settings_page() {
         $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'general';
         
-        // Aktif sekmeye göre doğru grup belirleniyor
         $active_group = 'rejimde_group_general';
         if ($active_tab == 'ai') $active_group = 'rejimde_group_ai';
         elseif ($active_tab == 'images') $active_group = 'rejimde_group_images';
@@ -181,7 +161,6 @@ class CoreSettings {
             
             <form action="options.php" method="post">
                 <?php
-                // Sadece aktif sekmenin grubunu basıyoruz. Böylece diğerleri silinmez.
                 settings_fields($active_group);
                 
                 if ($active_tab == 'general') {
