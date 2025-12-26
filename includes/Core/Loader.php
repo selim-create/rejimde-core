@@ -178,7 +178,7 @@ class Loader {
                 $count = (int) get_comment_meta($comment_ID, 'report_count', true);
                 if ($count > 0) {
                     $color = $count >= 3 ? 'red' : ($count >= 2 ? 'orange' : 'gray');
-                    echo '<span style="color:' . $color . '; font-weight:bold;">⚠️ ' . $count . '</span>';
+                    echo '<span style="color:' . esc_attr($color) . '; font-weight:bold;">⚠️ ' . esc_html($count) . '</span>';
                 } else {
                     echo '-';
                 }
