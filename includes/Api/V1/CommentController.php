@@ -412,7 +412,9 @@ class CommentController extends WP_REST_Controller {
         }
         
         $comment = get_comment($comment_id);
-        if (!$comment) return new WP_Error('not_found', 'Yorum bulunamadı', ['status' => 404]);
+        if (!$comment) {
+            return new WP_Error('not_found', 'Yorum bulunamadı', ['status' => 404]);
+        }
 
         // Kendi yorumunu şikayet edemez
         if ((int) $comment->user_id === $user_id) {
