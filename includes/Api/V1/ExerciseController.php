@@ -142,12 +142,39 @@ class ExerciseController extends WP_REST_Controller {
         foreach ($posts as $post) {
             $author_id = $post->post_author;
             $author_name = get_the_author_meta('display_name', $author_id);
+            $author_user = get_userdata($author_id);
             $author_avatar = get_avatar_url($author_id);
+
+            // Tamamlayanlar - PlanController ile aynı mantık
+            $completed_users_raw = get_post_meta($post->ID, 'completed_users', true);
+            $completed_users = $this->safe_json_decode($completed_users_raw);
+            
+            // Son 3 tamamlayan (avatar için)
+            $last_completed_avatars = [];
+            $count = 0;
+            if (is_array($completed_users)) {
+                foreach (array_reverse($completed_users) as $uid) {
+                    if ($count >= 3) break;
+
+                    $u = get_userdata($uid);
+                    if ($u) {
+                        $last_completed_avatars[] = [
+                            'id' => $uid,
+                            'name' => $u->display_name,
+                            'avatar' => get_user_meta($uid, 'avatar_url', true) ?: get_avatar_url($uid),
+                            'slug' => $u->user_nicename,
+                            'is_expert' => in_array('rejimde_pro', (array) $u->roles) || in_array('administrator', (array) $u->roles),
+                        ];
+                        $count++;
+                    }
+                }
+            }
 
             $data[] = [
                 'id' => $post->ID,
                 'title' => $post->post_title,
                 'excerpt' => wp_trim_words($post->post_content, 20),
+                'content' => $post->post_content,
                 'slug' => $post->post_name,
                 'image' => get_the_post_thumbnail_url($post->ID, 'medium_large') ?: '',
                 'meta' => [
@@ -156,16 +183,32 @@ class ExerciseController extends WP_REST_Controller {
                     'calories' => get_post_meta($post->ID, 'calories', true),
                     'exercise_category' => get_post_meta($post->ID, 'exercise_category', true),
                     'is_verified' => (bool) get_post_meta($post->ID, 'is_verified', true),
+                    'score_reward' => get_post_meta($post->ID, 'score_reward', true), // ✅ EKLENDİ
                 ],
                 'author' => [
                     'name' => $author_name,
                     'avatar' => $author_avatar,
-                ]
+                    'slug' => $author_user ?  $author_user->user_nicename :  ''
+                ],
+                'completed_users' => $last_completed_avatars, // ✅ EKLENDİ
+                'completed_count' => count($completed_users)   // ✅ EKLENDİ
             ];
         }
         return $this->success($data);
     }
-
+    /**
+     * Safely decode JSON data that might already be an array
+     */
+    private function safe_json_decode($value) {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (is_string($value) && !empty($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return [];
+    }
     // --- Detay ---
     public function get_item($request) {
         $slug = $request['slug'];
