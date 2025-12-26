@@ -787,10 +787,13 @@ class ProgressController extends WP_REST_Controller {
             ]
         ]);
         
-        if (!$result['success']) {
+        // Handle already claimed case - return 200 with flag
+        if (!$result['success'] || !empty($result['already_earned'])) {
             return $this->success([
                 'already_claimed' => true,
-                'message' => $result['message']
+                'message' => $result['message'],
+                'earned_points' => 0,
+                'new_total' => $result['total_score'] ?? (int) get_user_meta($user_id, 'rejimde_total_score', true)
             ]);
         }
 
@@ -800,6 +803,35 @@ class ProgressController extends WP_REST_Controller {
         if (!in_array($user_id, $readers)) {
             $readers[] = $user_id;
             update_post_meta($content_id, 'rejimde_readers', $readers);
+        }
+        
+        // Update progress table with reward_claimed flag
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_user_progress';
+        
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+            $user_id, 'blog', $content_id
+        ));
+        
+        if ($existing) {
+            $wpdb->update(
+                $table,
+                ['reward_claimed' => 1],
+                ['id' => $existing->id]
+            );
+        } else {
+            // Create progress record with reward_claimed flag
+            $wpdb->insert($table, [
+                'user_id' => $user_id,
+                'content_type' => 'blog',
+                'content_id' => $content_id,
+                'reward_claimed' => 1,
+                'is_started' => 1,
+                'is_completed' => 1,
+                'started_at' => current_time('mysql'),
+                'completed_at' => current_time('mysql')
+            ]);
         }
 
         return $this->success([

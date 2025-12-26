@@ -98,8 +98,17 @@ class EventDispatcher {
         );
         
         if (!$canEarn['allowed']) {
-            // Handle "already earned" case with success response
-            if ($canEarn['reason'] === 'Already earned points for this entity') {
+            // Determine if this is a "soft" failure (user-level, not an error) or a hard error
+            $softFailureReasons = [
+                'Already earned points for this entity',
+                'Daily limit reached',
+                'Already sent to this user today',
+                'Daily score cap reached'
+            ];
+            
+            $isSoftFailure = in_array($canEarn['reason'], $softFailureReasons);
+            
+            if ($isSoftFailure) {
                 // Still log the event for tracking
                 $this->eventService->log(
                     $userId,
@@ -110,17 +119,34 @@ class EventDispatcher {
                     $context
                 );
                 
-                return [
+                // Return success with appropriate flag
+                $responseData = [
                     'success' => true,
-                    'already_earned' => true,
                     'event_type' => $eventType,
                     'points_earned' => 0,
                     'total_score' => (int) get_user_meta($userId, 'rejimde_total_score', true),
                     'daily_score' => $this->scoreService->getDailyScore($userId),
-                    'message' => 'Bu içerik için zaten puan kazandınız.'
                 ];
+                
+                // Set specific flags based on reason
+                if ($canEarn['reason'] === 'Already earned points for this entity') {
+                    $responseData['already_earned'] = true;
+                    $responseData['message'] = 'Bu içerik için zaten puan kazandınız.';
+                } elseif ($canEarn['reason'] === 'Daily limit reached') {
+                    $responseData['daily_limit_reached'] = true;
+                    $responseData['message'] = 'Günlük limit doldu.';
+                } elseif ($canEarn['reason'] === 'Already sent to this user today') {
+                    $responseData['already_sent_today'] = true;
+                    $responseData['message'] = 'Bu kullanıcıya bugün zaten gönderdin.';
+                } elseif ($canEarn['reason'] === 'Daily score cap reached') {
+                    $responseData['daily_cap_reached'] = true;
+                    $responseData['message'] = 'Günlük puan limitine ulaştın.';
+                }
+                
+                return $responseData;
             }
             
+            // Hard failures (actual errors)
             return [
                 'success' => false,
                 'message' => $canEarn['reason'],
