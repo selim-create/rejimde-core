@@ -268,6 +268,9 @@ class ProfileController extends WP_REST_Controller {
         $count = (int) get_user_meta($target_id, 'rejimde_high_fives', true);
         update_user_meta($target_id, 'rejimde_high_fives', $count + 1);
 
+        // Son beşlik çakma zamanını kaydet (24 saat kontrolü için)
+        update_user_meta($current_user_id, 'last_high_five_' . $target_id, time());
+
         return new WP_REST_Response([
             'success' => true,
             'count' => $count + 1,
