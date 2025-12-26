@@ -57,10 +57,21 @@ class CommentController extends WP_REST_Controller {
             'callback' => [$this, 'spam_comment'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+
+        // YENİ: Yorum Şikayet Et
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>[\d]+)/report', [
+            'methods' => 'POST',
+            'callback' => [$this, 'report_comment'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
     }
 
     public function check_auth() {
-        return is_user_logged_in();
+        $is_logged_in = is_user_logged_in();
+        if ($is_logged_in) {
+            update_user_meta(get_current_user_id(), 'last_activity', current_time('mysql'));
+        }
+        return $is_logged_in;
     }
 
     // ... (get_comments, create_comment, like_comment, get_my_reviews, approve_comment aynı kalıyor) ...
@@ -389,6 +400,51 @@ class CommentController extends WP_REST_Controller {
         return new WP_REST_Response(['success' => true, 'message' => 'Yorum spam olarak işaretlendi.'], 200);
     }
 
+    /**
+     * YENİ: YORUM ŞİKAYET ET
+     */
+    public function report_comment($request) {
+        $comment_id = (int) $request->get_param('id');
+        $user_id = get_current_user_id();
+        
+        if ($comment_id <= 0) {
+            return new WP_Error('invalid_id', 'Geçersiz yorum ID', ['status' => 400]);
+        }
+        
+        $comment = get_comment($comment_id);
+        if (!$comment) {
+            return new WP_Error('not_found', 'Yorum bulunamadı', ['status' => 404]);
+        }
+
+        // Kendi yorumunu şikayet edemez
+        if ((int) $comment->user_id === $user_id) {
+            return new WP_Error('self_report', 'Kendi yorumunuzu şikayet edemezsiniz.', ['status' => 400]);
+        }
+
+        // Daha önce şikayet etmiş mi?
+        $reports = get_comment_meta($comment_id, 'rejimde_reports', true) ?: [];
+        if (!is_array($reports)) $reports = [];
+
+        if (in_array($user_id, $reports)) {
+            return new WP_Error('already_reported', 'Bu yorumu zaten şikayet ettiniz.', ['status' => 409]);
+        }
+
+        $reports[] = $user_id;
+        update_comment_meta($comment_id, 'rejimde_reports', $reports);
+        update_comment_meta($comment_id, 'report_count', count($reports));
+
+        // 3+ şikayet varsa otomatik gizle
+        if (count($reports) >= 3) {
+            wp_set_comment_status($comment_id, 'hold');
+        }
+
+        return new WP_REST_Response([
+            'success' => true, 
+            'message' => 'Şikayetiniz alındı. Teşekkürler!',
+            'report_count' => count($reports)
+        ], 200);
+    }
+
     // --- YARDIMCILAR ---
     private function get_translated_profession($slug) {
         $map = ['dietitian' => 'Diyetisyen', 'trainer' => 'Antrenör', 'psychologist' => 'Psikolog', 'physiotherapist' => 'Fizyoterapist', 'doctor' => 'Doktor', 'specialist' => 'Uzman', 'coach' => 'Yaşam Koçu'];
@@ -410,7 +466,7 @@ class CommentController extends WP_REST_Controller {
             $is_expert = in_array('rejimde_expert', $roles) || in_array('rejimde_pro', $roles);
             $author_details['is_expert'] = $is_expert;
             $is_verified_meta = get_user_meta($user_id, 'is_verified_expert', true);
-            $author_details['is_verified'] = ($is_verified_meta !== '') ? (bool) $is_verified_meta : $is_expert;
+            $author_details['is_verified'] = !empty($is_verified_meta) && ($is_verified_meta === '1' || $is_verified_meta === true);
             $author_details['rank'] = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
             $author_details['score'] = (int) get_user_meta($user_id, 'rejimde_total_score', true);
             $author_details['slug'] = $user_meta ? $user_meta->user_nicename : '';
