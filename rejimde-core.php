@@ -78,6 +78,9 @@ add_action('init', function() {
     $allowed_origins = [
         'http://localhost:3000',
         'https://rejimde.com',
+        'http://127.0.0.1:3000',
+        'http://192.168.48.90:3000',
+        'https://192.168.48.89:3000',
         'https://www.rejimde.com',
     ];
 
