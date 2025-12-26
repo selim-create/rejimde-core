@@ -404,14 +404,18 @@ class CommentController extends WP_REST_Controller {
      * YENİ: YORUM ŞİKAYET ET
      */
     public function report_comment($request) {
-        $comment_id = $request->get_param('id');
+        $comment_id = (int) $request->get_param('id');
         $user_id = get_current_user_id();
+        
+        if ($comment_id <= 0) {
+            return new WP_Error('invalid_id', 'Geçersiz yorum ID', ['status' => 400]);
+        }
         
         $comment = get_comment($comment_id);
         if (!$comment) return new WP_Error('not_found', 'Yorum bulunamadı', ['status' => 404]);
 
         // Kendi yorumunu şikayet edemez
-        if ($comment->user_id == $user_id) {
+        if ((int) $comment->user_id === $user_id) {
             return new WP_Error('self_report', 'Kendi yorumunuzu şikayet edemezsiniz.', ['status' => 400]);
         }
 
