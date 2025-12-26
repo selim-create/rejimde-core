@@ -776,6 +776,25 @@ class ProgressController extends WP_REST_Controller {
         // Sticky mi kontrol et
         $is_sticky = is_sticky($content_id);
         
+        // Check if reward already claimed in progress table
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_user_progress';
+        
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, reward_claimed FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+            $user_id, 'blog', $content_id
+        ));
+        
+        // If already claimed, return early with 200 OK
+        if ($existing && $existing->reward_claimed) {
+            return $this->success([
+                'already_claimed' => true,
+                'message' => 'Bu içerik için zaten puan kazandınız.',
+                'earned_points' => 0,
+                'new_total' => (int) get_user_meta($user_id, 'rejimde_total_score', true)
+            ]);
+        }
+        
         // Dispatch blog_points_claimed event
         $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
         $result = $dispatcher->dispatch('blog_points_claimed', [
@@ -787,8 +806,29 @@ class ProgressController extends WP_REST_Controller {
             ]
         ]);
         
-        // Handle already claimed case - return 200 with flag
+        // Handle case where event dispatcher says already earned (from events table)
+        // This ensures consistency even if progress table is out of sync
         if (!$result['success'] || !empty($result['already_earned'])) {
+            // Update progress table to sync the reward_claimed flag
+            if ($existing) {
+                $wpdb->update(
+                    $table,
+                    ['reward_claimed' => 1],
+                    ['id' => $existing->id]
+                );
+            } else {
+                $wpdb->insert($table, [
+                    'user_id' => $user_id,
+                    'content_type' => 'blog',
+                    'content_id' => $content_id,
+                    'reward_claimed' => 1,
+                    'is_started' => 1,
+                    'is_completed' => 1,
+                    'started_at' => current_time('mysql'),
+                    'completed_at' => current_time('mysql')
+                ]);
+            }
+            
             return $this->success([
                 'already_claimed' => true,
                 'message' => $result['message'],
@@ -805,15 +845,7 @@ class ProgressController extends WP_REST_Controller {
             update_post_meta($content_id, 'rejimde_readers', $readers);
         }
         
-        // Update progress table with reward_claimed flag
-        global $wpdb;
-        $table = $wpdb->prefix . 'rejimde_user_progress';
-        
-        $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
-            $user_id, 'blog', $content_id
-        ));
-        
+        // Update progress table with reward_claimed flag after successful claim
         if ($existing) {
             $wpdb->update(
                 $table,
