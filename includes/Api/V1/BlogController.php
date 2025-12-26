@@ -87,11 +87,13 @@ class BlogController extends WP_REST_Controller {
                 if ($count >= 5) break;
                 $reader = get_userdata($reader_id);
                 if ($reader) {
+                    $is_expert = in_array('rejimde_pro', (array) $reader->roles);
                     $readers_info[] = [
                         'id' => $reader_id,
                         'name' => $reader->display_name,
                         'avatar' => get_user_meta($reader_id, 'avatar_url', true) ?: get_avatar_url($reader_id),
-                        'slug' => $reader->user_nicename
+                        'slug' => $reader->user_nicename,
+                        'is_expert' => $is_expert  // YENİ EKLENEN ALAN
                     ];
                     $count++;
                 }

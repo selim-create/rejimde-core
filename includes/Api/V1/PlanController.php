@@ -163,19 +163,27 @@ class PlanController extends WP_REST_Controller {
             $completed_users_raw = get_post_meta($post->ID, 'completed_users', true);
             $completed_users = $this->safe_json_decode($completed_users_raw);
             
-            // Son 3 tamamlayan (avatar için)
-            $last_completed_avatars = [];
-            $count = 0;
-            if(is_array($completed_users)) {
-                foreach (array_reverse($completed_users) as $uid) {
-                    if ($count >= 3) break;
+        // Son 3 tamamlayan (avatar için) - GÜNCEL
+        $last_completed_avatars = [];
+        $count = 0;
+        if (is_array($completed_users)) {
+            foreach (array_reverse($completed_users) as $uid) {
+                if ($count >= 3) break;
+
+                $u = get_userdata($uid);
+                if ($u) {
                     $last_completed_avatars[] = [
-                        'avatar' => get_avatar_url($uid),
-                        'name' => get_the_author_meta('display_name', $uid)
+                        'id' => $uid,
+                        'name' => $u->display_name,
+                        // gravatar yerine: kullanıcı profilinde seçtiği/yüklediği avatar_url
+                        'avatar' => get_user_meta($uid, 'avatar_url', true) ?: get_avatar_url($uid),
+                        'slug' => $u->user_nicename,
+                        'is_expert' => in_array('rejimde_pro', (array) $u->roles) || in_array('administrator', (array) $u->roles),
                     ];
                     $count++;
                 }
             }
+        }
 
             $data[] = [
                 'id' => $post->ID,
@@ -448,8 +456,9 @@ class PlanController extends WP_REST_Controller {
                 $completed_users[] = [
                     'id' => $uid,
                     'name' => $u->display_name,
-                    'avatar' => get_avatar_url($uid),
-                    'slug' => $u->user_nicename // Link için slug ekledik
+                    'avatar' => get_user_meta($uid, 'avatar_url', true) ?: get_avatar_url($uid),
+                    'slug' => $u->user_nicename,
+                    'is_expert' => in_array('rejimde_pro', (array) $u->roles)
                 ];
                 $count++;
             }
