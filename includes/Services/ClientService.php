@@ -257,11 +257,7 @@ class ClientService {
             $this->createPackage($relationshipId, $data);
         }
         
-        // Log activity
-        if (class_exists('Rejimde\Services\ActivityLogService')) {
-            $activityService = new ActivityLogService();
-            // Log to expert's activity
-        }
+        // TODO: Log activity when expert adds a new client
         
         return $relationshipId;
     }
