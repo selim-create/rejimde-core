@@ -17,6 +17,11 @@ define( 'REJIMDE_VERSION', '1.0.2' ); // Versiyon güncellendi
 define( 'REJIMDE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'REJIMDE_URL', plugin_dir_url( __FILE__ ) );
 
+// Frontend URL for invite links
+if (!defined('REJIMDE_FRONTEND_URL')) {
+    define('REJIMDE_FRONTEND_URL', 'https://rejimde.com');
+}
+
 // Eğer Composer kullanıyorsanız (JWT vb. kütüphaneler için) aşağıdaki satırı açabilirsiniz:
 // if (file_exists(REJIMDE_PATH . 'vendor/autoload.php')) require_once REJIMDE_PATH . 'vendor/autoload.php';
 

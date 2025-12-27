@@ -97,6 +97,13 @@ class RelationshipController extends WP_REST_Controller {
             'callback' => [$this, 'get_my_experts'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+
+        // POST /pro/clients/accept-invite - Accept invite (client-side)
+        register_rest_route($this->namespace, '/' . $this->base . '/accept-invite', [
+            'methods' => 'POST',
+            'callback' => [$this, 'accept_invite'],
+            'permission_callback' => [$this, 'check_auth'], // Normal auth, not expert
+        ]);
     }
 
     /**
@@ -164,15 +171,28 @@ class RelationshipController extends WP_REST_Controller {
             return $this->error('client_email gerekli', 400);
         }
         
-        $relationshipId = $this->clientService->addClient($expertId, $data);
+        // Validate email format
+        if (!is_email($data['client_email'])) {
+            return $this->error('Geçerli bir e-posta adresi girin', 400);
+        }
         
-        if (!$relationshipId) {
+        $result = $this->clientService->addClient($expertId, $data);
+        
+        // Handle error responses
+        if (is_array($result) && isset($result['error'])) {
+            return $this->error($result['error'], 409); // 409 Conflict
+        }
+        
+        if (!$result || (is_array($result) && !isset($result['relationship_id']))) {
             return $this->error('Danışan eklenemedi', 500);
         }
         
+        $relationshipId = is_array($result) ? $result['relationship_id'] : $result;
+        $reactivated = is_array($result) && isset($result['reactivated']) && $result['reactivated'];
+        
         return $this->success([
             'relationship_id' => $relationshipId,
-            'message' => 'Danışan başarıyla eklendi'
+            'message' => $reactivated ? 'Danışan yeniden aktifleştirildi' : 'Danışan başarıyla eklendi'
         ], 201);
     }
 
@@ -366,6 +386,29 @@ class RelationshipController extends WP_REST_Controller {
         $experts = $this->clientService->getClientExperts($clientId);
         
         return $this->success($experts);
+    }
+
+    /**
+     * Accept invite link (client-side)
+     */
+    public function accept_invite($request) {
+        $clientId = get_current_user_id();
+        $token = $request->get_param('token');
+        
+        if (empty($token)) {
+            return $this->error('Token gerekli', 400);
+        }
+        
+        $result = $this->clientService->acceptInvite($token, $clientId);
+        
+        if (isset($result['error'])) {
+            return $this->error($result['error'], 400);
+        }
+        
+        return $this->success([
+            'message' => 'Davet kabul edildi',
+            'expert' => $result['expert']
+        ]);
     }
 
     /**
