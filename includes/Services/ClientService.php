@@ -320,13 +320,19 @@ class ClientService {
             // Generate unique token
             $token = bin2hex(random_bytes(32));
         } catch (\Exception $e) {
-            // Fallback token generation
-            $token = wp_generate_password(64, false, false);
+            // Fallback token generation with high entropy
+            $token = hash('sha256', wp_generate_password(64, true, true) . time() . wp_rand());
         }
         
-        // Validate package_name
+        // Validate and set defaults
         if (empty($data['package_name'])) {
             $data['package_name'] = 'Genel Paket';
+        }
+        if (empty($data['package_type'])) {
+            $data['package_type'] = 'session';
+        }
+        if (!isset($data['price'])) {
+            $data['price'] = 0;
         }
         
         // Store invite (with client_id = 0 for pending)

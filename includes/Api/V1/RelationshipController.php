@@ -205,11 +205,11 @@ class RelationshipController extends WP_REST_Controller {
         $expertId = get_current_user_id();
         
         $data = [
-            'package_name' => $request->get_param('package_name') ?: 'Genel Paket',
-            'package_type' => $request->get_param('package_type') ?: 'session',
+            'package_name' => $request->get_param('package_name'),
+            'package_type' => $request->get_param('package_type'),
             'total_sessions' => $request->get_param('total_sessions'),
             'duration_months' => $request->get_param('duration_months'),
-            'price' => $request->get_param('price') ?: 0
+            'price' => $request->get_param('price')
         ];
         
         $invite = $this->clientService->createInvite($expertId, $data);
