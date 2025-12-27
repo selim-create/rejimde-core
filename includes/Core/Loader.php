@@ -33,6 +33,12 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/InboxService.php')) require_once REJIMDE_PATH . 'includes/Services/InboxService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/CalendarService.php')) require_once REJIMDE_PATH . 'includes/Services/CalendarService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/FinanceService.php')) require_once REJIMDE_PATH . 'includes/Services/FinanceService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ServiceManager.php')) require_once REJIMDE_PATH . 'includes/Services/ServiceManager.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/PrivatePlanService.php')) require_once REJIMDE_PATH . 'includes/Services/PrivatePlanService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/MediaLibraryService.php')) require_once REJIMDE_PATH . 'includes/Services/MediaLibraryService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/FAQService.php')) require_once REJIMDE_PATH . 'includes/Services/FAQService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/AnnouncementService.php')) require_once REJIMDE_PATH . 'includes/Services/AnnouncementService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/AIPlannerService.php')) require_once REJIMDE_PATH . 'includes/Services/AIPlannerService.php';
         
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
@@ -77,6 +83,20 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/FinanceController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/FinanceController.php';
         // YENİ: Pro Dashboard Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProDashboardController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProDashboardController.php';
+        // YENİ: Client Controller (CRM)
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ClientController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ClientController.php';
+        // YENİ: Service Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ServiceController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ServiceController.php';
+        // YENİ: Private Plan Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/PrivatePlanController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/PrivatePlanController.php';
+        // YENİ: Media Library Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/MediaLibraryController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/MediaLibraryController.php';
+        // YENİ: FAQ Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/FAQController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/FAQController.php';
+        // YENİ: Announcement Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AnnouncementController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AnnouncementController.php';
+        // YENİ: AI Planner Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AIPlannerController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AIPlannerController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -137,6 +157,20 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\FinanceController')) (new \Rejimde\Api\V1\FinanceController())->register_routes();
             // YENİ: Pro Dashboard Routes
             if (class_exists('Rejimde\\Api\\V1\\ProDashboardController')) (new \Rejimde\Api\V1\ProDashboardController())->register_routes();
+            // YENİ: Client Routes (CRM)
+            if (class_exists('Rejimde\\Api\\V1\\ClientController')) (new \Rejimde\Api\V1\ClientController())->register_routes();
+            // YENİ: Service Routes
+            if (class_exists('Rejimde\\Api\\V1\\ServiceController')) (new \Rejimde\Api\V1\ServiceController())->register_routes();
+            // YENİ: Private Plan Routes
+            if (class_exists('Rejimde\\Api\\V1\\PrivatePlanController')) (new \Rejimde\Api\V1\PrivatePlanController())->register_routes();
+            // YENİ: Media Library Routes
+            if (class_exists('Rejimde\\Api\\V1\\MediaLibraryController')) (new \Rejimde\Api\V1\MediaLibraryController())->register_routes();
+            // YENİ: FAQ Routes
+            if (class_exists('Rejimde\\Api\\V1\\FAQController')) (new \Rejimde\Api\V1\FAQController())->register_routes();
+            // YENİ: Announcement Routes
+            if (class_exists('Rejimde\\Api\\V1\\AnnouncementController')) (new \Rejimde\Api\V1\AnnouncementController())->register_routes();
+            // YENİ: AI Planner Routes
+            if (class_exists('Rejimde\\Api\\V1\\AIPlannerController')) (new \Rejimde\Api\V1\AIPlannerController())->register_routes();
         });
 
         // CPT Kayıtları
