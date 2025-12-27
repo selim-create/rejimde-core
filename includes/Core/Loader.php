@@ -75,6 +75,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CalendarController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CalendarController.php';
         // YENİ: Finance Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/FinanceController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/FinanceController.php';
+        // YENİ: Pro Dashboard Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProDashboardController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProDashboardController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -133,6 +135,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\CalendarController')) (new \Rejimde\Api\V1\CalendarController())->register_routes();
             // YENİ: Finance Routes
             if (class_exists('Rejimde\\Api\\V1\\FinanceController')) (new \Rejimde\Api\V1\FinanceController())->register_routes();
+            // YENİ: Pro Dashboard Routes
+            if (class_exists('Rejimde\\Api\\V1\\ProDashboardController')) (new \Rejimde\Api\V1\ProDashboardController())->register_routes();
         });
 
         // CPT Kayıtları

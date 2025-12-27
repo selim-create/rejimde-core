@@ -517,14 +517,13 @@ class FinanceController extends WP_REST_Controller {
     /**
      * Check if user is authenticated as expert
      */
-    public function check_expert_auth(WP_REST_Request $request): bool {
+    public function check_expert_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
         
-        $userId = get_current_user_id();
-        $isProfessional = get_user_meta($userId, 'is_professional', true);
-        
-        return (bool) $isProfessional;
+        $user = wp_get_current_user();
+        return in_array('rejimde_pro', (array) $user->roles) || 
+               in_array('administrator', (array) $user->roles);
     }
 }
