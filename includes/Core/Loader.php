@@ -29,6 +29,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/ActivityLogService.php')) require_once REJIMDE_PATH . 'includes/Services/ActivityLogService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/ExpertMetricsService.php')) require_once REJIMDE_PATH . 'includes/Services/ExpertMetricsService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/ProfileViewService.php')) require_once REJIMDE_PATH . 'includes/Services/ProfileViewService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ClientService.php')) require_once REJIMDE_PATH . 'includes/Services/ClientService.php';
         
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
@@ -63,6 +64,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/NotificationController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/NotificationController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ActivityController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ActivityController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ExpertActivityController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ExpertActivityController.php';
+        // YENİ: CRM Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/RelationshipController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/RelationshipController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -113,6 +116,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\ExpertActivityController')) (new \Rejimde\Api\V1\ExpertActivityController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\ProgressController')) (new \Rejimde\Api\V1\ProgressController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\FavoritesController')) (new \Rejimde\Api\V1\FavoritesController())->register_routes();
+            // YENİ: CRM Routes
+            if (class_exists('Rejimde\\Api\\V1\\RelationshipController')) (new \Rejimde\Api\V1\RelationshipController())->register_routes();
         });
 
         // CPT Kayıtları

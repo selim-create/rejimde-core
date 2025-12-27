@@ -197,7 +197,64 @@ class Activator {
         ) $charset_collate;";
         dbDelta( $sql_profile_views );
         
-        // 12. Migrate rejimde_level to rejimde_rank (if needed)
+        // 12. CRM: Expert-Client Relationships Table
+        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+        $sql_relationships = "CREATE TABLE $table_relationships (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            client_id BIGINT UNSIGNED NOT NULL,
+            status ENUM('pending', 'active', 'paused', 'archived', 'blocked') DEFAULT 'pending',
+            source ENUM('marketplace', 'invite', 'manual') DEFAULT 'manual',
+            invite_token VARCHAR(64) DEFAULT NULL,
+            started_at DATETIME DEFAULT NULL,
+            ended_at DATETIME DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_relationship (expert_id, client_id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_client (client_id),
+            INDEX idx_status (status)
+        ) $charset_collate;";
+        dbDelta( $sql_relationships );
+        
+        // 13. CRM: Client Packages Table
+        $table_packages = $wpdb->prefix . 'rejimde_client_packages';
+        $sql_packages = "CREATE TABLE $table_packages (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            relationship_id BIGINT UNSIGNED NOT NULL,
+            package_name VARCHAR(255) NOT NULL,
+            package_type ENUM('session', 'duration', 'unlimited') DEFAULT 'session',
+            total_sessions INT DEFAULT NULL,
+            used_sessions INT DEFAULT 0,
+            start_date DATE NOT NULL,
+            end_date DATE DEFAULT NULL,
+            price DECIMAL(10,2) DEFAULT 0,
+            status ENUM('active', 'completed', 'cancelled', 'expired') DEFAULT 'active',
+            notes TEXT DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_relationship (relationship_id),
+            INDEX idx_status (status)
+        ) $charset_collate;";
+        dbDelta( $sql_packages );
+        
+        // 14. CRM: Client Notes Table
+        $table_notes = $wpdb->prefix . 'rejimde_client_notes';
+        $sql_notes = "CREATE TABLE $table_notes (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            relationship_id BIGINT UNSIGNED NOT NULL,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            note_type ENUM('general', 'health', 'progress', 'reminder') DEFAULT 'general',
+            content TEXT NOT NULL,
+            is_pinned TINYINT(1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_relationship (relationship_id)
+        ) $charset_collate;";
+        dbDelta( $sql_notes );
+        
+        // 15. Migrate rejimde_level to rejimde_rank (if needed)
         self::migrate_level_to_rank();
     }
     
