@@ -144,13 +144,14 @@ class ExpertActivityController extends WP_REST_Controller {
     /**
      * Check if user is an expert (rejimde_pro)
      */
-    public function check_expert_auth($request) {
+    public function check_expert_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
         
         $user = wp_get_current_user();
-        return in_array('rejimde_pro', $user->roles);
+        return in_array('rejimde_pro', (array) $user->roles) || 
+               in_array('administrator', (array) $user->roles);
     }
 
     protected function success($data = null) {
