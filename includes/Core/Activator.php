@@ -507,7 +507,173 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_payment_reminders);
 
-        // 25. Terminoloji Migrasyonu
+        // 25. Client Notes Table
+        $table_client_notes = $wpdb->prefix . 'rejimde_client_notes';
+        $sql_client_notes = "CREATE TABLE {$table_client_notes} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            relationship_id BIGINT UNSIGNED NOT NULL,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            type ENUM('general', 'health', 'progress', 'reminder') DEFAULT 'general',
+            content TEXT NOT NULL,
+            is_pinned TINYINT(1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_relationship (relationship_id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_pinned (is_pinned)
+        ) {$charset_collate};";
+        dbDelta($sql_client_notes);
+
+        // 26. Client Invites Table
+        $table_invites = $wpdb->prefix . 'rejimde_invites';
+        $sql_invites = "CREATE TABLE {$table_invites} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            token VARCHAR(64) NOT NULL,
+            package_data LONGTEXT DEFAULT NULL COMMENT 'JSON package details',
+            status ENUM('pending', 'accepted', 'expired', 'cancelled') DEFAULT 'pending',
+            used_by BIGINT UNSIGNED DEFAULT NULL,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_token (token),
+            INDEX idx_expert (expert_id),
+            INDEX idx_status (status)
+        ) {$charset_collate};";
+        dbDelta($sql_invites);
+
+        // 27. Private Plans Table
+        $table_private_plans = $wpdb->prefix . 'rejimde_private_plans';
+        $sql_private_plans = "CREATE TABLE {$table_private_plans} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            client_id BIGINT UNSIGNED DEFAULT NULL,
+            relationship_id BIGINT UNSIGNED DEFAULT NULL,
+            title VARCHAR(255) NOT NULL,
+            type ENUM('diet', 'workout', 'flow', 'rehab', 'habit') NOT NULL,
+            status ENUM('draft', 'ready', 'assigned', 'in_progress', 'completed') DEFAULT 'draft',
+            plan_data LONGTEXT DEFAULT NULL COMMENT 'JSON plan structure',
+            notes TEXT DEFAULT NULL,
+            assigned_at DATETIME DEFAULT NULL,
+            completed_at DATETIME DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_client (client_id),
+            INDEX idx_status (status),
+            INDEX idx_type (type)
+        ) {$charset_collate};";
+        dbDelta($sql_private_plans);
+
+        // 28. Plan Progress Table
+        $table_plan_progress = $wpdb->prefix . 'rejimde_plan_progress';
+        $sql_plan_progress = "CREATE TABLE {$table_plan_progress} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            plan_id BIGINT UNSIGNED NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            completed_items LONGTEXT DEFAULT NULL COMMENT 'JSON array of completed item IDs',
+            progress_percent DECIMAL(5,2) DEFAULT 0,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_plan_user (plan_id, user_id),
+            INDEX idx_plan (plan_id),
+            INDEX idx_user (user_id)
+        ) {$charset_collate};";
+        dbDelta($sql_plan_progress);
+
+        // 29. Media Library Table
+        $table_media_library = $wpdb->prefix . 'rejimde_media_library';
+        $sql_media_library = "CREATE TABLE {$table_media_library} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            description TEXT DEFAULT NULL,
+            type ENUM('youtube', 'instagram', 'spotify', 'vimeo', 'custom_link') NOT NULL,
+            url VARCHAR(500) NOT NULL,
+            thumbnail_url VARCHAR(500) DEFAULT NULL,
+            folder_id BIGINT UNSIGNED DEFAULT NULL,
+            tags LONGTEXT DEFAULT NULL COMMENT 'JSON array of tags',
+            usage_count INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_type (type),
+            INDEX idx_folder (folder_id)
+        ) {$charset_collate};";
+        dbDelta($sql_media_library);
+
+        // 30. Media Folders Table
+        $table_media_folders = $wpdb->prefix . 'rejimde_media_folders';
+        $sql_media_folders = "CREATE TABLE {$table_media_folders} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            parent_id BIGINT UNSIGNED DEFAULT NULL,
+            sort_order INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_parent (parent_id)
+        ) {$charset_collate};";
+        dbDelta($sql_media_folders);
+
+        // 31. FAQ Table
+        $table_faq = $wpdb->prefix . 'rejimde_faq';
+        $sql_faq = "CREATE TABLE {$table_faq} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            question VARCHAR(500) NOT NULL,
+            answer TEXT NOT NULL,
+            category VARCHAR(100) DEFAULT NULL,
+            is_public TINYINT(1) DEFAULT 1,
+            sort_order INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_public (is_public),
+            INDEX idx_category (category)
+        ) {$charset_collate};";
+        dbDelta($sql_faq);
+
+        // 32. Announcements Table
+        $table_announcements = $wpdb->prefix . 'rejimde_announcements';
+        $sql_announcements = "CREATE TABLE {$table_announcements} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            type ENUM('info', 'warning', 'promo') DEFAULT 'info',
+            target_roles LONGTEXT DEFAULT NULL COMMENT 'JSON array of target roles',
+            start_date DATETIME NOT NULL,
+            end_date DATETIME NOT NULL,
+            is_dismissible TINYINT(1) DEFAULT 1,
+            priority INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_dates (start_date, end_date),
+            INDEX idx_type (type)
+        ) {$charset_collate};";
+        dbDelta($sql_announcements);
+
+        // 33. Announcement Dismissals Table
+        $table_announcement_dismissals = $wpdb->prefix . 'rejimde_announcement_dismissals';
+        $sql_announcement_dismissals = "CREATE TABLE {$table_announcement_dismissals} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            announcement_id BIGINT UNSIGNED NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_user_announcement (announcement_id, user_id),
+            INDEX idx_announcement (announcement_id),
+            INDEX idx_user (user_id)
+        ) {$charset_collate};";
+        dbDelta($sql_announcement_dismissals);
+
+        // 34. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
