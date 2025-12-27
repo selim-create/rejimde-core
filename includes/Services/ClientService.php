@@ -21,8 +21,8 @@ class ClientService {
         $table_packages = $wpdb->prefix . 'rejimde_client_packages';
         $table_events = $wpdb->prefix . 'rejimde_events';
         
-        // Build query
-        $query = "SELECT r.* FROM $table_relationships r WHERE r.expert_id = %d";
+        // Build query - filter out pending invites (client_id = 0)
+        $query = "SELECT r.* FROM $table_relationships r WHERE r.expert_id = %d AND r.client_id > 0";
         $params = [$expertId];
         
         // Filter by status
@@ -53,7 +53,7 @@ class ClientService {
         
         $relationships = $wpdb->get_results($wpdb->prepare($query, ...$params), ARRAY_A);
         
-        // Get meta counts
+        // Get meta counts - filter out pending invites (client_id = 0)
         $meta = [
             'total' => 0,
             'active' => 0,
@@ -61,7 +61,7 @@ class ClientService {
             'archived' => 0
         ];
         
-        $meta_query = "SELECT status, COUNT(*) as count FROM $table_relationships WHERE expert_id = %d GROUP BY status";
+        $meta_query = "SELECT status, COUNT(*) as count FROM $table_relationships WHERE expert_id = %d AND client_id > 0 GROUP BY status";
         $meta_results = $wpdb->get_results($wpdb->prepare($meta_query, $expertId), ARRAY_A);
         
         foreach ($meta_results as $row) {
@@ -202,7 +202,7 @@ class ClientService {
      * 
      * @param int $expertId Expert user ID
      * @param array $data Client data
-     * @return int|false Relationship ID or false
+     * @return array|int Relationship ID or error array
      */
     public function addClient(int $expertId, array $data) {
         global $wpdb;
@@ -220,7 +220,7 @@ class ClientService {
             );
             
             if (is_wp_error($clientId)) {
-                return false;
+                return ['error' => 'Kullanıcı oluşturulamadı: ' . $clientId->get_error_message()];
             }
             
             // Set display name
@@ -233,9 +233,52 @@ class ClientService {
             $clientId = $client->ID;
         }
         
-        // Create relationship
+        // Check for existing relationship
         $table_relationships = $wpdb->prefix . 'rejimde_relationships';
         
+        $existingRelationship = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, status FROM $table_relationships WHERE expert_id = %d AND client_id = %d",
+            $expertId,
+            $clientId
+        ));
+        
+        if ($existingRelationship) {
+            // Relationship already exists
+            if ($existingRelationship->status === 'active') {
+                return ['error' => 'Bu danışan zaten listenizde aktif olarak mevcut.'];
+            }
+            
+            if ($existingRelationship->status === 'archived' || $existingRelationship->status === 'paused') {
+                // Reactivate archived or paused relationship
+                $wpdb->update(
+                    $table_relationships,
+                    [
+                        'status' => 'active',
+                        'started_at' => current_time('mysql'),
+                        'ended_at' => null,
+                        'updated_at' => current_time('mysql')
+                    ],
+                    ['id' => $existingRelationship->id]
+                );
+                
+                // Update package if provided
+                if (!empty($data['package_name'])) {
+                    $this->createPackage($existingRelationship->id, $data);
+                }
+                
+                return ['relationship_id' => $existingRelationship->id, 'reactivated' => true];
+            }
+            
+            if ($existingRelationship->status === 'blocked') {
+                return ['error' => 'Bu danışan engellenmiş durumda. Önce engeli kaldırın.'];
+            }
+            
+            if ($existingRelationship->status === 'pending') {
+                return ['error' => 'Bu danışan için zaten bekleyen bir davet var.'];
+            }
+        }
+        
+        // Create new relationship
         $result = $wpdb->insert($table_relationships, [
             'expert_id' => $expertId,
             'client_id' => $clientId,
@@ -247,7 +290,7 @@ class ClientService {
         ]);
         
         if (!$result) {
-            return false;
+            return ['error' => 'Veritabanı hatası: İlişki oluşturulamadı.'];
         }
         
         $relationshipId = $wpdb->insert_id;
@@ -259,7 +302,7 @@ class ClientService {
         
         // TODO: Log activity when expert adds a new client
         
-        return $relationshipId;
+        return ['relationship_id' => $relationshipId];
     }
     
     /**
@@ -293,9 +336,14 @@ class ClientService {
         
         $expiresAt = date('Y-m-d', strtotime('+14 days'));
         
+        // Use frontend URL instead of backend URL
+        $frontendUrl = defined('REJIMDE_FRONTEND_URL') 
+            ? REJIMDE_FRONTEND_URL 
+            : 'https://rejimde.com';
+        
         return [
             'invite_token' => $token,
-            'invite_url' => get_site_url() . '/invite/' . $token,
+            'invite_url' => $frontendUrl . '/invite/' . $token,
             'expires_at' => $expiresAt
         ];
     }
@@ -488,6 +536,88 @@ class ClientService {
         // TODO: Query from user_progress table or plan assignments
         // For now, return empty array
         return [];
+    }
+    
+    /**
+     * Accept invite link
+     * 
+     * @param string $token Invite token
+     * @param int $clientId Client user ID
+     * @return array
+     */
+    public function acceptInvite(string $token, int $clientId): array {
+        global $wpdb;
+        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+        
+        // Find pending invite
+        $invite = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_relationships WHERE invite_token = %s AND status = 'pending' AND client_id = 0",
+            $token
+        ), ARRAY_A);
+        
+        if (!$invite) {
+            return ['error' => 'Geçersiz veya süresi dolmuş davet linki'];
+        }
+        
+        $expertId = (int) $invite['expert_id'];
+        
+        // Check if relationship already exists
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_relationships WHERE expert_id = %d AND client_id = %d AND id != %d",
+            $expertId,
+            $clientId,
+            $invite['id']
+        ));
+        
+        if ($existing) {
+            // Delete the pending invite since relationship exists
+            $wpdb->delete($table_relationships, ['id' => $invite['id']]);
+            return ['error' => 'Bu uzmanla zaten bir ilişkiniz mevcut'];
+        }
+        
+        // Update invite to active relationship
+        $packageData = json_decode($invite['notes'], true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $packageData = [];
+        }
+        
+        $updateResult = $wpdb->update(
+            $table_relationships,
+            [
+                'client_id' => $clientId,
+                'status' => 'active',
+                'invite_token' => null,
+                'started_at' => current_time('mysql'),
+                'notes' => null,
+                'updated_at' => current_time('mysql')
+            ],
+            ['id' => $invite['id']]
+        );
+        
+        if ($updateResult === false) {
+            return ['error' => 'Davet kabul edilemedi. Lütfen tekrar deneyin.'];
+        }
+        
+        // Create package if data exists
+        if (!empty($packageData['package_name'])) {
+            $this->createPackage($invite['id'], $packageData);
+        }
+        
+        // Get expert info
+        $expert = get_userdata($expertId);
+        
+        if (!$expert) {
+            return ['error' => 'Uzman bilgisi bulunamadı'];
+        }
+        
+        return [
+            'relationship_id' => $invite['id'],
+            'expert' => [
+                'id' => $expertId,
+                'name' => $expert->display_name,
+                'avatar' => get_user_meta($expertId, 'avatar_url', true) ?: 'https://placehold.co/150'
+            ]
+        ];
     }
     
     /**
