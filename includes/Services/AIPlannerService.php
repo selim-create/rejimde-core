@@ -246,7 +246,7 @@ class AIPlannerService {
                 'Porsiyon kontrolüne dikkat et',
             ],
             'workout' => [
-                'Isınma ve soğuma hareketlerini atla',
+                'Isınma ve soğuma hareketlerini atlamayın',
                 'Düzenli ilerleme kayıtları tut',
                 'Dinlenme günlerini ihmal etme',
             ],

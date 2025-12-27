@@ -247,7 +247,7 @@ class PrivatePlanService {
         
         $newData = [
             'expert_id' => $expertId,
-            'title' => $original['title'] . ' (Kopya)',
+            'title' => $original['title'] . ' (Kopyası)',
             'type' => $original['type'],
             'status' => 'draft',
             'plan_data' => $original['plan_data'],
