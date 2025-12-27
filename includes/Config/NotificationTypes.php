@@ -208,5 +208,69 @@ return [
         'body' => 'Bu hafta {rank}. olarak {points} puan kazandın!',
         'action_url' => '/leaderboard',
         'expires_days' => 7
+    ],
+    
+    // CALENDAR & APPOINTMENT NOTIFICATIONS
+    'appointment_request_received' => [
+        'category' => 'expert',
+        'icon' => 'fa-calendar-plus',
+        'title' => 'Yeni randevu talebi! 📅',
+        'body' => '{actor_name} randevu talebinde bulundu.',
+        'action_url' => '/expert/calendar/requests',
+        'expires_days' => 7
+    ],
+    
+    'appointment_approved' => [
+        'category' => 'expert',
+        'icon' => 'fa-calendar-check',
+        'title' => 'Randevun onaylandı! ✅',
+        'body' => 'Randevu talebiniz uzman tarafından onaylandı.',
+        'action_url' => '/appointments',
+        'expires_days' => 14
+    ],
+    
+    'appointment_rejected' => [
+        'category' => 'expert',
+        'icon' => 'fa-calendar-times',
+        'title' => 'Randevu talebi reddedildi',
+        'body' => 'Maalesef randevu talebiniz reddedildi. Alternatif tarihler için iletişime geçebilirsiniz.',
+        'action_url' => '/appointments',
+        'expires_days' => 7
+    ],
+    
+    'appointment_created' => [
+        'category' => 'expert',
+        'icon' => 'fa-calendar-plus',
+        'title' => 'Yeni randevu oluşturuldu! 📅',
+        'body' => 'Uzmanınız sizin için bir randevu oluşturdu.',
+        'action_url' => '/appointments',
+        'expires_days' => 14
+    ],
+    
+    'appointment_cancelled' => [
+        'category' => 'expert',
+        'icon' => 'fa-calendar-times',
+        'title' => 'Randevu iptal edildi',
+        'body' => 'Randevunuz iptal edildi.',
+        'action_url' => '/appointments',
+        'expires_days' => 7
+    ],
+    
+    'appointment_reminder_24h' => [
+        'category' => 'expert',
+        'icon' => 'fa-bell',
+        'title' => 'Randevu hatırlatma! ⏰',
+        'body' => 'Yarın saat {time}\'de randevunuz var.',
+        'action_url' => '/appointments/{entity_id}',
+        'expires_days' => 2
+    ],
+    
+    'appointment_reminder_1h' => [
+        'category' => 'expert',
+        'icon' => 'fa-bell',
+        'title' => 'Randevu yaklaşıyor! ⏰',
+        'body' => '1 saat içinde randevunuz var.',
+        'action_url' => '/appointments/{entity_id}',
+        'expires_days' => 1
     ]
 ];
