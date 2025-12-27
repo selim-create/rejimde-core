@@ -350,7 +350,7 @@ class UserDashboardService {
         ));
 
         if ($existing) {
-            $wpdb->update(
+            $result = $wpdb->update(
                 $table_progress,
                 [
                     'completed_items' => json_encode($completedItems),
@@ -359,8 +359,12 @@ class UserDashboardService {
                 ],
                 ['id' => $existing]
             );
+            
+            if ($result === false) {
+                return false;
+            }
         } else {
-            $wpdb->insert(
+            $result = $wpdb->insert(
                 $table_progress,
                 [
                     'plan_id' => $planId,
@@ -370,11 +374,15 @@ class UserDashboardService {
                     'updated_at' => current_time('mysql'),
                 ]
             );
+            
+            if ($result === false) {
+                return false;
+            }
         }
 
         // Update plan status if completed
         if ($progressPercent >= 100) {
-            $wpdb->update(
+            $result = $wpdb->update(
                 $table_plans,
                 [
                     'status' => 'completed',
@@ -382,12 +390,20 @@ class UserDashboardService {
                 ],
                 ['id' => $planId]
             );
+            
+            if ($result === false) {
+                error_log("Failed to update plan status to completed for plan ID: $planId");
+            }
         } elseif ($progressPercent > 0 && $plan->status === 'assigned') {
-            $wpdb->update(
+            $result = $wpdb->update(
                 $table_plans,
                 ['status' => 'in_progress'],
                 ['id' => $planId]
             );
+            
+            if ($result === false) {
+                error_log("Failed to update plan status to in_progress for plan ID: $planId");
+            }
         }
 
         return true;
@@ -448,7 +464,7 @@ class UserDashboardService {
         if (!$relationship) return null;
 
         // Create thread
-        $wpdb->insert($table_threads, [
+        $result = $wpdb->insert($table_threads, [
             'relationship_id' => $relationship->id,
             'subject' => $subject,
             'status' => 'open',
@@ -456,11 +472,15 @@ class UserDashboardService {
             'updated_at' => current_time('mysql'),
         ]);
 
+        if ($result === false) {
+            return null;
+        }
+
         $threadId = $wpdb->insert_id;
         if (!$threadId) return null;
 
         // Create first message
-        $wpdb->insert($table_messages, [
+        $result = $wpdb->insert($table_messages, [
             'thread_id' => $threadId,
             'sender_id' => $userId,
             'sender_type' => 'client',
@@ -469,6 +489,12 @@ class UserDashboardService {
             'is_read' => false,
             'created_at' => current_time('mysql'),
         ]);
+
+        if ($result === false) {
+            // Rollback: delete the orphaned thread
+            $wpdb->delete($table_threads, ['id' => $threadId]);
+            return null;
+        }
 
         return $threadId;
     }
@@ -574,7 +600,7 @@ class UserDashboardService {
         // Create relationship
         $packageData = json_decode($invite->package_data, true) ?: [];
         
-        $wpdb->insert($table_relationships, [
+        $result = $wpdb->insert($table_relationships, [
             'expert_id' => $invite->expert_id,
             'client_id' => $userId,
             'status' => 'active',
@@ -583,11 +609,19 @@ class UserDashboardService {
             'created_at' => current_time('mysql'),
         ]);
 
+        if ($result === false) {
+            return ['error' => 'İlişki oluşturulamadı'];
+        }
+
         $relationshipId = $wpdb->insert_id;
+        
+        if (!$relationshipId) {
+            return ['error' => 'İlişki oluşturulamadı'];
+        }
 
         // Create package if data exists
         if (!empty($packageData['package_name'])) {
-            $wpdb->insert($table_packages, [
+            $result = $wpdb->insert($table_packages, [
                 'relationship_id' => $relationshipId,
                 'package_name' => $packageData['package_name'] ?? 'Genel Paket',
                 'package_type' => $packageData['package_type'] ?? 'session',
@@ -601,10 +635,16 @@ class UserDashboardService {
                 'status' => 'active',
                 'created_at' => current_time('mysql'),
             ]);
+            
+            if ($result === false) {
+                // Rollback: delete the relationship
+                $wpdb->delete($table_relationships, ['id' => $relationshipId]);
+                return ['error' => 'Paket oluşturulamadı'];
+            }
         }
 
         // Update invite
-        $wpdb->update(
+        $result = $wpdb->update(
             $table_invites,
             [
                 'status' => 'accepted',
@@ -612,6 +652,12 @@ class UserDashboardService {
             ],
             ['id' => $invite->id]
         );
+        
+        if ($result === false) {
+            error_log("Failed to update invite status for invite ID: {$invite->id}");
+            // Don't rollback here as the relationship and package are already created
+            // Just log the error for manual investigation
+        }
 
         // Get expert info
         $expert = get_userdata($invite->expert_id);
