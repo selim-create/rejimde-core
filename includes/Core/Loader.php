@@ -32,6 +32,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/ClientService.php')) require_once REJIMDE_PATH . 'includes/Services/ClientService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/InboxService.php')) require_once REJIMDE_PATH . 'includes/Services/InboxService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/CalendarService.php')) require_once REJIMDE_PATH . 'includes/Services/CalendarService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/FinanceService.php')) require_once REJIMDE_PATH . 'includes/Services/FinanceService.php';
         
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
@@ -72,6 +73,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/InboxController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/InboxController.php';
         // YENİ: Calendar Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/CalendarController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/CalendarController.php';
+        // YENİ: Finance Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/FinanceController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/FinanceController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -128,6 +131,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\InboxController')) (new \Rejimde\Api\V1\InboxController())->register_routes();
             // YENİ: Calendar Routes
             if (class_exists('Rejimde\\Api\\V1\\CalendarController')) (new \Rejimde\Api\V1\CalendarController())->register_routes();
+            // YENİ: Finance Routes
+            if (class_exists('Rejimde\\Api\\V1\\FinanceController')) (new \Rejimde\Api\V1\FinanceController())->register_routes();
         });
 
         // CPT Kayıtları
