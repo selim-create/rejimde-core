@@ -284,7 +284,63 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_notes);
 
-        // 15. Terminoloji Migrasyonu
+        // 15. Inbox: Threads Table
+        $table_threads = $wpdb->prefix . 'rejimde_threads';
+        $sql_threads = "CREATE TABLE {$table_threads} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            relationship_id BIGINT UNSIGNED NOT NULL,
+            subject VARCHAR(255) DEFAULT NULL,
+            status ENUM('open', 'closed', 'archived') DEFAULT 'open',
+            last_message_at DATETIME DEFAULT NULL,
+            last_message_by BIGINT UNSIGNED DEFAULT NULL,
+            unread_expert INT DEFAULT 0,
+            unread_client INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_relationship (relationship_id),
+            INDEX idx_status (status),
+            INDEX idx_last_message (last_message_at)
+        ) {$charset_collate};";
+        dbDelta($sql_threads);
+
+        // 16. Inbox: Messages Table
+        $table_messages = $wpdb->prefix . 'rejimde_messages';
+        $sql_messages = "CREATE TABLE {$table_messages} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            thread_id BIGINT UNSIGNED NOT NULL,
+            sender_id BIGINT UNSIGNED NOT NULL,
+            sender_type ENUM('expert', 'client') NOT NULL,
+            content TEXT NOT NULL,
+            content_type ENUM('text', 'image', 'file', 'voice', 'plan_link') DEFAULT 'text',
+            attachments LONGTEXT DEFAULT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            read_at DATETIME DEFAULT NULL,
+            is_ai_generated TINYINT(1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_thread (thread_id),
+            INDEX idx_sender (sender_id),
+            INDEX idx_created (created_at)
+        ) {$charset_collate};";
+        dbDelta($sql_messages);
+
+        // 17. Inbox: Message Templates Table
+        $table_templates = $wpdb->prefix . 'rejimde_message_templates';
+        $sql_templates = "CREATE TABLE {$table_templates} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            category VARCHAR(50) DEFAULT 'general',
+            usage_count INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id)
+        ) {$charset_collate};";
+        dbDelta($sql_templates);
+
+        // 18. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
