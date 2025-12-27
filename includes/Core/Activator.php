@@ -340,7 +340,103 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_templates);
 
-        // 18. Terminoloji Migrasyonu
+        // 18. Calendar: Expert Availability Template
+        $table_availability = $wpdb->prefix . 'rejimde_availability';
+        $sql_availability = "CREATE TABLE {$table_availability} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            day_of_week TINYINT NOT NULL COMMENT '0=Pazar, 1=Pazartesi, ..., 6=Cumartesi',
+            start_time TIME NOT NULL,
+            end_time TIME NOT NULL,
+            is_active TINYINT(1) DEFAULT 1,
+            slot_duration INT DEFAULT 60 COMMENT 'Dakika cinsinden slot süresi',
+            buffer_time INT DEFAULT 15 COMMENT 'Randevular arası boşluk',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_day (day_of_week)
+        ) {$charset_collate};";
+        dbDelta($sql_availability);
+
+        // 19. Calendar: Appointments
+        $table_appointments = $wpdb->prefix . 'rejimde_appointments';
+        $sql_appointments = "CREATE TABLE {$table_appointments} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            client_id BIGINT UNSIGNED NOT NULL,
+            relationship_id BIGINT UNSIGNED DEFAULT NULL,
+            service_id BIGINT UNSIGNED DEFAULT NULL,
+            title VARCHAR(255) DEFAULT NULL,
+            description TEXT DEFAULT NULL,
+            appointment_date DATE NOT NULL,
+            start_time TIME NOT NULL,
+            end_time TIME NOT NULL,
+            duration INT DEFAULT 60,
+            status ENUM('pending', 'confirmed', 'cancelled', 'completed', 'no_show') DEFAULT 'pending',
+            type ENUM('online', 'in_person', 'phone') DEFAULT 'online',
+            location VARCHAR(255) DEFAULT NULL,
+            meeting_link VARCHAR(500) DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            cancellation_reason TEXT DEFAULT NULL,
+            cancelled_by BIGINT UNSIGNED DEFAULT NULL,
+            reminder_sent TINYINT(1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_client (client_id),
+            INDEX idx_date (appointment_date),
+            INDEX idx_status (status),
+            INDEX idx_expert_date (expert_id, appointment_date)
+        ) {$charset_collate};";
+        dbDelta($sql_appointments);
+
+        // 20. Calendar: Appointment Requests
+        $table_appointment_requests = $wpdb->prefix . 'rejimde_appointment_requests';
+        $sql_appointment_requests = "CREATE TABLE {$table_appointment_requests} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            requester_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'NULL ise guest',
+            requester_name VARCHAR(255) NOT NULL,
+            requester_email VARCHAR(255) NOT NULL,
+            requester_phone VARCHAR(50) DEFAULT NULL,
+            service_id BIGINT UNSIGNED DEFAULT NULL,
+            preferred_date DATE NOT NULL,
+            preferred_time TIME NOT NULL,
+            alternative_date DATE DEFAULT NULL,
+            alternative_time TIME DEFAULT NULL,
+            message TEXT DEFAULT NULL,
+            status ENUM('pending', 'approved', 'rejected', 'expired') DEFAULT 'pending',
+            rejection_reason TEXT DEFAULT NULL,
+            created_appointment_id BIGINT UNSIGNED DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_status (status),
+            INDEX idx_date (preferred_date)
+        ) {$charset_collate};";
+        dbDelta($sql_appointment_requests);
+
+        // 21. Calendar: Blocked Times
+        $table_blocked_times = $wpdb->prefix . 'rejimde_blocked_times';
+        $sql_blocked_times = "CREATE TABLE {$table_blocked_times} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            blocked_date DATE NOT NULL,
+            start_time TIME DEFAULT NULL COMMENT 'NULL ise tüm gün bloke',
+            end_time TIME DEFAULT NULL,
+            reason VARCHAR(255) DEFAULT NULL,
+            is_recurring TINYINT(1) DEFAULT 0,
+            recurrence_pattern VARCHAR(50) DEFAULT NULL COMMENT 'weekly, monthly',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert_date (expert_id, blocked_date)
+        ) {$charset_collate};";
+        dbDelta($sql_blocked_times);
+
+        // 22. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
