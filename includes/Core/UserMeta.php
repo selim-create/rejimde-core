@@ -54,6 +54,39 @@ class UserMeta {
             'consultation_types', // Online/Yüz yüze
             'career_start_date',  // Mesleğe başlama tarihi
             
+            // Kimlik & Profil
+            'motto',           // Motto / Yaklaşım (max 150 karakter)
+            
+            // Hizmet & Dil
+            'service_languages', // Hizmet dilleri - JSON array
+            
+            // Mesleki Deneyim
+            'education',       // Eğitim bilgileri - JSON array
+            'certificates',    // Sertifikalar - JSON array
+            
+            // Uzmanlık & Etiketler
+            'expertise_tags',  // Uzmanlık etiketleri - JSON array
+            'goal_tags',       // Çalıştığı hedefler - JSON array
+            'level_suitability', // Seviye uygunluğu - JSON array
+            'age_groups',      // Yaş grupları - JSON array
+            
+            // Danışan Bilgileri
+            'client_type',     // Danışan türü - string (woman, man, child, all)
+            
+            // Çalışmadığı Durumlar
+            'excluded_cases',  // Çalışmadığı durumlar - JSON array
+            'referral_note',   // Yönlendirme notu - string
+            
+            // Çalışma & İletişim
+            'working_hours',   // Çalışma saatleri - JSON object
+            'response_time',   // Yanıt süresi - string (1h, 24h, 48h, 3d)
+            'communication_preference', // İletişim tercihi - JSON array
+            
+            // Görünürlük & Mahremiyet
+            'privacy_settings', // Gizlilik ayarları - JSON object
+            'kvkk_consent',    // KVKK onayı - boolean
+            'emergency_disclaimer', // Acil durum uyarısı onayı - boolean
+            
             // Lokasyon & İletişim
             'city',            // İl
             'district',        // İlçe
@@ -72,29 +105,47 @@ class UserMeta {
             'score_impact'
         ];
 
+        // JSON alanları listesi
+        $json_fields = [
+            'goals', 
+            'notifications', 
+            'rejimde_earned_badges',
+            'rejimde_followers',
+            'rejimde_following',
+            'service_languages',
+            'education',
+            'certificates',
+            'expertise_tags',
+            'goal_tags',
+            'level_suitability',
+            'age_groups',
+            'excluded_cases',
+            'working_hours',
+            'communication_preference',
+            'privacy_settings'
+        ];
+
         foreach ($fields as $field) {
             register_rest_field('user', $field, [
-                'get_callback' => function ($user) use ($field) {
+                'get_callback' => function ($user) use ($field, $json_fields) {
                     $value = get_user_meta($user['id'], $field, true);
                     // JSON alanları için decode
-                    if (in_array($field, ['goals', 'notifications', 'rejimde_earned_badges'])) {
-                        if (is_string($value)) {
-                            $decoded = json_decode($value, true);
-                            return $decoded !== null ? $decoded : $value;
-                        }
+                    if (in_array($field, $json_fields) && is_string($value) && !empty($value)) {
+                        $decoded = json_decode($value, true);
+                        return $decoded !== null ? $decoded : $value;
                     }
                     return $value;
                 },
-                'update_callback' => function ($value, $user, $field) {
+                'update_callback' => function ($value, $user, $field) use ($json_fields) {
                     // JSON alanları için encode
-                    if (in_array($field, ['goals', 'notifications', 'rejimde_earned_badges']) && is_array($value)) {
-                        $value = json_encode($value);
+                    if (in_array($field, $json_fields) && (is_array($value) || is_object($value))) {
+                        $value = json_encode($value, JSON_UNESCAPED_UNICODE);
                     }
                     return update_user_meta($user->ID, $field, $value);
                 },
                 'schema' => [
                     'description' => "User $field",
-                    'type'        => in_array($field, ['goals', 'notifications', 'rejimde_earned_badges', 'rejimde_followers', 'rejimde_following']) ? 'array' : 'string',
+                    'type'        => $this->get_field_schema_type($field, $json_fields),
                     'context'     => ['view', 'edit'],
                 ],
             ]);
@@ -111,9 +162,37 @@ class UserMeta {
     }
 
     /**
+     * Get the appropriate schema type for a field
+     * 
+     * @param string $field Field name
+     * @param array $json_fields Array of fields that should be JSON
+     * @return string Schema type
+     */
+    private function get_field_schema_type($field, $json_fields) {
+        // Boolean alanlar
+        if (in_array($field, ['kvkk_consent', 'emergency_disclaimer', 'is_verified', 'is_featured'])) {
+            return 'boolean';
+        }
+        
+        // Object alanlar (JSON objects)
+        if (in_array($field, ['working_hours', 'privacy_settings'])) {
+            return 'object';
+        }
+        
+        // Array alanlar (JSON arrays veya basit arrays)
+        if (in_array($field, $json_fields)) {
+            return 'array';
+        }
+        
+        // Varsayılan olarak string
+        return 'string';
+    }
+
+    /**
      * Add custom avatar and role information to REST API user response
      * Combines avatar_url override and role information
-     * * @param WP_REST_Response $response The response object
+     *
+     * @param WP_REST_Response $response The response object
      * @param WP_User $user The user object
      * @param WP_REST_Request $request The request object
      * @return WP_REST_Response Modified response
@@ -170,7 +249,8 @@ class UserMeta {
     /**
      * Add custom avatar to comment REST API response
      * Ensures comment author avatars use custom uploads or DiceBear
-     * * @param WP_REST_Response $response The response object
+     *
+     * @param WP_REST_Response $response The response object
      * @param WP_Comment $comment The comment object
      * @param WP_REST_Request $request The request object
      * @return WP_REST_Response Modified response
