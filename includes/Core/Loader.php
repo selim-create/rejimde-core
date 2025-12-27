@@ -39,6 +39,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/FAQService.php')) require_once REJIMDE_PATH . 'includes/Services/FAQService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/AnnouncementService.php')) require_once REJIMDE_PATH . 'includes/Services/AnnouncementService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/AIPlannerService.php')) require_once REJIMDE_PATH . 'includes/Services/AIPlannerService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/UserDashboardService.php')) require_once REJIMDE_PATH . 'includes/Services/UserDashboardService.php';
         
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
@@ -97,6 +98,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AnnouncementController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AnnouncementController.php';
         // YENİ: AI Planner Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AIPlannerController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AIPlannerController.php';
+        // YENİ: User Dashboard Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/UserDashboardController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/UserDashboardController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -171,6 +174,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\AnnouncementController')) (new \Rejimde\Api\V1\AnnouncementController())->register_routes();
             // YENİ: AI Planner Routes
             if (class_exists('Rejimde\\Api\\V1\\AIPlannerController')) (new \Rejimde\Api\V1\AIPlannerController())->register_routes();
+            // YENİ: User Dashboard Routes
+            if (class_exists('Rejimde\\Api\\V1\\UserDashboardController')) (new \Rejimde\Api\V1\UserDashboardController())->register_routes();
         });
 
         // CPT Kayıtları
