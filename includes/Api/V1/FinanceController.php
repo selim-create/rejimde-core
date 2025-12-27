@@ -478,18 +478,18 @@ class FinanceController extends WP_REST_Controller {
 
     /**
      * Export data
+     * 
+     * Note: Currently returns JSON format only. CSV/Excel export to be implemented in future version.
      */
     public function export_data(WP_REST_Request $request): WP_REST_Response {
         $expertId = get_current_user_id();
         
-        $format = $request->get_param('format') ?? 'csv';
+        $format = $request->get_param('format') ?? 'json';
         $type = $request->get_param('type') ?? 'payments';
         $startDate = $request->get_param('start_date');
         $endDate = $request->get_param('end_date');
         
-        // For now, just return the data as JSON
-        // TODO: Implement actual CSV/Excel export
-        
+        // Get data based on type
         if ($type === 'payments') {
             $filters = [
                 'start_date' => $startDate,
@@ -509,7 +509,8 @@ class FinanceController extends WP_REST_Controller {
             'status' => 'success',
             'data' => $data,
             'format' => $format,
-            'type' => $type
+            'type' => $type,
+            'note' => 'JSON format only. CSV/Excel export coming soon.'
         ], 200);
     }
 

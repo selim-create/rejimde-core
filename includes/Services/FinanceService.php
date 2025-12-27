@@ -63,8 +63,10 @@ class FinanceService {
         $table_payments = $wpdb->prefix . 'rejimde_payments';
         $table_services = $wpdb->prefix . 'rejimde_services';
         
-        // Build query
-        $query = "SELECT p.* FROM $table_payments p WHERE p.expert_id = %d";
+        // Build query with LEFT JOIN to get service name
+        $query = "SELECT p.*, s.name as service_name FROM $table_payments p 
+                  LEFT JOIN $table_services s ON p.service_id = s.id 
+                  WHERE p.expert_id = %d";
         $params = [$expertId];
         
         // Filter by status
@@ -183,7 +185,12 @@ class FinanceService {
         ];
         
         // Insert payment
-        $wpdb->insert($table_payments, $paymentData);
+        $result = $wpdb->insert($table_payments, $paymentData);
+        
+        if ($result === false) {
+            return ['error' => 'Failed to create payment: ' . $wpdb->last_error];
+        }
+        
         $paymentId = $wpdb->insert_id;
         
         if (!$paymentId) {
@@ -359,7 +366,22 @@ class FinanceService {
             $expertId
         ), ARRAY_A);
         
-        // Add usage count for each service
+        // Get usage counts in a single query
+        $usageCounts = [];
+        if (!empty($services)) {
+            $serviceIds = array_column($services, 'id');
+            $placeholders = implode(',', array_fill(0, count($serviceIds), '%d'));
+            $usageResults = $wpdb->get_results($wpdb->prepare(
+                "SELECT service_id, COUNT(*) as count FROM $table_payments WHERE service_id IN ($placeholders) GROUP BY service_id",
+                ...$serviceIds
+            ), ARRAY_A);
+            
+            foreach ($usageResults as $row) {
+                $usageCounts[(int) $row['service_id']] = (int) $row['count'];
+            }
+        }
+        
+        // Format services and add usage count
         foreach ($services as &$service) {
             $service['id'] = (int) $service['id'];
             $service['expert_id'] = (int) $service['expert_id'];
@@ -371,12 +393,8 @@ class FinanceService {
             $service['is_featured'] = (bool) $service['is_featured'];
             $service['sort_order'] = (int) $service['sort_order'];
             
-            // Get usage count
-            $usageCount = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_payments WHERE service_id = %d",
-                $service['id']
-            ));
-            $service['usage_count'] = (int) $usageCount;
+            // Add usage count from cache
+            $service['usage_count'] = $usageCounts[$service['id']] ?? 0;
         }
         
         return $services;
@@ -418,7 +436,12 @@ class FinanceService {
             'sort_order' => (int) ($data['sort_order'] ?? 0)
         ];
         
-        $wpdb->insert($table_services, $serviceData);
+        $result = $wpdb->insert($table_services, $serviceData);
+        
+        if ($result === false) {
+            return ['error' => 'Failed to create service: ' . $wpdb->last_error];
+        }
+        
         $serviceId = $wpdb->insert_id;
         
         if (!$serviceId) {
@@ -697,13 +720,14 @@ class FinanceService {
             $expertId
         ), ARRAY_A);
         
-        // Update status to overdue
-        foreach ($payments as $payment) {
-            $wpdb->update(
-                $table_payments,
-                ['status' => 'overdue'],
-                ['id' => $payment['id']]
-            );
+        // Update status to overdue in bulk
+        if (!empty($payments)) {
+            $paymentIds = array_column($payments, 'id');
+            $placeholders = implode(',', array_fill(0, count($paymentIds), '%d'));
+            $wpdb->query($wpdb->prepare(
+                "UPDATE $table_payments SET status = 'overdue' WHERE id IN ($placeholders)",
+                ...$paymentIds
+            ));
         }
         
         $data = [];
@@ -933,14 +957,17 @@ class FinanceService {
     
     /**
      * Format payment for API response
+     * Expects payment array to have service_name from a LEFT JOIN
      */
     private function formatPayment(array $payment): array {
         $clientId = (int) $payment['client_id'];
         $client = get_userdata($clientId);
         
         $serviceId = (int) ($payment['service_id'] ?? 0);
-        $serviceName = null;
-        if ($serviceId > 0) {
+        // Use service_name from JOIN if available, otherwise fetch it
+        $serviceName = $payment['service_name'] ?? null;
+        
+        if ($serviceId > 0 && !$serviceName) {
             global $wpdb;
             $table_services = $wpdb->prefix . 'rejimde_services';
             $serviceName = $wpdb->get_var($wpdb->prepare(
