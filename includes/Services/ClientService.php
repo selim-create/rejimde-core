@@ -576,9 +576,12 @@ class ClientService {
         }
         
         // Update invite to active relationship
-        $packageData = json_decode($invite['notes'], true) ?: [];
+        $packageData = json_decode($invite['notes'], true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $packageData = [];
+        }
         
-        $wpdb->update(
+        $updateResult = $wpdb->update(
             $table_relationships,
             [
                 'client_id' => $clientId,
@@ -591,6 +594,10 @@ class ClientService {
             ['id' => $invite['id']]
         );
         
+        if ($updateResult === false) {
+            return ['error' => 'Davet kabul edilemedi. Lütfen tekrar deneyin.'];
+        }
+        
         // Create package if data exists
         if (!empty($packageData['package_name'])) {
             $this->createPackage($invite['id'], $packageData);
@@ -598,6 +605,10 @@ class ClientService {
         
         // Get expert info
         $expert = get_userdata($expertId);
+        
+        if (!$expert) {
+            return ['error' => 'Uzman bilgisi bulunamadı'];
+        }
         
         return [
             'relationship_id' => $invite['id'],
