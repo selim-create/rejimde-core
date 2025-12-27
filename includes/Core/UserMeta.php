@@ -191,7 +191,8 @@ class UserMeta {
     /**
      * Add custom avatar and role information to REST API user response
      * Combines avatar_url override and role information
-     * * @param WP_REST_Response $response The response object
+     *
+     * @param WP_REST_Response $response The response object
      * @param WP_User $user The user object
      * @param WP_REST_Request $request The request object
      * @return WP_REST_Response Modified response
@@ -248,7 +249,8 @@ class UserMeta {
     /**
      * Add custom avatar to comment REST API response
      * Ensures comment author avatars use custom uploads or DiceBear
-     * * @param WP_REST_Response $response The response object
+     *
+     * @param WP_REST_Response $response The response object
      * @param WP_Comment $comment The comment object
      * @param WP_REST_Request $request The request object
      * @return WP_REST_Response Modified response
