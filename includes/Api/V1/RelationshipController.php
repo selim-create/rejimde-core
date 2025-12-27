@@ -418,19 +418,20 @@ class RelationshipController extends WP_REST_Controller {
     /**
      * Check if user is expert (rejimde_pro role)
      */
-    public function check_expert_auth($request) {
+    public function check_expert_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
         
         $user = wp_get_current_user();
-        return in_array('rejimde_pro', (array) $user->roles);
+        return in_array('rejimde_pro', (array) $user->roles) || 
+               in_array('administrator', (array) $user->roles);
     }
 
     /**
      * Check if user is authenticated
      */
-    public function check_auth($request) {
+    public function check_auth(): bool {
         return is_user_logged_in();
     }
 

@@ -610,14 +610,13 @@ class CalendarController extends WP_REST_Controller {
         return is_user_logged_in();
     }
 
-    protected function check_expert_auth() {
+    protected function check_expert_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
         
-        $userId = get_current_user_id();
-        $userType = get_user_meta($userId, 'user_type', true);
-        
-        return $userType === 'expert';
+        $user = wp_get_current_user();
+        return in_array('rejimde_pro', (array) $user->roles) || 
+               in_array('administrator', (array) $user->roles);
     }
 }
