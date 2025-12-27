@@ -436,7 +436,78 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_blocked_times);
 
-        // 22. Terminoloji Migrasyonu
+        // 22. Finance: Services Table
+        $table_services = $wpdb->prefix . 'rejimde_services';
+        $sql_services = "CREATE TABLE {$table_services} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            description TEXT DEFAULT NULL,
+            type ENUM('session', 'package', 'subscription', 'one_time') DEFAULT 'session',
+            price DECIMAL(10,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(3) DEFAULT 'TRY',
+            duration_minutes INT DEFAULT 60 COMMENT 'Seans süresi',
+            session_count INT DEFAULT NULL COMMENT 'Paket içi seans sayısı',
+            validity_days INT DEFAULT NULL COMMENT 'Paket geçerlilik süresi',
+            is_active TINYINT(1) DEFAULT 1,
+            is_featured TINYINT(1) DEFAULT 0,
+            color VARCHAR(7) DEFAULT '#3B82F6' COMMENT 'UI renk kodu',
+            sort_order INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_active (is_active)
+        ) {$charset_collate};";
+        dbDelta($sql_services);
+
+        // 23. Finance: Payments Table
+        $table_payments = $wpdb->prefix . 'rejimde_payments';
+        $sql_payments = "CREATE TABLE {$table_payments} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            client_id BIGINT UNSIGNED NOT NULL,
+            relationship_id BIGINT UNSIGNED DEFAULT NULL,
+            package_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'client_packages tablosundaki ID',
+            service_id BIGINT UNSIGNED DEFAULT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            currency VARCHAR(3) DEFAULT 'TRY',
+            payment_method ENUM('cash', 'bank_transfer', 'credit_card', 'online', 'other') DEFAULT 'cash',
+            payment_date DATE NOT NULL,
+            due_date DATE DEFAULT NULL,
+            status ENUM('pending', 'paid', 'partial', 'overdue', 'cancelled', 'refunded') DEFAULT 'pending',
+            paid_amount DECIMAL(10,2) DEFAULT 0,
+            description VARCHAR(500) DEFAULT NULL,
+            receipt_url VARCHAR(500) DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
+            INDEX idx_client (client_id),
+            INDEX idx_status (status),
+            INDEX idx_date (payment_date),
+            INDEX idx_expert_date (expert_id, payment_date)
+        ) {$charset_collate};";
+        dbDelta($sql_payments);
+
+        // 24. Finance: Payment Reminders Table
+        $table_payment_reminders = $wpdb->prefix . 'rejimde_payment_reminders';
+        $sql_payment_reminders = "CREATE TABLE {$table_payment_reminders} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            payment_id BIGINT UNSIGNED NOT NULL,
+            reminder_date DATE NOT NULL,
+            reminder_type ENUM('upcoming', 'due', 'overdue') NOT NULL,
+            is_sent TINYINT(1) DEFAULT 0,
+            sent_at DATETIME DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_payment (payment_id),
+            INDEX idx_date (reminder_date)
+        ) {$charset_collate};";
+        dbDelta($sql_payment_reminders);
+
+        // 25. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
