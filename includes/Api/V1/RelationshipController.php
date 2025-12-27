@@ -126,10 +126,12 @@ class RelationshipController extends WP_REST_Controller {
         
         $result = $this->clientService->getClients($expertId, $options);
         
-        return $this->success([
+        // Return data and meta at top level, not nested in data
+        return new WP_REST_Response([
+            'status' => 'success',
             'data' => $result['data'],
             'meta' => $result['meta']
-        ]);
+        ], 200);
     }
 
     /**
@@ -203,16 +205,22 @@ class RelationshipController extends WP_REST_Controller {
         $expertId = get_current_user_id();
         
         $data = [
-            'package_name' => $request->get_param('package_name'),
-            'package_type' => $request->get_param('package_type'),
+            'package_name' => $request->get_param('package_name') ?: 'Genel Paket',
+            'package_type' => $request->get_param('package_type') ?: 'session',
+            'total_sessions' => $request->get_param('total_sessions'),
             'duration_months' => $request->get_param('duration_months'),
-            'price' => $request->get_param('price')
+            'price' => $request->get_param('price') ?: 0
         ];
         
         $invite = $this->clientService->createInvite($expertId, $data);
         
+        // Error handling
         if (!$invite) {
             return $this->error('Davet oluşturulamadı', 500);
+        }
+        
+        if (isset($invite['error'])) {
+            return $this->error($invite['error'], 500);
         }
         
         return $this->success($invite);
