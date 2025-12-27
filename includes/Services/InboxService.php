@@ -593,14 +593,14 @@ class InboxService {
         // Check if OpenAI is configured and class exists
         $openaiKey = get_option('rejimde_openai_api_key', '');
         
-        if (empty($openaiKey) || !class_exists('Rejimde\Services\OpenAIService')) {
+        if (empty($openaiKey) || !class_exists('Rejimde\\Services\\OpenAIService')) {
             // Return a simple template-based response
             return $this->generateSimpleDraft($messages);
         }
         
         // Use OpenAI to generate draft
         try {
-            $openaiService = new OpenAIService();
+            $openaiService = new \Rejimde\Services\OpenAIService();
             $prompt = "Sen bir diyetisyen/fitness uzmanısın. Aşağıdaki mesaj geçmişine dayanarak profesyonel, nazik ve yararlı bir yanıt oluştur:\n\n" . $contextString;
             $response = $openaiService->call_openai($prompt);
             
@@ -724,10 +724,10 @@ class InboxService {
         }
         
         // Create notification (if notification system exists)
-        if (class_exists('Rejimde\Services\NotificationService')) {
+        if (class_exists('Rejimde\\Services\\NotificationService')) {
             // Lazy-load notification service
             if ($this->notificationService === null) {
-                $this->notificationService = new NotificationService();
+                $this->notificationService = new \Rejimde\Services\NotificationService();
             }
             
             // Note: This would require a notification type to be defined in NotificationTypes.php
