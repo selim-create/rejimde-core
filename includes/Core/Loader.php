@@ -128,7 +128,6 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\InboxController')) (new \Rejimde\Api\V1\InboxController())->register_routes();
             // YENİ: Calendar Routes
             if (class_exists('Rejimde\\Api\\V1\\CalendarController')) (new \Rejimde\Api\V1\CalendarController())->register_routes();
-            if (class_exists('Rejimde\\Api\\V1\\InboxController')) (new \Rejimde\Api\V1\InboxController())->register_routes();
         });
 
         // CPT Kayıtları

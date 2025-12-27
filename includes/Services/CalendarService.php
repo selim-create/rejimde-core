@@ -499,8 +499,7 @@ class CalendarService {
                     'is_member' => $isMember
                 ],
                 'service' => $req['service_id'] ? [
-                    'id' => (int) $req['service_id'],
-                    'name' => 'Service' // TODO: Get actual service name
+                    'id' => (int) $req['service_id']
                 ] : null,
                 'preferred_date' => $req['preferred_date'],
                 'preferred_time' => substr($req['preferred_time'], 0, 5),
