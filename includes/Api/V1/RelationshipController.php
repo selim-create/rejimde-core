@@ -215,10 +215,6 @@ class RelationshipController extends WP_REST_Controller {
         $invite = $this->clientService->createInvite($expertId, $data);
         
         // Error handling
-        if (!$invite) {
-            return $this->error('Davet oluşturulamadı', 500);
-        }
-        
         if (isset($invite['error'])) {
             return $this->error($invite['error'], 500);
         }
