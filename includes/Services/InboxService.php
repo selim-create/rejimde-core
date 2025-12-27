@@ -10,8 +10,12 @@ class InboxService {
     
     private $notificationService;
     
+    // Default avatar URL
+    const DEFAULT_AVATAR_URL = 'https://placehold.co/150';
+    
     public function __construct() {
-        $this->notificationService = new NotificationService();
+        // NotificationService will be instantiated when needed
+        $this->notificationService = null;
     }
     
     /**
@@ -106,7 +110,7 @@ class InboxService {
                 'client' => [
                     'id' => $clientId,
                     'name' => $client->display_name,
-                    'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150',
+                    'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: self::DEFAULT_AVATAR_URL,
                 ],
                 'subject' => $thread['subject'],
                 'status' => $thread['status'],
@@ -184,7 +188,7 @@ class InboxService {
                 'client' => [
                     'id' => $clientId,
                     'name' => $client->display_name,
-                    'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150',
+                    'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: self::DEFAULT_AVATAR_URL,
                     'email' => $client->user_email,
                 ],
                 'subject' => $thread['subject'],
@@ -224,7 +228,7 @@ class InboxService {
                 'sender_id' => $senderId,
                 'sender_type' => $msg['sender_type'],
                 'sender_name' => $sender ? $sender->display_name : 'Unknown',
-                'sender_avatar' => $sender ? (get_user_meta($senderId, 'avatar_url', true) ?: 'https://placehold.co/150') : 'https://placehold.co/150',
+                'sender_avatar' => $sender ? (get_user_meta($senderId, 'avatar_url', true) ?: self::DEFAULT_AVATAR_URL) : self::DEFAULT_AVATAR_URL,
                 'content' => $msg['content'],
                 'content_type' => $msg['content_type'],
                 'attachments' => $msg['attachments'] ? json_decode($msg['attachments'], true) : null,
@@ -283,19 +287,33 @@ class InboxService {
         $messageId = (int) $wpdb->insert_id;
         
         // Update thread metadata
-        $unreadField = $senderType === 'expert' ? 'unread_client' : 'unread_expert';
-        $wpdb->query($wpdb->prepare(
-            "UPDATE $table_threads 
-             SET last_message_at = %s, 
-                 last_message_by = %d,
-                 $unreadField = $unreadField + 1,
-                 updated_at = %s
-             WHERE id = %d",
-            current_time('mysql'),
-            $senderId,
-            current_time('mysql'),
-            $threadId
-        ));
+        if ($senderType === 'expert') {
+            $wpdb->query($wpdb->prepare(
+                "UPDATE $table_threads 
+                 SET last_message_at = %s, 
+                     last_message_by = %d,
+                     unread_client = unread_client + 1,
+                     updated_at = %s
+                 WHERE id = %d",
+                current_time('mysql'),
+                $senderId,
+                current_time('mysql'),
+                $threadId
+            ));
+        } else {
+            $wpdb->query($wpdb->prepare(
+                "UPDATE $table_threads 
+                 SET last_message_at = %s, 
+                     last_message_by = %d,
+                     unread_expert = unread_expert + 1,
+                     updated_at = %s
+                 WHERE id = %d",
+                current_time('mysql'),
+                $senderId,
+                current_time('mysql'),
+                $threadId
+            ));
+        }
         
         // Send notification to recipient
         $this->sendMessageNotification($threadId, $senderId, $senderType);
@@ -572,19 +590,18 @@ class InboxService {
         
         $contextString = implode("\n", $messageContext);
         
-        // Check if OpenAI is configured
+        // Check if OpenAI is configured and class exists
         $openaiKey = get_option('rejimde_openai_api_key', '');
         
-        if (empty($openaiKey)) {
+        if (empty($openaiKey) || !class_exists('Rejimde\Services\OpenAIService')) {
             // Return a simple template-based response
             return $this->generateSimpleDraft($messages);
         }
         
         // Use OpenAI to generate draft
-        $openaiService = new OpenAIService();
-        $prompt = "Sen bir diyetisyen/fitness uzmanısın. Aşağıdaki mesaj geçmişine dayanarak profesyonel, nazik ve yararlı bir yanıt oluştur:\n\n" . $contextString;
-        
         try {
+            $openaiService = new OpenAIService();
+            $prompt = "Sen bir diyetisyen/fitness uzmanısın. Aşağıdaki mesaj geçmişine dayanarak profesyonel, nazik ve yararlı bir yanıt oluştur:\n\n" . $contextString;
             $response = $openaiService->call_openai($prompt);
             
             if (is_wp_error($response)) {
@@ -708,9 +725,20 @@ class InboxService {
         
         // Create notification (if notification system exists)
         if (class_exists('Rejimde\Services\NotificationService')) {
+            // Lazy-load notification service
+            if ($this->notificationService === null) {
+                $this->notificationService = new NotificationService();
+            }
+            
             // Note: This would require a notification type to be defined in NotificationTypes.php
             // For now, we'll skip creating the notification to avoid errors
             // In a production setup, you'd add 'new_message' type to NotificationTypes.php
+            // Example:
+            // $this->notificationService->create($recipientId, 'new_message', [
+            //     'actor_id' => $senderId,
+            //     'entity_type' => 'thread',
+            //     'entity_id' => $threadId,
+            // ]);
         }
     }
 }

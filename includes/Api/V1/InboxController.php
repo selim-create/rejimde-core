@@ -186,7 +186,7 @@ class InboxController extends WP_REST_Controller {
         ];
         
         if (empty($data['content'])) {
-            return $this->error('content gerekli', 400);
+            return $this->error('İçerik gerekli', 400);
         }
         
         $messageId = $this->inboxService->sendMessage($threadId, $expertId, 'expert', $data);
@@ -212,7 +212,7 @@ class InboxController extends WP_REST_Controller {
         $content = $request->get_param('content');
         
         if (empty($clientId) || empty($content)) {
-            return $this->error('client_id ve content gerekli', 400);
+            return $this->error('client_id ve içerik gerekli', 400);
         }
         
         $threadId = $this->inboxService->createThread($expertId, (int) $clientId, $subject, $content);
@@ -314,7 +314,7 @@ class InboxController extends WP_REST_Controller {
         ];
         
         if (empty($data['title']) || empty($data['content'])) {
-            return $this->error('title ve content gerekli', 400);
+            return $this->error('Başlık ve içerik gerekli', 400);
         }
         
         $templateId = $this->inboxService->createTemplate($expertId, $data);
@@ -428,7 +428,7 @@ class InboxController extends WP_REST_Controller {
         ];
         
         if (empty($data['content'])) {
-            return $this->error('content gerekli', 400);
+            return $this->error('İçerik gerekli', 400);
         }
         
         $messageId = $this->inboxService->sendMessage($threadId, $clientId, 'client', $data);
