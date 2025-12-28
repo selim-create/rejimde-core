@@ -420,7 +420,7 @@ class ClientController extends WP_REST_Controller {
 
     // Helper methods
 
-    protected function success($data = null, $message = 'Success', $code = 200, $meta = null): WP_REST_Response {
+    public function success($data = null, $message = 'Success', $code = 200, $meta = null): WP_REST_Response {
         $response = [
             'status' => 'success',
             'data' => $data
@@ -433,18 +433,18 @@ class ClientController extends WP_REST_Controller {
         return new WP_REST_Response($response, $code);
     }
 
-    protected function error($message = 'Error', $code = 400): WP_REST_Response {
+    public function error($message = 'Error', $code = 400): WP_REST_Response {
         return new WP_REST_Response([
             'status' => 'error',
             'message' => $message
         ], $code);
     }
 
-    protected function check_auth(): bool {
+    public function check_auth(): bool {
         return is_user_logged_in();
     }
 
-    protected function check_expert_auth(): bool {
+    public function check_expert_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
