@@ -57,7 +57,7 @@ class ClientService {
             
             // Handle database errors
             if ($wpdb->last_error) {
-                error_log('Rejimde CRM: getClients DB error - ' . $wpdb->last_error);
+                error_log('Rejimde CRM: getClients DB error occurred');
                 return [
                     'data' => [],
                     'meta' => ['total' => 0, 'active' => 0, 'pending' => 0, 'archived' => 0]
@@ -103,7 +103,7 @@ class ClientService {
                 // Get client data with null check
                 $client = get_userdata($clientId);
                 if (!$client) {
-                    error_log('Rejimde CRM: Client user not found for ID ' . $clientId);
+                    error_log('Rejimde CRM: Client user data not found');
                     continue;
                 }
                 

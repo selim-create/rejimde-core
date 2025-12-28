@@ -109,7 +109,7 @@ class FinanceService {
             
             // Handle database errors
             if ($wpdb->last_error) {
-                error_log('Rejimde Finance: getPayments DB error - ' . $wpdb->last_error);
+                error_log('Rejimde Finance: getPayments DB error occurred');
                 return [
                     'data' => [],
                     'meta' => [
@@ -409,7 +409,7 @@ class FinanceService {
             
             // Handle database errors
             if ($wpdb->last_error) {
-                error_log('Rejimde Finance: getServices DB error - ' . $wpdb->last_error);
+                error_log('Rejimde Finance: getServices DB error occurred');
                 return [];
             }
             
