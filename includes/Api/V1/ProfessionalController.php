@@ -282,6 +282,7 @@ class ProfessionalController extends WP_REST_Controller {
 
         $data = [
             'id'            => $post_id,
+            'user_id'       => $user_id ? (int) $user_id : 0,
             'name'          => $post->post_title,
             'slug'          => $post->post_name,
             'username'      => $username,
