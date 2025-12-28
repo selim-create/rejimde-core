@@ -114,23 +114,39 @@ class ClientController extends WP_REST_Controller {
      * GET /pro/clients
      */
     public function get_clients(WP_REST_Request $request): WP_REST_Response {
-        $expertId = get_current_user_id();
-        
-        $filters = [
-            'status' => $request->get_param('status'),
-            'search' => $request->get_param('search'),
-            'limit' => $request->get_param('limit') ?? 50,
-            'offset' => $request->get_param('offset') ?? 0,
-        ];
-        
-        // Remove null values
-        $filters = array_filter($filters, function($value) {
-            return $value !== null;
-        });
-        
-        $result = $this->clientService->getClients($expertId, $filters);
-        
-        return $this->success($result['data'], 'Success', 200, $result['meta']);
+        try {
+            $expertId = get_current_user_id();
+            
+            if (!$expertId) {
+                error_log('Rejimde CRM: get_clients failed - User not authenticated');
+                return $this->error('User not authenticated', 401);
+            }
+            
+            $filters = [
+                'status' => $request->get_param('status'),
+                'search' => $request->get_param('search'),
+                'limit' => $request->get_param('limit') ?? 50,
+                'offset' => $request->get_param('offset') ?? 0,
+            ];
+            
+            // Remove null values
+            $filters = array_filter($filters, function($value) {
+                return $value !== null;
+            });
+            
+            $result = $this->clientService->getClients($expertId, $filters);
+            
+            // Return response with 'clients' key instead of 'data' to match frontend expectations
+            return new WP_REST_Response([
+                'status' => 'success',
+                'clients' => $result['data'],
+                'meta' => $result['meta']
+            ], 200);
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde CRM: get_clients error - ' . $e->getMessage());
+            return $this->error('Failed to fetch clients: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -153,27 +169,43 @@ class ClientController extends WP_REST_Controller {
      * POST /pro/clients
      */
     public function add_client(WP_REST_Request $request): WP_REST_Response {
-        $expertId = get_current_user_id();
-        
-        $data = [
-            'client_id' => $request->get_param('client_id'),
-            'email' => $request->get_param('email'),
-            'name' => $request->get_param('name'),
-            'package_data' => $request->get_param('package'),
-            'source' => 'manual',
-        ];
-        
-        if (empty($data['client_id']) && empty($data['email'])) {
-            return $this->error('Either client_id or email is required', 400);
+        try {
+            $expertId = get_current_user_id();
+            
+            if (!$expertId) {
+                error_log('Rejimde CRM: add_client failed - User not authenticated');
+                return $this->error('User not authenticated', 401);
+            }
+            
+            // Accept both 'email' and 'client_email' parameters
+            $email = $request->get_param('email') ?? $request->get_param('client_email');
+            $name = $request->get_param('name') ?? $request->get_param('client_name');
+            
+            $data = [
+                'client_id' => $request->get_param('client_id'),
+                'client_email' => $email,
+                'client_name' => $name,
+                'package_data' => $request->get_param('package'),
+                'source' => 'manual',
+            ];
+            
+            if (empty($data['client_id']) && empty($data['client_email'])) {
+                return $this->error('Either client_id or email is required', 400);
+            }
+            
+            $result = $this->clientService->addClient($expertId, $data);
+            
+            if (is_array($result) && isset($result['error'])) {
+                error_log('Rejimde CRM: add_client error - ' . $result['error']);
+                return $this->error($result['error'], 400);
+            }
+            
+            return $this->success(['relationship_id' => $result['relationship_id'] ?? $result], 'Client added successfully', 201);
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde CRM: add_client exception - ' . $e->getMessage());
+            return $this->error('Failed to add client: ' . $e->getMessage(), 500);
         }
-        
-        $result = $this->clientService->addClient($expertId, $data);
-        
-        if (is_array($result) && isset($result['error'])) {
-            return $this->error($result['error'], 400);
-        }
-        
-        return $this->success(['relationship_id' => $result], 'Client added successfully', 201);
     }
 
     /**

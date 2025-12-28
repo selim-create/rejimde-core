@@ -17,105 +17,141 @@ class ClientService {
      */
     public function getClients(int $expertId, array $options = []): array {
         global $wpdb;
-        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
-        $table_packages = $wpdb->prefix . 'rejimde_client_packages';
-        $table_events = $wpdb->prefix . 'rejimde_events';
         
-        // Build query - filter out pending invites (client_id = 0)
-        $query = "SELECT r.* FROM $table_relationships r WHERE r.expert_id = %d AND r.client_id > 0";
-        $params = [$expertId];
-        
-        // Filter by status
-        if (!empty($options['status'])) {
-            $query .= " AND r.status = %s";
-            $params[] = $options['status'];
-        }
-        
-        // Search by client name
-        if (!empty($options['search'])) {
-            $search = '%' . $wpdb->esc_like($options['search']) . '%';
-            $query .= " AND EXISTS (
-                SELECT 1 FROM {$wpdb->users} u 
-                WHERE u.ID = r.client_id 
-                AND u.display_name LIKE %s
-            )";
-            $params[] = $search;
-        }
-        
-        $query .= " ORDER BY r.created_at DESC";
-        
-        // Pagination
-        $limit = $options['limit'] ?? 50;
-        $offset = $options['offset'] ?? 0;
-        $query .= " LIMIT %d OFFSET %d";
-        $params[] = $limit;
-        $params[] = $offset;
-        
-        $relationships = $wpdb->get_results($wpdb->prepare($query, ...$params), ARRAY_A);
-        
-        // Get meta counts - filter out pending invites (client_id = 0)
-        $meta = [
-            'total' => 0,
-            'active' => 0,
-            'pending' => 0,
-            'archived' => 0
-        ];
-        
-        $meta_query = "SELECT status, COUNT(*) as count FROM $table_relationships WHERE expert_id = %d AND client_id > 0 GROUP BY status";
-        $meta_results = $wpdb->get_results($wpdb->prepare($meta_query, $expertId), ARRAY_A);
-        
-        foreach ($meta_results as $row) {
-            $meta[$row['status']] = (int) $row['count'];
-            $meta['total'] += (int) $row['count'];
-        }
-        
-        // Format each relationship
-        $data = [];
-        foreach ($relationships as $rel) {
-            $clientId = (int) $rel['client_id'];
-            $relationshipId = (int) $rel['id'];
+        try {
+            $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+            $table_packages = $wpdb->prefix . 'rejimde_client_packages';
+            $table_events = $wpdb->prefix . 'rejimde_events';
             
-            // Get client data
-            $client = get_userdata($clientId);
-            if (!$client) continue;
+            // Build query - filter out pending invites (client_id = 0)
+            $query = "SELECT r.* FROM $table_relationships r WHERE r.expert_id = %d AND r.client_id > 0";
+            $params = [$expertId];
             
-            // Get active package
-            $package = $this->getActivePackage($relationshipId);
+            // Filter by status
+            if (!empty($options['status'])) {
+                $query .= " AND r.status = %s";
+                $params[] = $options['status'];
+            }
             
-            // Get last activity
-            $lastActivity = $this->getLastActivityDate($clientId);
+            // Search by client name
+            if (!empty($options['search'])) {
+                $search = '%' . $wpdb->esc_like($options['search']) . '%';
+                $query .= " AND EXISTS (
+                    SELECT 1 FROM {$wpdb->users} u 
+                    WHERE u.ID = r.client_id 
+                    AND u.display_name LIKE %s
+                )";
+                $params[] = $search;
+            }
             
-            // Calculate risk status
-            $risk = $this->calculateRiskStatus($clientId);
+            $query .= " ORDER BY r.created_at DESC";
             
-            // Get score
-            $score = (int) get_user_meta($clientId, 'rejimde_total_score', true);
+            // Pagination
+            $limit = $options['limit'] ?? 50;
+            $offset = $options['offset'] ?? 0;
+            $query .= " LIMIT %d OFFSET %d";
+            $params[] = $limit;
+            $params[] = $offset;
             
-            $data[] = [
-                'id' => $relationshipId,
-                'relationship_id' => $relationshipId,
-                'client' => [
-                    'id' => $clientId,
-                    'name' => $client->display_name,
-                    'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150',
-                    'email' => $client->user_email
-                ],
-                'status' => $rel['status'],
-                'source' => $rel['source'],
-                'started_at' => $rel['started_at'],
-                'package' => $package,
-                'last_activity' => $lastActivity,
-                'risk_status' => $risk['status'],
-                'risk_reason' => $risk['reason'],
-                'score' => $score,
-                'created_at' => $rel['created_at']
+            $relationships = $wpdb->get_results($wpdb->prepare($query, ...$params), ARRAY_A);
+            
+            // Handle database errors
+            if ($wpdb->last_error) {
+                error_log('Rejimde CRM: getClients DB error - ' . $wpdb->last_error);
+                return [
+                    'data' => [],
+                    'meta' => ['total' => 0, 'active' => 0, 'pending' => 0, 'archived' => 0]
+                ];
+            }
+            
+            // Ensure relationships is an array
+            if (!is_array($relationships)) {
+                $relationships = [];
+            }
+            
+            // Get meta counts - filter out pending invites (client_id = 0)
+            $meta = [
+                'total' => 0,
+                'active' => 0,
+                'pending' => 0,
+                'archived' => 0
+            ];
+            
+            $meta_query = "SELECT status, COUNT(*) as count FROM $table_relationships WHERE expert_id = %d AND client_id > 0 GROUP BY status";
+            $meta_results = $wpdb->get_results($wpdb->prepare($meta_query, $expertId), ARRAY_A);
+            
+            if (is_array($meta_results)) {
+                foreach ($meta_results as $row) {
+                    if (isset($row['status']) && isset($row['count'])) {
+                        $meta[$row['status']] = (int) $row['count'];
+                        $meta['total'] += (int) $row['count'];
+                    }
+                }
+            }
+            
+            // Format each relationship
+            $data = [];
+            foreach ($relationships as $rel) {
+                $clientId = (int) $rel['client_id'];
+                $relationshipId = (int) $rel['id'];
+                
+                // Skip if client_id is 0 (pending invite)
+                if ($clientId === 0) {
+                    continue;
+                }
+                
+                // Get client data with null check
+                $client = get_userdata($clientId);
+                if (!$client) {
+                    error_log('Rejimde CRM: Client user not found for ID ' . $clientId);
+                    continue;
+                }
+                
+                // Get active package
+                $package = $this->getActivePackage($relationshipId);
+                
+                // Get last activity
+                $lastActivity = $this->getLastActivityDate($clientId);
+                
+                // Calculate risk status
+                $risk = $this->calculateRiskStatus($clientId);
+                
+                // Get score with null check
+                $score = (int) get_user_meta($clientId, 'rejimde_total_score', true);
+                
+                $data[] = [
+                    'id' => $relationshipId,
+                    'relationship_id' => $relationshipId,
+                    'client' => [
+                        'id' => $clientId,
+                        'name' => $client->display_name ?? 'Unknown',
+                        'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150',
+                        'email' => $client->user_email ?? ''
+                    ],
+                    'status' => $rel['status'] ?? 'active',
+                    'source' => $rel['source'] ?? 'manual',
+                    'started_at' => $rel['started_at'] ?? null,
+                    'package' => $package,
+                    'last_activity' => $lastActivity,
+                    'risk_status' => $risk['status'] ?? 'normal',
+                    'risk_reason' => $risk['reason'] ?? null,
+                    'score' => $score,
+                    'created_at' => $rel['created_at'] ?? null
+                ];
+            }
+            
+            return [
+                'data' => $data,
+                'meta' => $meta
+            ];
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde CRM: getClients exception - ' . $e->getMessage());
+            return [
+                'data' => [],
+                'meta' => ['total' => 0, 'active' => 0, 'pending' => 0, 'archived' => 0]
             ];
         }
-        
-        return [
-            'data' => $data,
-            'meta' => $meta
-        ];
     }
     
     /**

@@ -60,90 +60,129 @@ class FinanceService {
      */
     public function getPayments(int $expertId, array $filters = []): array {
         global $wpdb;
-        $table_payments = $wpdb->prefix . 'rejimde_payments';
-        $table_services = $wpdb->prefix . 'rejimde_services';
         
-        // Build query with LEFT JOIN to get service name
-        $query = "SELECT p.*, s.name as service_name FROM $table_payments p 
-                  LEFT JOIN $table_services s ON p.service_id = s.id 
-                  WHERE p.expert_id = %d";
-        $params = [$expertId];
-        
-        // Filter by status
-        if (!empty($filters['status']) && $filters['status'] !== 'all') {
-            $query .= " AND p.status = %s";
-            $params[] = $filters['status'];
+        try {
+            $table_payments = $wpdb->prefix . 'rejimde_payments';
+            $table_services = $wpdb->prefix . 'rejimde_services';
+            
+            // Build query with LEFT JOIN to get service name
+            $query = "SELECT p.*, s.name as service_name FROM $table_payments p 
+                      LEFT JOIN $table_services s ON p.service_id = s.id 
+                      WHERE p.expert_id = %d";
+            $params = [$expertId];
+            
+            // Filter by status
+            if (!empty($filters['status']) && $filters['status'] !== 'all') {
+                $query .= " AND p.status = %s";
+                $params[] = $filters['status'];
+            }
+            
+            // Filter by client
+            if (!empty($filters['client_id'])) {
+                $query .= " AND p.client_id = %d";
+                $params[] = $filters['client_id'];
+            }
+            
+            // Filter by date range
+            if (!empty($filters['start_date'])) {
+                $query .= " AND p.payment_date >= %s";
+                $params[] = $filters['start_date'];
+            }
+            if (!empty($filters['end_date'])) {
+                $query .= " AND p.payment_date <= %s";
+                $params[] = $filters['end_date'];
+            }
+            
+            // Order by
+            $orderBy = $filters['order_by'] ?? 'payment_date';
+            $order = $filters['order'] ?? 'DESC';
+            $query .= " ORDER BY p.$orderBy $order";
+            
+            // Pagination
+            $limit = $filters['limit'] ?? 30;
+            $offset = $filters['offset'] ?? 0;
+            $query .= " LIMIT %d OFFSET %d";
+            $params[] = $limit;
+            $params[] = $offset;
+            
+            $payments = $wpdb->get_results($wpdb->prepare($query, ...$params), ARRAY_A);
+            
+            // Handle database errors
+            if ($wpdb->last_error) {
+                error_log('Rejimde Finance: getPayments DB error - ' . $wpdb->last_error);
+                return [
+                    'data' => [],
+                    'meta' => [
+                        'total' => 0,
+                        'total_amount' => 0,
+                        'paid_amount' => 0,
+                        'pending_amount' => 0
+                    ]
+                ];
+            }
+            
+            // Ensure payments is an array
+            if (!is_array($payments)) {
+                $payments = [];
+            }
+            
+            // Format payments
+            $data = [];
+            foreach ($payments as $payment) {
+                $data[] = $this->formatPayment($payment);
+            }
+            
+            // Get totals
+            $totalsQuery = "SELECT 
+                COUNT(*) as total,
+                SUM(amount) as total_amount,
+                SUM(paid_amount) as paid_amount
+            FROM $table_payments 
+            WHERE expert_id = %d";
+            $totalsParams = [$expertId];
+            
+            if (!empty($filters['status']) && $filters['status'] !== 'all') {
+                $totalsQuery .= " AND status = %s";
+                $totalsParams[] = $filters['status'];
+            }
+            if (!empty($filters['start_date'])) {
+                $totalsQuery .= " AND payment_date >= %s";
+                $totalsParams[] = $filters['start_date'];
+            }
+            if (!empty($filters['end_date'])) {
+                $totalsQuery .= " AND payment_date <= %s";
+                $totalsParams[] = $filters['end_date'];
+            }
+            
+            $totals = $wpdb->get_row($wpdb->prepare($totalsQuery, ...$totalsParams), ARRAY_A);
+            
+            // Ensure totals has valid data
+            if (!is_array($totals)) {
+                $totals = ['total' => 0, 'total_amount' => 0, 'paid_amount' => 0];
+            }
+            
+            return [
+                'data' => $data,
+                'meta' => [
+                    'total' => (int) ($totals['total'] ?? 0),
+                    'total_amount' => (float) ($totals['total_amount'] ?? 0),
+                    'paid_amount' => (float) ($totals['paid_amount'] ?? 0),
+                    'pending_amount' => (float) (($totals['total_amount'] ?? 0) - ($totals['paid_amount'] ?? 0))
+                ]
+            ];
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde Finance: getPayments exception - ' . $e->getMessage());
+            return [
+                'data' => [],
+                'meta' => [
+                    'total' => 0,
+                    'total_amount' => 0,
+                    'paid_amount' => 0,
+                    'pending_amount' => 0
+                ]
+            ];
         }
-        
-        // Filter by client
-        if (!empty($filters['client_id'])) {
-            $query .= " AND p.client_id = %d";
-            $params[] = $filters['client_id'];
-        }
-        
-        // Filter by date range
-        if (!empty($filters['start_date'])) {
-            $query .= " AND p.payment_date >= %s";
-            $params[] = $filters['start_date'];
-        }
-        if (!empty($filters['end_date'])) {
-            $query .= " AND p.payment_date <= %s";
-            $params[] = $filters['end_date'];
-        }
-        
-        // Order by
-        $orderBy = $filters['order_by'] ?? 'payment_date';
-        $order = $filters['order'] ?? 'DESC';
-        $query .= " ORDER BY p.$orderBy $order";
-        
-        // Pagination
-        $limit = $filters['limit'] ?? 30;
-        $offset = $filters['offset'] ?? 0;
-        $query .= " LIMIT %d OFFSET %d";
-        $params[] = $limit;
-        $params[] = $offset;
-        
-        $payments = $wpdb->get_results($wpdb->prepare($query, ...$params), ARRAY_A);
-        
-        // Format payments
-        $data = [];
-        foreach ($payments as $payment) {
-            $data[] = $this->formatPayment($payment);
-        }
-        
-        // Get totals
-        $totalsQuery = "SELECT 
-            COUNT(*) as total,
-            SUM(amount) as total_amount,
-            SUM(paid_amount) as paid_amount
-        FROM $table_payments 
-        WHERE expert_id = %d";
-        $totalsParams = [$expertId];
-        
-        if (!empty($filters['status']) && $filters['status'] !== 'all') {
-            $totalsQuery .= " AND status = %s";
-            $totalsParams[] = $filters['status'];
-        }
-        if (!empty($filters['start_date'])) {
-            $totalsQuery .= " AND payment_date >= %s";
-            $totalsParams[] = $filters['start_date'];
-        }
-        if (!empty($filters['end_date'])) {
-            $totalsQuery .= " AND payment_date <= %s";
-            $totalsParams[] = $filters['end_date'];
-        }
-        
-        $totals = $wpdb->get_row($wpdb->prepare($totalsQuery, ...$totalsParams), ARRAY_A);
-        
-        return [
-            'data' => $data,
-            'meta' => [
-                'total' => (int) ($totals['total'] ?? 0),
-                'total_amount' => (float) ($totals['total_amount'] ?? 0),
-                'paid_amount' => (float) ($totals['paid_amount'] ?? 0),
-                'pending_amount' => (float) (($totals['total_amount'] ?? 0) - ($totals['paid_amount'] ?? 0))
-            ]
-        ];
     }
     
     /**
@@ -358,46 +397,68 @@ class FinanceService {
      */
     public function getServices(int $expertId): array {
         global $wpdb;
-        $table_services = $wpdb->prefix . 'rejimde_services';
-        $table_payments = $wpdb->prefix . 'rejimde_payments';
         
-        $services = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table_services WHERE expert_id = %d ORDER BY sort_order ASC, created_at DESC",
-            $expertId
-        ), ARRAY_A);
-        
-        // Get usage counts in a single query
-        $usageCounts = [];
-        if (!empty($services)) {
-            $serviceIds = array_column($services, 'id');
-            $placeholders = implode(',', array_fill(0, count($serviceIds), '%d'));
-            $usageResults = $wpdb->get_results($wpdb->prepare(
-                "SELECT service_id, COUNT(*) as count FROM $table_payments WHERE service_id IN ($placeholders) GROUP BY service_id",
-                ...$serviceIds
+        try {
+            $table_services = $wpdb->prefix . 'rejimde_services';
+            $table_payments = $wpdb->prefix . 'rejimde_payments';
+            
+            $services = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $table_services WHERE expert_id = %d ORDER BY sort_order ASC, created_at DESC",
+                $expertId
             ), ARRAY_A);
             
-            foreach ($usageResults as $row) {
-                $usageCounts[(int) $row['service_id']] = (int) $row['count'];
+            // Handle database errors
+            if ($wpdb->last_error) {
+                error_log('Rejimde Finance: getServices DB error - ' . $wpdb->last_error);
+                return [];
             }
-        }
-        
-        // Format services and add usage count
-        foreach ($services as &$service) {
-            $service['id'] = (int) $service['id'];
-            $service['expert_id'] = (int) $service['expert_id'];
-            $service['price'] = (float) $service['price'];
-            $service['duration_minutes'] = (int) ($service['duration_minutes'] ?? 60);
-            $service['session_count'] = $service['session_count'] ? (int) $service['session_count'] : null;
-            $service['validity_days'] = $service['validity_days'] ? (int) $service['validity_days'] : null;
-            $service['is_active'] = (bool) $service['is_active'];
-            $service['is_featured'] = (bool) $service['is_featured'];
-            $service['sort_order'] = (int) $service['sort_order'];
             
-            // Add usage count from cache
-            $service['usage_count'] = $usageCounts[$service['id']] ?? 0;
+            // Ensure services is an array
+            if (!is_array($services)) {
+                return [];
+            }
+            
+            // Get usage counts in a single query
+            $usageCounts = [];
+            if (!empty($services)) {
+                $serviceIds = array_column($services, 'id');
+                $placeholders = implode(',', array_fill(0, count($serviceIds), '%d'));
+                $usageResults = $wpdb->get_results($wpdb->prepare(
+                    "SELECT service_id, COUNT(*) as count FROM $table_payments WHERE service_id IN ($placeholders) GROUP BY service_id",
+                    ...$serviceIds
+                ), ARRAY_A);
+                
+                if (is_array($usageResults)) {
+                    foreach ($usageResults as $row) {
+                        if (isset($row['service_id']) && isset($row['count'])) {
+                            $usageCounts[(int) $row['service_id']] = (int) $row['count'];
+                        }
+                    }
+                }
+            }
+            
+            // Format services and add usage count
+            foreach ($services as &$service) {
+                $service['id'] = (int) ($service['id'] ?? 0);
+                $service['expert_id'] = (int) ($service['expert_id'] ?? 0);
+                $service['price'] = (float) ($service['price'] ?? 0);
+                $service['duration_minutes'] = (int) ($service['duration_minutes'] ?? 60);
+                $service['session_count'] = isset($service['session_count']) && $service['session_count'] ? (int) $service['session_count'] : null;
+                $service['validity_days'] = isset($service['validity_days']) && $service['validity_days'] ? (int) $service['validity_days'] : null;
+                $service['is_active'] = (bool) ($service['is_active'] ?? false);
+                $service['is_featured'] = (bool) ($service['is_featured'] ?? false);
+                $service['sort_order'] = (int) ($service['sort_order'] ?? 0);
+                
+                // Add usage count from cache
+                $service['usage_count'] = $usageCounts[$service['id']] ?? 0;
+            }
+            
+            return $services;
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde Finance: getServices exception - ' . $e->getMessage());
+            return [];
         }
-        
-        return $services;
     }
     
     /**
@@ -960,8 +1021,12 @@ class FinanceService {
      * Expects payment array to have service_name from a LEFT JOIN
      */
     private function formatPayment(array $payment): array {
-        $clientId = (int) $payment['client_id'];
-        $client = get_userdata($clientId);
+        $clientId = (int) ($payment['client_id'] ?? 0);
+        $client = null;
+        
+        if ($clientId > 0) {
+            $client = get_userdata($clientId);
+        }
         
         $serviceId = (int) ($payment['service_id'] ?? 0);
         // Use service_name from JOIN if available, otherwise fetch it
@@ -977,24 +1042,24 @@ class FinanceService {
         }
         
         return [
-            'id' => (int) $payment['id'],
+            'id' => (int) ($payment['id'] ?? 0),
             'client' => [
                 'id' => $clientId,
-                'name' => $client ? $client->display_name : 'Unknown',
-                'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150'
+                'name' => $client ? ($client->display_name ?? 'Unknown') : 'Unknown',
+                'avatar' => $client ? (get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150') : 'https://placehold.co/150'
             ],
             'service' => $serviceId > 0 ? [
                 'id' => $serviceId,
                 'name' => $serviceName ?? 'N/A'
             ] : null,
-            'amount' => (float) $payment['amount'],
-            'paid_amount' => (float) $payment['paid_amount'],
-            'currency' => $payment['currency'],
-            'payment_method' => $payment['payment_method'],
-            'payment_date' => $payment['payment_date'],
-            'due_date' => $payment['due_date'],
-            'status' => $payment['status'],
-            'description' => $payment['description']
+            'amount' => (float) ($payment['amount'] ?? 0),
+            'paid_amount' => (float) ($payment['paid_amount'] ?? 0),
+            'currency' => $payment['currency'] ?? 'TRY',
+            'payment_method' => $payment['payment_method'] ?? 'cash',
+            'payment_date' => $payment['payment_date'] ?? null,
+            'due_date' => $payment['due_date'] ?? null,
+            'status' => $payment['status'] ?? 'pending',
+            'description' => $payment['description'] ?? null
         ];
     }
 }
