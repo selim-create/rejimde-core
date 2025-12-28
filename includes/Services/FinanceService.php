@@ -492,7 +492,7 @@ class FinanceService {
             'duration_minutes' => (int) ($data['duration_minutes'] ?? 60),
             'session_count' => !empty($data['session_count']) ? (int) $data['session_count'] : null,
             'validity_days' => !empty($data['validity_days']) ? (int) $data['validity_days'] : null,
-            'capacity' => !empty($data['capacity']) ? (int) $data['capacity'] : 1,
+            'capacity' => (int) ($data['capacity'] ?? 1),
             'is_active' => isset($data['is_active']) ? (int) $data['is_active'] : 1,
             'is_featured' => isset($data['is_featured']) ? (int) $data['is_featured'] : 0,
             'color' => $data['color'] ?? '#3B82F6',
@@ -600,7 +600,7 @@ class FinanceService {
         }
         
         // Hard delete
-        $result = $wpdb->delete($table_services, ['id' => $serviceId]);
+        $result = $wpdb->delete($table_services, ['id' => (int) $serviceId]);
         
         return $result !== false;
     }
