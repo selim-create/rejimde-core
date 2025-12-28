@@ -133,24 +133,42 @@ class FinanceController extends WP_REST_Controller {
      * Get payments list
      */
     public function get_payments(WP_REST_Request $request): WP_REST_Response {
-        $expertId = get_current_user_id();
-        
-        $filters = [
-            'status' => $request->get_param('status') ?? 'all',
-            'client_id' => $request->get_param('client_id'),
-            'start_date' => $request->get_param('start_date'),
-            'end_date' => $request->get_param('end_date'),
-            'limit' => $request->get_param('limit') ?? 30,
-            'offset' => $request->get_param('offset') ?? 0,
-        ];
-        
-        $result = $this->financeService->getPayments($expertId, $filters);
-        
-        return new WP_REST_Response([
-            'status' => 'success',
-            'data' => $result['data'],
-            'meta' => $result['meta']
-        ], 200);
+        try {
+            $expertId = get_current_user_id();
+            
+            if (!$expertId) {
+                error_log('Rejimde Finance: get_payments failed - User not authenticated');
+                return new WP_REST_Response([
+                    'status' => 'error',
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+            
+            $filters = [
+                'status' => $request->get_param('status') ?? 'all',
+                'client_id' => $request->get_param('client_id'),
+                'start_date' => $request->get_param('start_date'),
+                'end_date' => $request->get_param('end_date'),
+                'limit' => $request->get_param('limit') ?? 30,
+                'offset' => $request->get_param('offset') ?? 0,
+            ];
+            
+            $result = $this->financeService->getPayments($expertId, $filters);
+            
+            // Return response with 'payments' key to match frontend expectations
+            return new WP_REST_Response([
+                'status' => 'success',
+                'payments' => $result['data'],
+                'meta' => $result['meta']
+            ], 200);
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde Finance: get_payments error - ' . $e->getMessage());
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Failed to fetch payments: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -324,14 +342,32 @@ class FinanceController extends WP_REST_Controller {
      * Get services list
      */
     public function get_services(WP_REST_Request $request): WP_REST_Response {
-        $expertId = get_current_user_id();
-        
-        $data = $this->financeService->getServices($expertId);
-        
-        return new WP_REST_Response([
-            'status' => 'success',
-            'data' => $data
-        ], 200);
+        try {
+            $expertId = get_current_user_id();
+            
+            if (!$expertId) {
+                error_log('Rejimde Finance: get_services failed - User not authenticated');
+                return new WP_REST_Response([
+                    'status' => 'error',
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+            
+            $data = $this->financeService->getServices($expertId);
+            
+            // Return response with 'services' key to match frontend expectations
+            return new WP_REST_Response([
+                'status' => 'success',
+                'services' => $data
+            ], 200);
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde Finance: get_services error - ' . $e->getMessage());
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Failed to fetch services: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

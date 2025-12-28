@@ -3,7 +3,7 @@
  * Plugin Name:       Rejimde Core
  * Plugin URI:        https://rejimde.com
  * Description:       Rejimde.com platformunun çekirdek API ve veritabanı yönetim eklentisi.
- * Version:           1.0.2
+ * Version:           1.0.3
  * Author:            Hip Medya
  * Text Domain:       rejimde-core
  */
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Sabitler
-define( 'REJIMDE_VERSION', '1.0.2' ); // Versiyon güncellendi
+define( 'REJIMDE_VERSION', '1.0.3' ); // Versiyon güncellendi
 define( 'REJIMDE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'REJIMDE_URL', plugin_dir_url( __FILE__ ) );
 
