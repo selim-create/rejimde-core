@@ -606,6 +606,86 @@ class FinanceService {
     }
     
     /**
+     * Get public services for an expert
+     * Only returns active and public services
+     * 
+     * @param int $expertId Expert user ID
+     * @return array
+     */
+    public function getPublicServices(int $expertId): array {
+        global $wpdb;
+        
+        $table_services = $wpdb->prefix . 'rejimde_services';
+        
+        $services = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, name, description, type, price, currency, duration_minutes, 
+                    session_count, validity_days, color, is_featured
+             FROM $table_services 
+             WHERE expert_id = %d 
+             AND is_active = 1 
+             AND (is_public = 1 OR is_public IS NULL)
+             ORDER BY is_featured DESC, sort_order ASC, created_at DESC",
+            $expertId
+        ), ARRAY_A);
+        
+        if (!is_array($services)) {
+            return [];
+        }
+        
+        // Format services for public display
+        foreach ($services as &$service) {
+            $service['id'] = (int) $service['id'];
+            $service['price'] = (float) $service['price'];
+            $service['duration_minutes'] = (int) $service['duration_minutes'];
+            $service['session_count'] = $service['session_count'] ? (int) $service['session_count'] : null;
+            $service['validity_days'] = $service['validity_days'] ? (int) $service['validity_days'] : null;
+            $service['is_featured'] = (bool) $service['is_featured'];
+        }
+        
+        return $services;
+    }
+    
+    /**
+     * Toggle service active status
+     * 
+     * @param int $serviceId Service ID
+     * @param int $expertId Expert user ID (for security check)
+     * @return array|bool
+     */
+    public function toggleServiceActive(int $serviceId, int $expertId): array|bool {
+        global $wpdb;
+        $table_services = $wpdb->prefix . 'rejimde_services';
+        
+        // Get current status
+        $service = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, is_active FROM $table_services WHERE id = %d AND expert_id = %d",
+            $serviceId,
+            $expertId
+        ), ARRAY_A);
+        
+        if (!$service) {
+            return ['error' => 'Service not found or access denied'];
+        }
+        
+        $newStatus = $service['is_active'] ? 0 : 1;
+        
+        $result = $wpdb->update(
+            $table_services,
+            ['is_active' => $newStatus],
+            ['id' => $serviceId]
+        );
+        
+        if ($result === false) {
+            return ['error' => 'Failed to toggle service status'];
+        }
+        
+        return [
+            'id' => $serviceId,
+            'is_active' => (bool) $newStatus
+        ];
+    }
+    
+    /**
      * Get monthly report
      * 
      * @param int $expertId Expert user ID

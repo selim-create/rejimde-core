@@ -98,6 +98,20 @@ class FinanceController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
 
+        // Toggle service active status
+        register_rest_route($this->namespace, '/' . $this->base . '/services/(?P<id>\d+)/toggle', [
+            'methods' => 'PATCH',
+            'callback' => [$this, 'toggle_service_active'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
+        // Public endpoint - Get expert services
+        register_rest_route($this->namespace, '/experts/(?P<expertId>\d+)/services', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_expert_public_services'],
+            'permission_callback' => '__return_true',
+        ]);
+
         // Reports
         register_rest_route($this->namespace, '/' . $this->base . '/reports/monthly', [
             'methods' => 'GET',
@@ -507,6 +521,54 @@ class FinanceController extends WP_REST_Controller {
         return new WP_REST_Response([
             'status' => 'success',
             'message' => 'Service permanently deleted'
+        ], 200);
+    }
+
+    /**
+     * Toggle service active status
+     */
+    public function toggle_service_active(WP_REST_Request $request): WP_REST_Response {
+        $expertId = get_current_user_id();
+        $serviceId = (int) $request->get_param('id');
+        
+        $result = $this->financeService->toggleServiceActive($serviceId, $expertId);
+        
+        if (is_array($result) && isset($result['error'])) {
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => $result['error']
+            ], 404);
+        }
+        
+        return new WP_REST_Response([
+            'status' => 'success',
+            'data' => $result,
+            'message' => 'Service status toggled successfully'
+        ], 200);
+    }
+
+    /**
+     * Get expert's public (active) services
+     * Public endpoint - no auth required
+     */
+    public function get_expert_public_services(WP_REST_Request $request): WP_REST_Response {
+        $expertId = (int) $request->get_param('expertId');
+        
+        // Validate expert exists
+        $expert = get_userdata($expertId);
+        if (!$expert) {
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Expert not found'
+            ], 404);
+        }
+        
+        // Get only active and public services
+        $services = $this->financeService->getPublicServices($expertId);
+        
+        return new WP_REST_Response([
+            'status' => 'success',
+            'data' => $services
         ], 200);
     }
 
