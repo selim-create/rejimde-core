@@ -91,6 +91,13 @@ class FinanceController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
 
+        // Force delete service (hard delete)
+        register_rest_route($this->namespace, '/' . $this->base . '/services/(?P<id>\d+)/force', [
+            'methods' => 'DELETE',
+            'callback' => [$this, 'force_delete_service'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
         // Reports
         register_rest_route($this->namespace, '/' . $this->base . '/reports/monthly', [
             'methods' => 'GET',
@@ -385,6 +392,7 @@ class FinanceController extends WP_REST_Controller {
             'duration_minutes' => $request->get_param('duration_minutes') ?? 60,
             'session_count' => $request->get_param('session_count'),
             'validity_days' => $request->get_param('validity_days'),
+            'capacity' => $request->get_param('capacity') ?? 1,
             'is_active' => $request->get_param('is_active') ?? true,
             'is_featured' => $request->get_param('is_featured') ?? false,
             'color' => $request->get_param('color') ?? '#3B82F6',
@@ -433,7 +441,7 @@ class FinanceController extends WP_REST_Controller {
         // Get update data from request
         $data = [];
         $allowedFields = ['name', 'description', 'type', 'price', 'currency', 'duration_minutes',
-                          'session_count', 'validity_days', 'is_active', 'is_featured', 'color', 'sort_order'];
+                          'session_count', 'validity_days', 'capacity', 'is_active', 'is_featured', 'color', 'sort_order'];
         
         foreach ($allowedFields as $field) {
             $value = $request->get_param($field);
@@ -475,7 +483,30 @@ class FinanceController extends WP_REST_Controller {
         
         return new WP_REST_Response([
             'status' => 'success',
-            'message' => 'Service deactivated successfully'
+            'message' => 'Service deactivated successfully',
+            'action' => 'soft_delete'
+        ], 200);
+    }
+
+    /**
+     * Force delete service (hard delete)
+     */
+    public function force_delete_service(WP_REST_Request $request): WP_REST_Response {
+        $serviceId = (int) $request->get_param('id');
+        $expertId = get_current_user_id();
+        
+        $result = $this->financeService->forceDeleteService($serviceId, $expertId);
+        
+        if (!$result) {
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Service not found or access denied'
+            ], 404);
+        }
+        
+        return new WP_REST_Response([
+            'status' => 'success',
+            'message' => 'Service permanently deleted'
         ], 200);
     }
 

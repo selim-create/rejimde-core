@@ -445,6 +445,7 @@ class FinanceService {
                 $service['duration_minutes'] = (int) ($service['duration_minutes'] ?? 60);
                 $service['session_count'] = isset($service['session_count']) && $service['session_count'] ? (int) $service['session_count'] : null;
                 $service['validity_days'] = isset($service['validity_days']) && $service['validity_days'] ? (int) $service['validity_days'] : null;
+                $service['capacity'] = (int) ($service['capacity'] ?? 1);
                 $service['is_active'] = (bool) ($service['is_active'] ?? false);
                 $service['is_featured'] = (bool) ($service['is_featured'] ?? false);
                 $service['sort_order'] = (int) ($service['sort_order'] ?? 0);
@@ -491,6 +492,7 @@ class FinanceService {
             'duration_minutes' => (int) ($data['duration_minutes'] ?? 60),
             'session_count' => !empty($data['session_count']) ? (int) $data['session_count'] : null,
             'validity_days' => !empty($data['validity_days']) ? (int) $data['validity_days'] : null,
+            'capacity' => !empty($data['capacity']) ? (int) $data['capacity'] : 1,
             'is_active' => isset($data['is_active']) ? (int) $data['is_active'] : 1,
             'is_featured' => isset($data['is_featured']) ? (int) $data['is_featured'] : 0,
             'color' => $data['color'] ?? '#3B82F6',
@@ -571,6 +573,34 @@ class FinanceService {
             ['is_active' => 0],
             ['id' => $serviceId]
         );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * Force delete service (hard delete)
+     * 
+     * @param int $serviceId Service ID
+     * @param int $expertId Expert user ID (for security check)
+     * @return bool
+     */
+    public function forceDeleteService(int $serviceId, int $expertId): bool {
+        global $wpdb;
+        $table_services = $wpdb->prefix . 'rejimde_services';
+        
+        // Security check - verify ownership
+        $service = $wpdb->get_row($wpdb->prepare(
+            "SELECT id FROM $table_services WHERE id = %d AND expert_id = %d",
+            $serviceId,
+            $expertId
+        ));
+        
+        if (!$service) {
+            return false;
+        }
+        
+        // Hard delete
+        $result = $wpdb->delete($table_services, ['id' => $serviceId]);
         
         return $result !== false;
     }
