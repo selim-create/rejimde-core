@@ -619,7 +619,7 @@ class FinanceService {
         
         $services = $wpdb->get_results($wpdb->prepare(
             "SELECT id, name, description, type, price, currency, duration_minutes, 
-                    session_count, validity_days, color, is_featured
+                    session_count, validity_days, color, is_featured, sort_order, created_at
              FROM $table_services 
              WHERE expert_id = %d 
              AND is_active = 1 
@@ -640,6 +640,9 @@ class FinanceService {
             $service['session_count'] = $service['session_count'] ? (int) $service['session_count'] : null;
             $service['validity_days'] = $service['validity_days'] ? (int) $service['validity_days'] : null;
             $service['is_featured'] = (bool) $service['is_featured'];
+            // Remove internal fields from public response
+            unset($service['sort_order']);
+            unset($service['created_at']);
         }
         
         return $services;
@@ -650,9 +653,9 @@ class FinanceService {
      * 
      * @param int $serviceId Service ID
      * @param int $expertId Expert user ID (for security check)
-     * @return array|bool
+     * @return array Array with either error or service data
      */
-    public function toggleServiceActive(int $serviceId, int $expertId): array|bool {
+    public function toggleServiceActive(int $serviceId, int $expertId): array {
         global $wpdb;
         $table_services = $wpdb->prefix . 'rejimde_services';
         
