@@ -533,7 +533,7 @@ class FinanceController extends WP_REST_Controller {
         
         $result = $this->financeService->toggleServiceActive($serviceId, $expertId);
         
-        if (is_array($result) && isset($result['error'])) {
+        if (isset($result['error'])) {
             return new WP_REST_Response([
                 'status' => 'error',
                 'message' => $result['error']

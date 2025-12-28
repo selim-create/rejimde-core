@@ -637,8 +637,8 @@ class FinanceService {
             $service['id'] = (int) $service['id'];
             $service['price'] = (float) $service['price'];
             $service['duration_minutes'] = (int) $service['duration_minutes'];
-            $service['session_count'] = $service['session_count'] ? (int) $service['session_count'] : null;
-            $service['validity_days'] = $service['validity_days'] ? (int) $service['validity_days'] : null;
+            $service['session_count'] = ($service['session_count'] !== null) ? (int) $service['session_count'] : null;
+            $service['validity_days'] = ($service['validity_days'] !== null) ? (int) $service['validity_days'] : null;
             $service['is_featured'] = (bool) $service['is_featured'];
             // Remove internal fields from public response
             unset($service['sort_order']);
@@ -670,7 +670,7 @@ class FinanceService {
             return ['error' => 'Service not found or access denied'];
         }
         
-        $newStatus = $service['is_active'] ? 0 : 1;
+        $newStatus = ((int) $service['is_active']) ? 0 : 1;
         
         $result = $wpdb->update(
             $table_services,
