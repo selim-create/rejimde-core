@@ -281,12 +281,13 @@ class ProfessionalController extends WP_REST_Controller {
         }
 
         $data = [
-            'id'            => $post_id,
-            'user_id'       => $user_id ?  (int) $user_id : null, 
-            'name'          => $post->post_title,
-            'slug'          => $post->post_name,
-            'username'      => $username,
-            'bio'           => $bio,
+            'id'              => $post_id,
+            'user_id'         => $user_id ?  (int) $user_id : null,
+            'related_user_id' => $user_id ? (int) $user_id : null,
+            'name'            => $post->post_title,
+            'slug'            => $post->post_name,
+            'username'        => $username,
+            'bio'             => $bio,
             
             // KATEGORİ ve ÜNVAN AYRIMI
             'profession'    => $profession,    // Kategori:  dietitian, pt, doctor, yoga, etc.
