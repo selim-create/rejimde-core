@@ -156,7 +156,8 @@ class ExpertSettingsService {
         // Generate new ID
         $newId = 1;
         if (!empty($addresses)) {
-            $maxId = max(array_column($addresses, 'id'));
+            $ids = array_map('intval', array_column($addresses, 'id'));
+            $maxId = max($ids);
             $newId = $maxId + 1;
         }
         
@@ -165,10 +166,7 @@ class ExpertSettingsService {
         
         // If marked as default, unset other defaults
         if ($isDefault && !empty($addresses)) {
-            foreach ($addresses as &$addr) {
-                $addr['is_default'] = false;
-            }
-            unset($addr);
+            $addresses = $this->resetDefaultAddresses($addresses);
         }
         
         $newAddress = [
@@ -212,10 +210,7 @@ class ExpertSettingsService {
                 // Handle is_default
                 if (isset($addressData['is_default']) && $addressData['is_default']) {
                     // Unset all other defaults
-                    foreach ($addresses as &$a) {
-                        $a['is_default'] = false;
-                    }
-                    unset($a);
+                    $addresses = $this->resetDefaultAddresses($addresses);
                     $addr['is_default'] = true;
                 } elseif (isset($addressData['is_default']) && !$addressData['is_default']) {
                     $addr['is_default'] = false;
@@ -268,5 +263,19 @@ class ExpertSettingsService {
         }
         
         return $this->updateSettings($expertId, ['addresses' => $addresses]);
+    }
+
+    /**
+     * Helper method to reset all addresses to non-default
+     * 
+     * @param array $addresses Array of addresses
+     * @return array Modified addresses array
+     */
+    private function resetDefaultAddresses(array $addresses): array {
+        foreach ($addresses as &$addr) {
+            $addr['is_default'] = false;
+        }
+        unset($addr);
+        return $addresses;
     }
 }

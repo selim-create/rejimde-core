@@ -111,7 +111,7 @@ class ExpertSettingsController extends WP_REST_Controller {
         $data = $request->get_json_params();
         
         // Validate required fields
-        if (empty($data['title']) || empty($data['address'])) {
+        if (!isset($data['title']) || $data['title'] === '' || !isset($data['address']) || $data['address'] === '') {
             return $this->error('Title and address are required', 400);
         }
         
