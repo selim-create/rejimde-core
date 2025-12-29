@@ -36,15 +36,21 @@ class CalendarService {
         // Format appointments with client data
         $formatted = [];
         foreach ($appointments as $apt) {
-            $client = get_userdata((int) $apt['client_id']);
-            
-            $formatted[] = [
-                'id' => (int) $apt['id'],
-                'client' => [
+            // Handle null client_id (personal appointments)
+            $clientData = null;
+            if ($apt['client_id']) {
+                $client = get_userdata((int) $apt['client_id']);
+                $clientData = [
                     'id' => (int) $apt['client_id'],
                     'name' => $client ? $client->display_name : 'Unknown',
                     'avatar' => $client ? (get_user_meta((int) $apt['client_id'], 'avatar_url', true) ?: 'https://placehold.co/150') : 'https://placehold.co/150'
-                ],
+                ];
+            }
+            
+            $formatted[] = [
+                'id' => (int) $apt['id'],
+                'client' => $clientData,
+                'is_personal' => $apt['client_id'] === null,
                 'title' => $apt['title'],
                 'description' => $apt['description'],
                 'date' => $apt['appointment_date'],
@@ -279,12 +285,13 @@ class CalendarService {
      * @return int|array Appointment ID on success, error array on failure
      */
     public function createAppointment(int $expertId, array $data): int|array {
-        // Validate required fields
-        if (empty($data['client_id']) || empty($data['date']) || empty($data['start_time'])) {
+        // Validate required fields - client_id is now optional (for personal appointments)
+        if (empty($data['date']) || empty($data['start_time'])) {
             return ['error' => 'Missing required fields'];
         }
         
-        $clientId = (int) $data['client_id'];
+        // Allow null client_id for personal/blocked appointments
+        $clientId = isset($data['client_id']) && $data['client_id'] ? (int) $data['client_id'] : null;
         $date = $data['date'];
         $startTime = $data['start_time'];
         $duration = (int) ($data['duration'] ?? 60);

@@ -364,7 +364,7 @@ class Activator {
         $sql_appointments = "CREATE TABLE {$table_appointments} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             expert_id BIGINT UNSIGNED NOT NULL,
-            client_id BIGINT UNSIGNED NOT NULL,
+            client_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'NULL for personal/blocked appointments',
             relationship_id BIGINT UNSIGNED DEFAULT NULL,
             service_id BIGINT UNSIGNED DEFAULT NULL,
             title VARCHAR(255) DEFAULT NULL,
@@ -676,7 +676,29 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_announcement_dismissals);
 
-        // 34. Terminoloji Migrasyonu
+        // 34. Expert Settings Table
+        $table_expert_settings = $wpdb->prefix . 'rejimde_expert_settings';
+        $sql_expert_settings = "CREATE TABLE {$table_expert_settings} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL,
+            bank_name VARCHAR(255) DEFAULT NULL,
+            iban VARCHAR(50) DEFAULT NULL,
+            account_holder VARCHAR(255) DEFAULT NULL,
+            company_name VARCHAR(255) DEFAULT NULL,
+            tax_number VARCHAR(50) DEFAULT NULL,
+            business_phone VARCHAR(50) DEFAULT NULL,
+            business_email VARCHAR(255) DEFAULT NULL,
+            addresses LONGTEXT DEFAULT NULL COMMENT 'JSON array: [{id, title, address, city, district, is_default}]',
+            default_meeting_link VARCHAR(500) DEFAULT NULL,
+            auto_confirm_appointments TINYINT(1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_expert (expert_id)
+        ) {$charset_collate};";
+        dbDelta($sql_expert_settings);
+
+        // 35. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
