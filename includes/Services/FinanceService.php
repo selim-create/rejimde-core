@@ -619,8 +619,8 @@ class FinanceService {
         
         $services = $wpdb->get_results($wpdb->prepare(
             "SELECT id, name, description, type, price, currency, duration_minutes, 
-                    session_count, validity_days, color, is_featured, sort_order, created_at
-             FROM $table_services 
+                session_count, validity_days, color, is_featured, is_active, sort_order, created_at
+             FROM $table_services  
              WHERE expert_id = %d 
              AND is_active = 1 
              AND (is_public = 1 OR is_public IS NULL)
@@ -640,6 +640,7 @@ class FinanceService {
             $service['session_count'] = ($service['session_count'] !== null) ? (int) $service['session_count'] : null;
             $service['validity_days'] = ($service['validity_days'] !== null) ? (int) $service['validity_days'] : null;
             $service['is_featured'] = (bool) $service['is_featured'];
+            $service['is_active'] = (bool) $service['is_active'];  // ← BU SATIRI EKLEYİN
             // Remove internal fields from public response
             unset($service['sort_order']);
             unset($service['created_at']);
