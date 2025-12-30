@@ -207,11 +207,11 @@ class AnnouncementController extends WP_REST_Controller {
         ], $code);
     }
 
-    protected function check_auth(): bool {
+    public function check_auth(): bool {
         return is_user_logged_in();
     }
 
-    protected function check_admin_auth(): bool {
+    public function check_admin_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
