@@ -78,7 +78,9 @@ Update settings for the authenticated expert.
 ### 3. Get Addresses
 Get all addresses for the authenticated expert.
 
-**Endpoint:** `GET /rejimde/v1/pro/settings/addresses`
+**Endpoints:** 
+- `GET /rejimde/v1/pro/addresses` (recommended)
+- `GET /rejimde/v1/pro/settings/addresses` (also supported)
 
 **Authentication:** Required (rejimde_pro or administrator role)
 
@@ -150,7 +152,9 @@ Add a new address for the authenticated expert.
 ### 5. Update Address
 Update an existing address.
 
-**Endpoint:** `PATCH /rejimde/v1/pro/settings/addresses/{id}`
+**Endpoints:**
+- `PATCH /rejimde/v1/pro/addresses/{id}` (recommended)
+- `PATCH /rejimde/v1/pro/settings/addresses/{id}` (also supported)
 
 **Authentication:** Required (rejimde_pro or administrator role)
 
@@ -182,7 +186,9 @@ Update an existing address.
 ### 6. Delete Address
 Delete an address.
 
-**Endpoint:** `DELETE /rejimde/v1/pro/settings/addresses/{id}`
+**Endpoints:**
+- `DELETE /rejimde/v1/pro/addresses/{id}` (recommended)
+- `DELETE /rejimde/v1/pro/settings/addresses/{id}` (also supported)
 
 **Authentication:** Required (rejimde_pro or administrator role)
 
