@@ -259,7 +259,7 @@ class ClientController extends WP_REST_Controller {
     }
 
     /**
-     * PATCH /pro/clients/{id}/status
+     * PATCH/POST /pro/clients/{id}/status
      */
     public function update_status(WP_REST_Request $request): WP_REST_Response {
         $relationshipId = (int) $request['id'];
@@ -280,7 +280,7 @@ class ClientController extends WP_REST_Controller {
     }
 
     /**
-     * PATCH /pro/clients/{id}/package
+     * PATCH/POST /pro/clients/{id}/package
      */
     public function update_package(WP_REST_Request $request): WP_REST_Response {
         $relationshipId = (int) $request['id'];
@@ -350,18 +350,10 @@ class ClientController extends WP_REST_Controller {
             'is_pinned' => $request->get_param('is_pinned') ?? false,
         ];
         
-        if (empty($data['content'])) {
-            return $this->error('Content is required', 400);
-        }
-        
         $result = $this->clientService->addNote($relationshipId, $data);
         
         if (is_array($result) && isset($result['error'])) {
             return $this->error($result['error'], 400);
-        }
-        
-        if (!$result) {
-            return $this->error('Failed to add note', 500);
         }
         
         return $this->success($result, 'Note added successfully', 201);

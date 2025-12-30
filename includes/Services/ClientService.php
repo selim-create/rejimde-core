@@ -479,11 +479,16 @@ class ClientService {
      * 
      * @param int $relationshipId Relationship ID
      * @param array $data Note data
-     * @return array|false Note object or false
+     * @return array Note object or error array
      */
     public function addNote(int $relationshipId, array $data) {
         global $wpdb;
         $table_notes = $wpdb->prefix . 'rejimde_client_notes';
+        
+        // Validate required content field
+        if (empty($data['content'])) {
+            return ['error' => 'Content is required'];
+        }
         
         // Get expert_id from relationship
         $table_relationships = $wpdb->prefix . 'rejimde_relationships';
@@ -493,7 +498,7 @@ class ClientService {
         ));
         
         if (!$expertId) {
-            return false;
+            return ['error' => 'Relationship not found'];
         }
         
         $noteType = $data['type'] ?? 'general';
@@ -511,7 +516,7 @@ class ClientService {
         ]);
         
         if (!$result) {
-            return false;
+            return ['error' => 'Failed to insert note'];
         }
         
         $noteId = $wpdb->insert_id;
