@@ -167,3 +167,147 @@ This endpoint aggregates data from the following services:
 - Dates are calculated based on server timezone
 - At-risk clients are those with `risk_status` of 'warning' or 'danger'
 - Week count includes appointments from today through 7 days from now
+
+---
+
+## Pro Announcements API
+
+### Overview
+Pro users can create, view, and manage announcements for their clients using these endpoints.
+
+### Endpoint: GET /rejimde/v1/pro/announcements
+
+#### Description
+Retrieves all announcements created by the authenticated Pro user.
+
+#### Authentication
+Required. User must have one of the following roles:
+- `rejimde_pro` (Expert/Professional)
+- `administrator`
+
+#### Request
+```
+GET /wp-json/rejimde/v1/pro/announcements
+```
+
+#### Response (200 OK)
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 123,
+      "title": "Yeni Diyet Programı",
+      "content": "Bu hafta yeni bir diyet programı başlatıyoruz...",
+      "type": "info",
+      "start_date": "2025-12-30 10:00:00",
+      "end_date": "2026-01-30 10:00:00",
+      "is_dismissible": true,
+      "priority": 0,
+      "created_at": "2025-12-30 09:00:00"
+    }
+  ]
+}
+```
+
+---
+
+### Endpoint: POST /rejimde/v1/pro/announcements
+
+#### Description
+Creates a new announcement for the Pro user's clients.
+
+#### Authentication
+Required. User must have one of the following roles:
+- `rejimde_pro` (Expert/Professional)
+- `administrator`
+
+#### Request
+```
+POST /wp-json/rejimde/v1/pro/announcements
+Content-Type: application/json
+```
+
+#### Request Body
+```json
+{
+  "title": "Announcement Title",
+  "content": "Announcement content...",
+  "type": "info",
+  "start_date": "2025-12-30 10:00:00",
+  "end_date": "2026-01-30 10:00:00",
+  "is_dismissible": true,
+  "priority": 0
+}
+```
+
+#### Parameters
+- `title` (required): Announcement title
+- `content` (required): Announcement content (supports HTML)
+- `type` (optional): Type of announcement - `info`, `warning`, or `promo`. Default: `info`
+- `start_date` (optional): When announcement becomes active. Default: current time
+- `end_date` (optional): When announcement expires. Default: 30 days from now
+- `is_dismissible` (optional): Can users dismiss this announcement? Default: `true`
+- `priority` (optional): Display priority (higher shows first). Default: `0`
+
+#### Response (201 Created)
+```json
+{
+  "status": "success",
+  "data": {
+    "id": 123
+  }
+}
+```
+
+#### Error Response (400 Bad Request)
+```json
+{
+  "status": "error",
+  "message": "Title and content are required"
+}
+```
+
+---
+
+### Endpoint: DELETE /rejimde/v1/pro/announcements/{id}
+
+#### Description
+Deletes an announcement created by the authenticated Pro user.
+
+#### Authentication
+Required. User must have one of the following roles:
+- `rejimde_pro` (Expert/Professional)
+- `administrator`
+
+#### Request
+```
+DELETE /wp-json/rejimde/v1/pro/announcements/{id}
+```
+
+#### Parameters
+- `id` (required): Announcement ID
+
+#### Response (200 OK)
+```json
+{
+  "status": "success",
+  "data": {
+    "message": "Announcement deleted successfully"
+  }
+}
+```
+
+#### Error Response (404 Not Found)
+```json
+{
+  "status": "error",
+  "message": "Announcement not found or access denied"
+}
+```
+
+### Notes
+- Pro announcements are automatically targeted to `rejimde_user` role (clients)
+- Only the creator (expert) can delete their own announcements
+- Administrators can manage all announcements via `/admin/announcements` endpoints
+- Announcements are visible to clients between `start_date` and `end_date`
