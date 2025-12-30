@@ -60,17 +60,24 @@ class ClientController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_auth'],
         ]);
 
-        // PATCH /pro/clients/{id}/status - Update status
+        // PATCH/POST /pro/clients/{id}/status - Update status
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/status', [
-            'methods' => 'PATCH',
+            'methods' => ['PATCH', 'POST'],
             'callback' => [$this, 'update_status'],
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
 
-        // PATCH /pro/clients/{id}/package - Update package
+        // PATCH/POST /pro/clients/{id}/package - Update package
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/package', [
-            'methods' => 'PATCH',
+            'methods' => ['PATCH', 'POST'],
             'callback' => [$this, 'update_package'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
+        // POST /pro/clients/{id}/use-session - Use session from package
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/use-session', [
+            'methods' => 'POST',
+            'callback' => [$this, 'use_session'],
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
 
@@ -353,7 +360,11 @@ class ClientController extends WP_REST_Controller {
             return $this->error($result['error'], 400);
         }
         
-        return $this->success(['note_id' => $result], 'Note added successfully', 201);
+        if (!$result) {
+            return $this->error('Failed to add note', 500);
+        }
+        
+        return $this->success($result, 'Note added successfully', 201);
     }
 
     /**
@@ -370,6 +381,27 @@ class ClientController extends WP_REST_Controller {
         }
         
         return $this->success(['message' => 'Note deleted successfully']);
+    }
+
+    /**
+     * POST /pro/clients/{id}/use-session
+     */
+    public function use_session(WP_REST_Request $request): WP_REST_Response {
+        $relationshipId = (int) $request['id'];
+        $count = $request->get_param('count') ?? 1;
+        $reason = $request->get_param('reason');
+        
+        if ($count < 1) {
+            return $this->error('Count must be at least 1', 400);
+        }
+        
+        $result = $this->clientService->useSession($relationshipId, (int) $count, $reason);
+        
+        if (is_array($result) && isset($result['error'])) {
+            return $this->error($result['error'], 400);
+        }
+        
+        return $this->success($result, 'Session used successfully');
     }
 
     /**
