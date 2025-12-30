@@ -141,7 +141,10 @@ class MediaLibraryController extends WP_REST_Controller {
             return $this->error($result['error'], 400);
         }
         
-        return $this->success(['id' => $result], 'Media added successfully', 201);
+        // Get the full media item to return to frontend
+        $mediaItem = $this->mediaService->getMediaItem($result, $expertId);
+        
+        return $this->success($mediaItem, 'Media added successfully', 201);
     }
 
     /**

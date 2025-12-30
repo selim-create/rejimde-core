@@ -259,4 +259,96 @@ class AnnouncementService {
             'updated_at' => $announcement['updated_at'],
         ];
     }
+
+    /**
+     * Get announcements created by a specific expert
+     * 
+     * @param int $expertId Expert user ID
+     * @return array
+     */
+    public function getProAnnouncements(int $expertId): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_announcements';
+        
+        $announcements = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table WHERE expert_id = %d ORDER BY created_at DESC",
+            $expertId
+        ), ARRAY_A);
+        
+        return array_map(function($row) {
+            return [
+                'id' => (int) $row['id'],
+                'title' => $row['title'],
+                'content' => $row['content'],
+                'type' => $row['type'],
+                'start_date' => $row['start_date'],
+                'end_date' => $row['end_date'],
+                'is_dismissible' => (bool) $row['is_dismissible'],
+                'priority' => (int) $row['priority'],
+                'created_at' => $row['created_at'],
+            ];
+        }, $announcements ?: []);
+    }
+
+    /**
+     * Create announcement for pro user's clients
+     * 
+     * @param int $expertId Expert user ID
+     * @param array $data Announcement data
+     * @return int|array Announcement ID or error
+     */
+    public function createProAnnouncement(int $expertId, array $data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_announcements';
+        
+        if (empty($data['title']) || empty($data['content'])) {
+            return ['error' => 'Title and content are required'];
+        }
+        
+        $result = $wpdb->insert($table, [
+            'expert_id' => $expertId,
+            'title' => sanitize_text_field($data['title']),
+            'content' => wp_kses_post($data['content']),
+            'type' => sanitize_text_field($data['type'] ?? 'info'),
+            'target_roles' => json_encode(['rejimde_user']), // Pro's clients
+            'start_date' => $data['start_date'] ?? current_time('mysql'),
+            'end_date' => $data['end_date'] ?? date('Y-m-d H:i:s', strtotime('+30 days')),
+            'is_dismissible' => $data['is_dismissible'] ?? 1,
+            'priority' => $data['priority'] ?? 0,
+            'created_at' => current_time('mysql'),
+        ]);
+        
+        if ($result === false) {
+            return ['error' => 'Failed to create announcement'];
+        }
+        
+        return $wpdb->insert_id;
+    }
+
+    /**
+     * Delete pro user's own announcement
+     * 
+     * @param int $announcementId Announcement ID
+     * @param int $expertId Expert user ID
+     * @return bool
+     */
+    public function deleteProAnnouncement(int $announcementId, int $expertId): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_announcements';
+        
+        // Verify ownership
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id FROM $table WHERE id = %d AND expert_id = %d",
+            $announcementId,
+            $expertId
+        ));
+        
+        if (!$existing) {
+            return false;
+        }
+        
+        $result = $wpdb->delete($table, ['id' => $announcementId], ['%d']);
+        
+        return $result !== false;
+    }
 }

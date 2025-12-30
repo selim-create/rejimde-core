@@ -646,6 +646,7 @@ class Activator {
         $table_announcements = $wpdb->prefix . 'rejimde_announcements';
         $sql_announcements = "CREATE TABLE {$table_announcements} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'Pro user ID for expert announcements',
             title VARCHAR(255) NOT NULL,
             content TEXT NOT NULL,
             type ENUM('info', 'warning', 'promo') DEFAULT 'info',
@@ -657,6 +658,7 @@ class Activator {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
+            INDEX idx_expert (expert_id),
             INDEX idx_dates (start_date, end_date),
             INDEX idx_type (type)
         ) {$charset_collate};";
