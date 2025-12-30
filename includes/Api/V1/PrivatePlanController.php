@@ -212,12 +212,26 @@ class PrivatePlanController extends WP_REST_Controller {
      * POST /pro/plans/{id}/assign
      */
     public function assign_plan(WP_REST_Request $request): WP_REST_Response {
+        $expertId = get_current_user_id();
         $planId = (int) $request['id'];
         $clientId = $request->get_param('client_id');
-        $relationshipId = $request->get_param('relationship_id');
         
-        if (empty($clientId) || empty($relationshipId)) {
-            return $this->error('client_id and relationship_id are required', 400);
+        if (empty($clientId)) {
+            return $this->error('client_id is required', 400);
+        }
+        
+        // Auto-detect relationship_id from expert-client pair
+        global $wpdb;
+        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+        $relationshipId = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_relationships 
+             WHERE expert_id = %d AND client_id = %d AND status = 'active'",
+            $expertId,
+            (int) $clientId
+        ));
+        
+        if (!$relationshipId) {
+            return $this->error('No active relationship found with this client', 400);
         }
         
         $result = $this->planService->assignPlan($planId, (int) $clientId, (int) $relationshipId);
