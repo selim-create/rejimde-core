@@ -63,6 +63,27 @@ class ExpertSettingsController extends WP_REST_Controller {
             'callback' => [$this, 'delete_address'],
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
+
+        // GET /pro/addresses - Get addresses (alternative endpoint for frontend)
+        register_rest_route($this->namespace, '/pro/addresses', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_addresses'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
+        // PATCH /pro/addresses/{id} - Update address (alternative endpoint for frontend)
+        register_rest_route($this->namespace, '/pro/addresses/(?P<id>\d+)', [
+            'methods' => 'PATCH',
+            'callback' => [$this, 'update_address'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
+        // DELETE /pro/addresses/{id} - Delete address (alternative endpoint for frontend)
+        register_rest_route($this->namespace, '/pro/addresses/(?P<id>\d+)', [
+            'methods' => 'DELETE',
+            'callback' => [$this, 'delete_address'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
     }
 
     /**
