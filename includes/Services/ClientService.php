@@ -352,6 +352,14 @@ class ClientService {
         global $wpdb;
         $table_relationships = $wpdb->prefix . 'rejimde_relationships';
         
+        // Check for existing pending invite (get most recent one if multiple exist)
+        $existingInvite = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, invite_token FROM $table_relationships 
+             WHERE expert_id = %d AND client_id = 0 AND status = 'pending' AND source = 'invite'
+             ORDER BY created_at DESC LIMIT 1",
+            $expertId
+        ));
+        
         try {
             // Generate unique token
             $token = bin2hex(random_bytes(32));
@@ -371,22 +379,40 @@ class ClientService {
             $data['price'] = 0;
         }
         
-        // Store invite (with client_id = 0 for pending)
-        $insertData = [
-            'expert_id' => $expertId,
-            'client_id' => 0, // Pending until accepted
-            'status' => 'pending',
-            'source' => 'invite',
-            'invite_token' => $token,
-            'notes' => wp_json_encode($data), // Use wp_json_encode for safety
-            'created_at' => current_time('mysql')
-        ];
-        
-        $result = $wpdb->insert($table_relationships, $insertData);
-        
-        if (!$result) {
-            error_log('Rejimde CRM: Invite creation failed - ' . $wpdb->last_error);
-            return ['error' => 'Davet oluşturulamadı: ' . $wpdb->last_error];
+        if ($existingInvite) {
+            // Update existing invite with new token and data (preserve original created_at)
+            $result = $wpdb->update(
+                $table_relationships,
+                [
+                    'invite_token' => $token,
+                    'notes' => wp_json_encode($data),
+                    'updated_at' => current_time('mysql')
+                ],
+                ['id' => $existingInvite->id]
+            );
+            
+            if ($result === false) {
+                error_log('Rejimde CRM: Invite update failed - ' . $wpdb->last_error);
+                return ['error' => 'Davet güncellenemedi: ' . $wpdb->last_error];
+            }
+        } else {
+            // Create new invite (with client_id = 0 for pending)
+            $insertData = [
+                'expert_id' => $expertId,
+                'client_id' => 0, // Pending until accepted
+                'status' => 'pending',
+                'source' => 'invite',
+                'invite_token' => $token,
+                'notes' => wp_json_encode($data), // Use wp_json_encode for safety
+                'created_at' => current_time('mysql')
+            ];
+            
+            $result = $wpdb->insert($table_relationships, $insertData);
+            
+            if (!$result) {
+                error_log('Rejimde CRM: Invite creation failed - ' . $wpdb->last_error);
+                return ['error' => 'Davet oluşturulamadı: ' . $wpdb->last_error];
+            }
         }
         
         $expiresAt = date('Y-m-d', strtotime('+14 days'));
