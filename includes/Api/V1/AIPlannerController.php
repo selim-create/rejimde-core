@@ -59,15 +59,15 @@ class AIPlannerController extends WP_REST_Controller {
         $planType = $request->get_param('plan_type');
         $parameters = $request->get_param('parameters');
         
-        if (empty($clientId) || empty($planType)) {
-            return $this->error('client_id and plan_type are required', 400);
+        if (empty($planType)) {
+            return $this->error('plan_type is required', 400);
         }
         
         if (!is_array($parameters)) {
             $parameters = [];
         }
         
-        $result = $this->aiPlannerService->generatePlan((int) $clientId, $planType, $parameters);
+        $result = $this->aiPlannerService->generatePlan($clientId ? (int) $clientId : null, $planType, $parameters);
         
         if (is_array($result) && isset($result['error'])) {
             return $this->error($result['error'], 400);

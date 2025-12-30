@@ -19,20 +19,23 @@ class AIPlannerService {
     /**
      * Generate plan draft using AI
      * 
-     * @param int $clientId Client user ID
+     * @param int|null $clientId Client user ID (null for template plans)
      * @param string $planType Plan type (diet, workout, flow, rehab, habit)
      * @param array $parameters Plan parameters
      * @return array|null Generated plan or null
      */
-    public function generatePlan(int $clientId, string $planType, array $parameters): ?array {
+    public function generatePlan(?int $clientId, string $planType, array $parameters): ?array {
         if (!$this->openAIService) {
             return ['error' => 'AI service not available'];
         }
         
-        // Get client information
-        $client = get_userdata($clientId);
-        if (!$client) {
-            return ['error' => 'Client not found'];
+        // Get client information if clientId is provided
+        $client = null;
+        if ($clientId) {
+            $client = get_userdata($clientId);
+            if (!$client) {
+                return ['error' => 'Client not found'];
+            }
         }
         
         // Build prompt based on plan type
@@ -184,7 +187,7 @@ class AIPlannerService {
      * 
      * @param string $planType Plan type
      * @param array $parameters Parameters
-     * @param \WP_User $client Client user object
+     * @param \WP_User|null $client Client user object (null for template plans)
      * @return string
      */
     private function buildPrompt(string $planType, array $parameters, $client): string {
@@ -197,7 +200,10 @@ class AIPlannerService {
         ];
         
         $prompt = $prompts[$planType] ?? $prompts['diet'];
-        $prompt .= "Danışan: " . $client->display_name . "\n";
+        
+        if ($client) {
+            $prompt .= "Danışan: " . $client->display_name . "\n";
+        }
         
         foreach ($parameters as $key => $value) {
             if (is_array($value)) {
