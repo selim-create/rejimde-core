@@ -383,8 +383,9 @@ class ClientController extends WP_REST_Controller {
         $count = $request->get_param('count') ?? 1;
         $reason = $request->get_param('reason');
         
-        if ($count < 1) {
-            return $this->error('Count must be at least 1', 400);
+        // Validate count is a positive integer
+        if (!is_numeric($count) || $count < 1 || $count != (int) $count) {
+            return $this->error('Count must be a positive integer', 400);
         }
         
         $result = $this->clientService->useSession($relationshipId, (int) $count, $reason);

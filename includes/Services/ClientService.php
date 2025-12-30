@@ -596,7 +596,7 @@ class ClientService {
             return ['error' => 'Failed to update package'];
         }
         
-        // Log activity
+        // Log activity (sessions don't award points, just track usage)
         $wpdb->insert($table_events, [
             'user_id' => $clientId,
             'event_type' => 'session_used',
@@ -614,7 +614,7 @@ class ClientService {
         
         // Return updated package info
         $remaining = $totalSessions !== null ? max(0, $totalSessions - $newUsed) : null;
-        $progressPercent = $totalSessions !== null ? round(($newUsed / $totalSessions) * 100) : 0;
+        $progressPercent = ($totalSessions !== null && $totalSessions > 0) ? round(($newUsed / $totalSessions) * 100) : 0;
         
         return [
             'id' => $packageId,
@@ -859,7 +859,7 @@ class ClientService {
         $total = $package['total_sessions'] !== null ? (int) $package['total_sessions'] : null;
         $used = (int) $package['used_sessions'];
         $remaining = $total !== null ? max(0, $total - $used) : null;
-        $progressPercent = $total !== null ? round(($used / $total) * 100) : 0;
+        $progressPercent = ($total !== null && $total > 0) ? round(($used / $total) * 100) : 0;
         
         return [
             'name' => $package['package_name'],
