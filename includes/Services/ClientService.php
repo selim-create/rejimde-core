@@ -352,10 +352,11 @@ class ClientService {
         global $wpdb;
         $table_relationships = $wpdb->prefix . 'rejimde_relationships';
         
-        // Check for existing pending invite
+        // Check for existing pending invite (get most recent one if multiple exist)
         $existingInvite = $wpdb->get_row($wpdb->prepare(
             "SELECT id, invite_token FROM $table_relationships 
-             WHERE expert_id = %d AND client_id = 0 AND status = 'pending' AND source = 'invite'",
+             WHERE expert_id = %d AND client_id = 0 AND status = 'pending' AND source = 'invite'
+             ORDER BY created_at DESC LIMIT 1",
             $expertId
         ));
         
@@ -379,13 +380,12 @@ class ClientService {
         }
         
         if ($existingInvite) {
-            // Update existing invite with new token and data
+            // Update existing invite with new token and data (preserve original created_at)
             $result = $wpdb->update(
                 $table_relationships,
                 [
                     'invite_token' => $token,
                     'notes' => wp_json_encode($data),
-                    'created_at' => current_time('mysql'),
                     'updated_at' => current_time('mysql')
                 ],
                 ['id' => $existingInvite->id]
