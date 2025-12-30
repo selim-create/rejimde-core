@@ -537,7 +537,7 @@ class ClientService {
      * @param int $relationshipId Relationship ID
      * @param int $count Number of sessions to use
      * @param string|null $reason Reason for using session
-     * @return array|false Updated package data or false
+     * @return array Updated package data or error array
      */
     public function useSession(int $relationshipId, int $count = 1, ?string $reason = null) {
         global $wpdb;
@@ -567,7 +567,7 @@ class ClientService {
         
         $packageId = (int) $package['id'];
         $currentUsed = (int) $package['used_sessions'];
-        $totalSessions = $package['total_sessions'] ? (int) $package['total_sessions'] : null;
+        $totalSessions = $package['total_sessions'] !== null ? (int) $package['total_sessions'] : null;
         $newUsed = $currentUsed + $count;
         
         // Check if we have enough sessions
@@ -613,8 +613,8 @@ class ClientService {
         ]);
         
         // Return updated package info
-        $remaining = $totalSessions ? max(0, $totalSessions - $newUsed) : null;
-        $progressPercent = $totalSessions ? round(($newUsed / $totalSessions) * 100) : 0;
+        $remaining = $totalSessions !== null ? max(0, $totalSessions - $newUsed) : null;
+        $progressPercent = $totalSessions !== null ? round(($newUsed / $totalSessions) * 100) : 0;
         
         return [
             'id' => $packageId,
@@ -856,10 +856,10 @@ class ClientService {
             return null;
         }
         
-        $total = $package['total_sessions'] ? (int) $package['total_sessions'] : null;
+        $total = $package['total_sessions'] !== null ? (int) $package['total_sessions'] : null;
         $used = (int) $package['used_sessions'];
-        $remaining = $total ? max(0, $total - $used) : null;
-        $progressPercent = $total ? round(($used / $total) * 100) : 0;
+        $remaining = $total !== null ? max(0, $total - $used) : null;
+        $progressPercent = $total !== null ? round(($used / $total) * 100) : 0;
         
         return [
             'name' => $package['package_name'],
