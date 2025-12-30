@@ -163,6 +163,50 @@ class OpenAIService {
         return false;
     }
 
+    /**
+     * Generic completion API call
+     * Used by AIPlannerService for plan generation
+     * 
+     * @param array $params OpenAI API parameters
+     * @return array|null Response data or null on error
+     */
+    public function generateCompletion(array $params): ?array {
+        if (empty($this->api_key)) {
+            return ['error' => 'OpenAI API key not configured'];
+        }
+        
+        $messages = $params['messages'] ?? [];
+        $maxTokens = $params['max_tokens'] ?? 2000;
+        $temperature = $params['temperature'] ?? 0.7;
+        
+        $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->api_key,
+                'Content-Type' => 'application/json',
+            ],
+            'body' => json_encode([
+                'model' => $this->model,
+                'messages' => $messages,
+                'max_tokens' => $maxTokens,
+                'temperature' => $temperature,
+            ]),
+            'timeout' => 60,
+        ]);
+        
+        if (is_wp_error($response)) {
+            return ['error' => $response->get_error_message()];
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if (isset($data['error'])) {
+            return ['error' => $data['error']['message'] ?? 'OpenAI API error'];
+        }
+        
+        return $data;
+    }
+
     // --- OPENAI CALL ---
     private function call_openai($prompt) {
         $body = [
