@@ -275,19 +275,7 @@ class AnnouncementService {
             $expertId
         ), ARRAY_A);
         
-        return array_map(function($row) {
-            return [
-                'id' => (int) $row['id'],
-                'title' => $row['title'],
-                'content' => $row['content'],
-                'type' => $row['type'],
-                'start_date' => $row['start_date'],
-                'end_date' => $row['end_date'],
-                'is_dismissible' => (bool) $row['is_dismissible'],
-                'priority' => (int) $row['priority'],
-                'created_at' => $row['created_at'],
-            ];
-        }, $announcements ?: []);
+        return array_map([$this, 'formatAnnouncement'], $announcements ?: []);
     }
 
     /**

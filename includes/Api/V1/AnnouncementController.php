@@ -230,7 +230,6 @@ class AnnouncementController extends WP_REST_Controller {
         $expertId = get_current_user_id();
         
         $data = [
-            'expert_id' => $expertId,
             'title' => $request->get_param('title'),
             'content' => $request->get_param('content'),
             'type' => $request->get_param('type') ?? 'info',
