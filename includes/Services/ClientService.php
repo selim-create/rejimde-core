@@ -479,11 +479,16 @@ class ClientService {
      * 
      * @param int $relationshipId Relationship ID
      * @param array $data Note data
-     * @return int|false Note ID or false
+     * @return array Note object or error array
      */
     public function addNote(int $relationshipId, array $data) {
         global $wpdb;
         $table_notes = $wpdb->prefix . 'rejimde_client_notes';
+        
+        // Validate required content field
+        if (empty($data['content'])) {
+            return ['error' => 'Content is required'];
+        }
         
         // Get expert_id from relationship
         $table_relationships = $wpdb->prefix . 'rejimde_relationships';
@@ -493,19 +498,137 @@ class ClientService {
         ));
         
         if (!$expertId) {
-            return false;
+            return ['error' => 'Relationship not found'];
         }
+        
+        $noteType = $data['type'] ?? 'general';
+        $content = $data['content'];
+        $isPinned = $data['is_pinned'] ?? 0;
+        $createdAt = current_time('mysql');
         
         $result = $wpdb->insert($table_notes, [
             'relationship_id' => $relationshipId,
             'expert_id' => $expertId,
-            'note_type' => $data['type'] ?? 'general',
-            'content' => $data['content'],
-            'is_pinned' => $data['is_pinned'] ?? 0,
+            'note_type' => $noteType,
+            'content' => $content,
+            'is_pinned' => $isPinned,
+            'created_at' => $createdAt
+        ]);
+        
+        if (!$result) {
+            return ['error' => 'Failed to insert note'];
+        }
+        
+        $noteId = $wpdb->insert_id;
+        
+        // Return full note object
+        return [
+            'id' => (int) $noteId,
+            'type' => $noteType,
+            'content' => $content,
+            'is_pinned' => (bool) $isPinned,
+            'created_at' => $createdAt
+        ];
+    }
+    
+    /**
+     * Use session(s) from client package
+     * 
+     * @param int $relationshipId Relationship ID
+     * @param int $count Number of sessions to use
+     * @param string|null $reason Reason for using session
+     * @return array Updated package data or error array
+     */
+    public function useSession(int $relationshipId, int $count = 1, ?string $reason = null) {
+        global $wpdb;
+        $table_packages = $wpdb->prefix . 'rejimde_client_packages';
+        $table_events = $wpdb->prefix . 'rejimde_events';
+        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+        
+        // Get active package
+        $package = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_packages WHERE relationship_id = %d AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+            $relationshipId
+        ), ARRAY_A);
+        
+        if (!$package) {
+            return ['error' => 'No active package found'];
+        }
+        
+        // Get client_id for activity log
+        $clientId = $wpdb->get_var($wpdb->prepare(
+            "SELECT client_id FROM $table_relationships WHERE id = %d",
+            $relationshipId
+        ));
+        
+        if (!$clientId) {
+            return ['error' => 'Relationship not found'];
+        }
+        
+        $packageId = (int) $package['id'];
+        $currentUsed = (int) $package['used_sessions'];
+        $totalSessions = $package['total_sessions'] !== null ? (int) $package['total_sessions'] : null;
+        $newUsed = $currentUsed + $count;
+        
+        // Check if we have enough sessions
+        if ($totalSessions !== null && $newUsed > $totalSessions) {
+            return ['error' => 'Not enough sessions remaining'];
+        }
+        
+        // Update used_sessions
+        $updateData = [
+            'used_sessions' => $newUsed,
+            'updated_at' => current_time('mysql')
+        ];
+        
+        // Check if package should be completed
+        if ($totalSessions !== null && $newUsed >= $totalSessions) {
+            $updateData['status'] = 'completed';
+        }
+        
+        $result = $wpdb->update(
+            $table_packages,
+            $updateData,
+            ['id' => $packageId]
+        );
+        
+        if ($result === false) {
+            return ['error' => 'Failed to update package'];
+        }
+        
+        // Log activity (sessions don't award points, just track usage)
+        $wpdb->insert($table_events, [
+            'user_id' => $clientId,
+            'event_type' => 'session_used',
+            'entity_type' => 'package',
+            'entity_id' => $packageId,
+            'points' => 0,
+            'context' => wp_json_encode([
+                'count' => $count,
+                'reason' => $reason,
+                'used_sessions' => $newUsed,
+                'total_sessions' => $totalSessions
+            ]),
             'created_at' => current_time('mysql')
         ]);
         
-        return $result ? $wpdb->insert_id : false;
+        // Return updated package info
+        $remaining = $totalSessions !== null ? max(0, $totalSessions - $newUsed) : null;
+        $progressPercent = ($totalSessions !== null && $totalSessions > 0) ? round(($newUsed / $totalSessions) * 100) : 0;
+        
+        return [
+            'id' => $packageId,
+            'name' => $package['package_name'],
+            'type' => $package['package_type'],
+            'total' => $totalSessions,
+            'used' => $newUsed,
+            'remaining' => $remaining,
+            'progress_percent' => $progressPercent,
+            'status' => $updateData['status'] ?? $package['status'],
+            'start_date' => $package['start_date'],
+            'end_date' => $package['end_date'],
+            'price' => $package['price']
+        ];
     }
     
     /**
@@ -733,10 +856,10 @@ class ClientService {
             return null;
         }
         
-        $total = $package['total_sessions'] ? (int) $package['total_sessions'] : null;
+        $total = $package['total_sessions'] !== null ? (int) $package['total_sessions'] : null;
         $used = (int) $package['used_sessions'];
-        $remaining = $total ? max(0, $total - $used) : null;
-        $progressPercent = $total ? round(($used / $total) * 100) : 0;
+        $remaining = $total !== null ? max(0, $total - $used) : null;
+        $progressPercent = ($total !== null && $total > 0) ? round(($used / $total) * 100) : 0;
         
         return [
             'name' => $package['package_name'],
