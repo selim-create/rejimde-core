@@ -240,7 +240,7 @@ class FAQController extends WP_REST_Controller {
         ], $code);
     }
 
-    protected function check_expert_auth(): bool {
+    public function check_expert_auth(): bool {
         if (!is_user_logged_in()) {
             return false;
         }
