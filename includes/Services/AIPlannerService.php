@@ -190,7 +190,7 @@ class AIPlannerService {
      * @param \WP_User|null $client Client user object (null for template plans)
      * @return string
      */
-    private function buildPrompt(string $planType, array $parameters, $client): string {
+    private function buildPrompt(string $planType, array $parameters, ?\WP_User $client): string {
         $prompts = [
             'diet' => "Lütfen aşağıdaki bilgilere göre kişiye özel bir diyet planı oluştur:\n",
             'workout' => "Lütfen aşağıdaki bilgilere göre kişiye özel bir egzersiz programı oluştur:\n",

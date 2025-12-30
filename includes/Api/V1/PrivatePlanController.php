@@ -222,8 +222,9 @@ class PrivatePlanController extends WP_REST_Controller {
         
         // Auto-detect relationship_id from expert-client pair
         global $wpdb;
+        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
         $relationshipId = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}rejimde_relationships 
+            "SELECT id FROM $table_relationships 
              WHERE expert_id = %d AND client_id = %d AND status = 'active'",
             $expertId,
             (int) $clientId
