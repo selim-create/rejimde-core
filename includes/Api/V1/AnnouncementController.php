@@ -74,6 +74,29 @@ class AnnouncementController extends WP_REST_Controller {
             'callback' => [$this, 'delete_announcement'],
             'permission_callback' => [$this, 'check_admin_auth'],
         ]);
+
+        // Pro user endpoints
+
+        // GET /pro/announcements - Pro's announcements list
+        register_rest_route($this->namespace, '/pro/' . $this->base, [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_pro_announcements'],
+            'permission_callback' => [$this, 'check_pro_auth'],
+        ]);
+
+        // POST /pro/announcements - Create pro announcement
+        register_rest_route($this->namespace, '/pro/' . $this->base, [
+            'methods' => 'POST',
+            'callback' => [$this, 'create_pro_announcement'],
+            'permission_callback' => [$this, 'check_pro_auth'],
+        ]);
+
+        // DELETE /pro/announcements/{id} - Delete pro announcement
+        register_rest_route($this->namespace, '/pro/' . $this->base . '/(?P<id>\d+)', [
+            'methods' => 'DELETE',
+            'callback' => [$this, 'delete_pro_announcement'],
+            'permission_callback' => [$this, 'check_pro_auth'],
+        ]);
     }
 
     /**
@@ -191,6 +214,56 @@ class AnnouncementController extends WP_REST_Controller {
         return $this->success(['message' => 'Announcement deleted successfully']);
     }
 
+    /**
+     * GET /pro/announcements
+     */
+    public function get_pro_announcements(WP_REST_Request $request): WP_REST_Response {
+        $expertId = get_current_user_id();
+        $announcements = $this->announcementService->getProAnnouncements($expertId);
+        return $this->success($announcements);
+    }
+
+    /**
+     * POST /pro/announcements
+     */
+    public function create_pro_announcement(WP_REST_Request $request): WP_REST_Response {
+        $expertId = get_current_user_id();
+        
+        $data = [
+            'title' => $request->get_param('title'),
+            'content' => $request->get_param('content'),
+            'type' => $request->get_param('type') ?? 'info',
+            'start_date' => $request->get_param('start_date') ?? current_time('mysql'),
+            'end_date' => $request->get_param('end_date'),
+            'is_dismissible' => $request->get_param('is_dismissible') ?? true,
+            'priority' => $request->get_param('priority') ?? 0,
+        ];
+        
+        $result = $this->announcementService->createProAnnouncement($expertId, $data);
+        
+        if (is_array($result) && isset($result['error'])) {
+            return $this->error($result['error'], 400);
+        }
+        
+        return $this->success(['id' => $result], 'Announcement created successfully', 201);
+    }
+
+    /**
+     * DELETE /pro/announcements/{id}
+     */
+    public function delete_pro_announcement(WP_REST_Request $request): WP_REST_Response {
+        $expertId = get_current_user_id();
+        $announcementId = (int) $request['id'];
+        
+        $result = $this->announcementService->deleteProAnnouncement($announcementId, $expertId);
+        
+        if (!$result) {
+            return $this->error('Announcement not found or access denied', 404);
+        }
+        
+        return $this->success(['message' => 'Announcement deleted successfully']);
+    }
+
     // Helper methods
 
     protected function success($data = null, $message = 'Success', $code = 200): WP_REST_Response {
@@ -218,5 +291,15 @@ class AnnouncementController extends WP_REST_Controller {
         
         $user = wp_get_current_user();
         return in_array('administrator', (array) $user->roles);
+    }
+
+    public function check_pro_auth(): bool {
+        if (!is_user_logged_in()) {
+            return false;
+        }
+        
+        $user = wp_get_current_user();
+        return in_array('rejimde_pro', (array) $user->roles) || 
+               in_array('administrator', (array) $user->roles);
     }
 }
