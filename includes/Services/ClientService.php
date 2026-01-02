@@ -270,7 +270,6 @@ class ClientService {
             'assigned_plans' => $plans,
             'risk_status' => $riskStatus['status'] ?? 'normal',
             'risk_reason' => $riskStatus['reason'] ?? null,
-            'score' => $score,
             'created_at' => $relationship['created_at'],
         ];
     }
@@ -1021,7 +1020,9 @@ class ClientService {
      * @return string
      */
     private function getDefaultAvatar(int $userId): string {
-        return 'https://placehold.co/150';
+        return defined('REJIMDE_DEFAULT_AVATAR') 
+            ? REJIMDE_DEFAULT_AVATAR 
+            : 'https://placehold.co/150';
     }
     
     /**

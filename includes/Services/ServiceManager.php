@@ -19,7 +19,7 @@ class ServiceManager {
         $table_services = $wpdb->prefix . 'rejimde_services';
         
         // Tablo var mı kontrol et
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '$table_services'");
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_services));
         if (!$tableExists) {
             // Tablo yoksa boş array dön (hata yerine)
             error_log('Rejimde: Services table does not exist');
