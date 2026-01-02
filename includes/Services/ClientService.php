@@ -570,8 +570,7 @@ class ClientService {
             }
             
             // Check if package is unlimited (null total_sessions)
-            // Use is_null() for reliable null checking across database drivers
-            if (is_null($package['total_sessions']) || $package['total_sessions'] === null) {
+            if (is_null($package['total_sessions'])) {
                 error_log("Rejimde CRM: Cannot extend unlimited package for relationship: $relationshipId");
                 return ['error' => 'Cannot extend unlimited package. Please create a new package instead.'];
             }

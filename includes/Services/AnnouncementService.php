@@ -292,7 +292,7 @@ class AnnouncementService {
      * 
      * @param int $expertId Expert user ID
      * @param array $data Announcement data
-     * @return array Announcement object or error
+     * @return array Announcement object or error array with 'error' key
      */
     public function createProAnnouncement(int $expertId, array $data) {
         global $wpdb;

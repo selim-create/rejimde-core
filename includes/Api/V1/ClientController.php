@@ -313,7 +313,15 @@ class ClientController extends WP_REST_Controller {
             }
             
             error_log('Rejimde CRM: update_package successful for relationship ' . $relationshipId);
-            return $this->success(['message' => 'Package updated successfully', 'package_id' => $result]);
+            
+            // Standardize response structure - for extend action, result is package ID (int)
+            // For cancel action, result is boolean
+            $responseData = ['message' => 'Package updated successfully'];
+            if (is_int($result)) {
+                $responseData['package_id'] = $result;
+            }
+            
+            return $this->success($responseData);
             
         } catch (\Exception $e) {
             error_log('Rejimde CRM: update_package exception - ' . $e->getMessage());
