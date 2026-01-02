@@ -252,9 +252,15 @@ class Activator {
         // Add risk_status and risk_reason columns to existing tables (for upgrades)
         $column_exists = $wpdb->get_var("SHOW COLUMNS FROM $table_relationships LIKE 'risk_status'");
         if (!$column_exists) {
-            $wpdb->query("ALTER TABLE $table_relationships ADD COLUMN risk_status VARCHAR(20) DEFAULT NULL AFTER notes");
-            $wpdb->query("ALTER TABLE $table_relationships ADD COLUMN risk_reason TEXT DEFAULT NULL AFTER risk_status");
-            $wpdb->query("ALTER TABLE $table_relationships ADD INDEX idx_risk_status (risk_status)");
+            $result1 = $wpdb->query("ALTER TABLE $table_relationships ADD COLUMN risk_status VARCHAR(20) DEFAULT NULL AFTER notes");
+            $result2 = $wpdb->query("ALTER TABLE $table_relationships ADD COLUMN risk_reason TEXT DEFAULT NULL AFTER risk_status");
+            $result3 = $wpdb->query("ALTER TABLE $table_relationships ADD INDEX idx_risk_status (risk_status)");
+            
+            if ($result1 === false || $result2 === false || $result3 === false) {
+                error_log('[Rejimde Core] Failed to add risk_status columns: ' . $wpdb->last_error);
+            } else {
+                error_log('[Rejimde Core] Successfully added risk_status columns to relationships table');
+            }
         }
 
         // 13. CRM: Client Packages Table

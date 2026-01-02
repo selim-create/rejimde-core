@@ -91,7 +91,8 @@ if (strpos($controllerContent, "SHOW COLUMNS FROM") !== false &&
 }
 
 // Check for conditional query
-if (strpos($controllerContent, 'if ($column_exists)') !== false) {
+if (strpos($controllerContent, 'if (self::$risk_status_column_exists)') !== false || 
+    strpos($controllerContent, 'if ($column_exists)') !== false) {
     echo "   ✓ Conditional query based on column existence\n";
 } else {
     echo "   ✗ Conditional query NOT found\n";
@@ -114,7 +115,8 @@ if (preg_match('/\$wpdb->prepare\(/', $controllerContent)) {
 }
 
 // Check that risk_status query is inside the if block
-if (preg_match('/if \(\$column_exists\).*?risk_status.*?warning.*?danger/s', $controllerContent)) {
+if (preg_match('/if \(self::\$risk_status_column_exists\).*?risk_status.*?warning.*?danger/s', $controllerContent) ||
+    preg_match('/if \(\$column_exists\).*?risk_status.*?warning.*?danger/s', $controllerContent)) {
     echo "   ✓ risk_status query protected by column existence check\n";
 } else {
     echo "   ⚠ Could not verify risk_status query protection\n";

@@ -18,6 +18,12 @@ class ProDashboardController extends WP_REST_Controller {
 
     protected $namespace = 'rejimde/v1';
     protected $base = 'pro/dashboard';
+    
+    /**
+     * Cache for column existence check to avoid repeated queries
+     * @var bool|null
+     */
+    private static $risk_status_column_exists = null;
 
     public function register_routes() {
         register_rest_route($this->namespace, '/' . $this->base, [
@@ -61,11 +67,13 @@ class ProDashboardController extends WP_REST_Controller {
             // Suppress database errors to prevent HTML output in JSON response
             $wpdb->suppress_errors(true);
             
-            // Check if risk_status column exists
-            $column_exists = $wpdb->get_var("SHOW COLUMNS FROM $table_relationships LIKE 'risk_status'");
+            // Check if risk_status column exists (cached to avoid repeated queries)
+            if (self::$risk_status_column_exists === null) {
+                self::$risk_status_column_exists = (bool) $wpdb->get_var("SHOW COLUMNS FROM $table_relationships LIKE 'risk_status'");
+            }
             
             $atRiskCount = 0;
-            if ($column_exists) {
+            if (self::$risk_status_column_exists) {
                 $atRiskCount = $wpdb->get_var($wpdb->prepare(
                     "SELECT COUNT(*) FROM $table_relationships 
                      WHERE expert_id = %d AND status = 'active' 
