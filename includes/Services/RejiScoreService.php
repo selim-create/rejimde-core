@@ -100,19 +100,18 @@ class RejiScoreService {
         $metaTable = $wpdb->prefix . 'commentmeta';
         
         // Get all approved reviews with their ratings and verification status
+        // Using LEFT JOINs for better performance than correlated subqueries
         $reviews = $wpdb->get_results($wpdb->prepare("
             SELECT 
                 c.comment_ID,
                 c.user_id,
-                COALESCE(
-                    (SELECT meta_value FROM $metaTable WHERE comment_id = c.comment_ID AND meta_key = 'rating'),
-                    0
-                ) as rating,
-                COALESCE(
-                    (SELECT meta_value FROM $metaTable WHERE comment_id = c.comment_ID AND meta_key = 'verified_client'),
-                    0
-                ) as is_verified_client
+                COALESCE(cm_rating.meta_value, 0) as rating,
+                COALESCE(cm_verified.meta_value, 0) as is_verified_client
             FROM $table c
+            LEFT JOIN $metaTable cm_rating 
+                ON c.comment_ID = cm_rating.comment_id AND cm_rating.meta_key = 'rating'
+            LEFT JOIN $metaTable cm_verified 
+                ON c.comment_ID = cm_verified.comment_id AND cm_verified.meta_key = 'verified_client'
             WHERE c.comment_post_ID = %d
             AND c.comment_approved = '1'
             AND c.comment_type IN ('comment', '')
@@ -183,7 +182,6 @@ class RejiScoreService {
         
         // Count client completions
         if ($this->metricsTableExists()) {
-            global $wpdb;
             $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
             
             $clientCompletions = $wpdb->get_var($wpdb->prepare("
