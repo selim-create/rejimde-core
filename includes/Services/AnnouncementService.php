@@ -330,20 +330,19 @@ class AnnouncementService {
         $announcementId = $wpdb->insert_id;
         error_log("Rejimde Announcements: Successfully created announcement ID $announcementId for expert $expertId");
         
-        // Return the full announcement object instead of just ID
-        return [
-            'id' => (int) $announcementId,
-            'title' => $insertData['title'],
-            'content' => $insertData['content'],
-            'type' => $insertData['type'],
-            'target_roles' => ['rejimde_user'],
-            'start_date' => $insertData['start_date'],
-            'end_date' => $insertData['end_date'],
-            'is_dismissible' => (bool) $insertData['is_dismissible'],
-            'priority' => (int) $insertData['priority'],
-            'created_at' => $currentTime,
-            'updated_at' => $currentTime,
-        ];
+        // Fetch the created record to get database-generated timestamps
+        $announcement = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table WHERE id = %d",
+            $announcementId
+        ), ARRAY_A);
+        
+        if (!$announcement) {
+            error_log("Rejimde Announcements: Failed to fetch created announcement");
+            return ['error' => 'Failed to retrieve created announcement'];
+        }
+        
+        // Return the full announcement object with actual database timestamps
+        return $this->formatAnnouncement($announcement);
     }
 
     /**
