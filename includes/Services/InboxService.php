@@ -116,6 +116,7 @@ class InboxService {
                 'status' => $thread['status'],
                 'last_message' => $lastMessage,
                 'unread_count' => $userType === 'expert' ? (int) $thread['unread_expert'] : (int) $thread['unread_client'],
+                'is_read' => $userType === 'expert' ? ((int) $thread['unread_expert'] === 0) : ((int) $thread['unread_client'] === 0),
                 'created_at' => $thread['created_at'],
             ];
         }
@@ -394,19 +395,27 @@ class InboxService {
         $table_threads = $wpdb->prefix . 'rejimde_threads';
         $table_messages = $wpdb->prefix . 'rejimde_messages';
         
+        error_log("Rejimde Inbox: markAsRead called for thread $threadId, readerType: $readerType");
+        
         // Update unread count
         $unreadField = $readerType === 'expert' ? 'unread_expert' : 'unread_client';
-        $wpdb->update(
+        $result = $wpdb->update(
             $table_threads,
-            [$unreadField => 0],
+            [$unreadField => 0, 'updated_at' => current_time('mysql')],
             ['id' => $threadId],
-            ['%d'],
+            ['%d', '%s'],
             ['%d']
         );
         
+        if ($result === false) {
+            error_log("Rejimde Inbox: Failed to update thread $threadId unread count");
+        } else {
+            error_log("Rejimde Inbox: Successfully reset $unreadField for thread $threadId");
+        }
+        
         // Mark messages as read
         $senderType = $readerType === 'expert' ? 'client' : 'expert';
-        $wpdb->query($wpdb->prepare(
+        $messagesUpdated = $wpdb->query($wpdb->prepare(
             "UPDATE $table_messages 
              SET is_read = 1, read_at = %s 
              WHERE thread_id = %d AND sender_type = %s AND is_read = 0",
@@ -414,6 +423,8 @@ class InboxService {
             $threadId,
             $senderType
         ));
+        
+        error_log("Rejimde Inbox: Marked $messagesUpdated messages as read for thread $threadId");
         
         return true;
     }

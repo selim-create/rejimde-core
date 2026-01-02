@@ -270,10 +270,19 @@ class AnnouncementService {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_announcements';
         
+        error_log("Rejimde Announcements: getProAnnouncements called for expert $expertId");
+        
         $announcements = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table WHERE expert_id = %d ORDER BY created_at DESC",
             $expertId
         ), ARRAY_A);
+        
+        if ($wpdb->last_error) {
+            error_log("Rejimde Announcements: Database error - " . $wpdb->last_error);
+        }
+        
+        $count = is_array($announcements) ? count($announcements) : 0;
+        error_log("Rejimde Announcements: Found $count announcements for expert $expertId");
         
         return array_map([$this, 'formatAnnouncement'], $announcements ?: []);
     }
@@ -290,10 +299,13 @@ class AnnouncementService {
         $table = $wpdb->prefix . 'rejimde_announcements';
         
         if (empty($data['title']) || empty($data['content'])) {
+            error_log("Rejimde Announcements: createProAnnouncement failed - title or content missing");
             return ['error' => 'Title and content are required'];
         }
         
-        $result = $wpdb->insert($table, [
+        error_log("Rejimde Announcements: Creating announcement for expert $expertId");
+        
+        $insertData = [
             'expert_id' => $expertId,
             'title' => sanitize_text_field($data['title']),
             'content' => wp_kses_post($data['content']),
@@ -304,13 +316,19 @@ class AnnouncementService {
             'is_dismissible' => $data['is_dismissible'] ?? 1,
             'priority' => $data['priority'] ?? 0,
             'created_at' => current_time('mysql'),
-        ]);
+        ];
+        
+        $result = $wpdb->insert($table, $insertData);
         
         if ($result === false) {
+            error_log("Rejimde Announcements: Database insert failed - " . $wpdb->last_error);
             return ['error' => 'Failed to create announcement'];
         }
         
-        return $wpdb->insert_id;
+        $announcementId = $wpdb->insert_id;
+        error_log("Rejimde Announcements: Successfully created announcement ID $announcementId for expert $expertId");
+        
+        return $announcementId;
     }
 
     /**

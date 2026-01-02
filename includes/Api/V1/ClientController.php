@@ -290,24 +290,35 @@ class ClientController extends WP_REST_Controller {
      * PATCH/POST /pro/clients/{id}/package
      */
     public function update_package(WP_REST_Request $request): WP_REST_Response {
-        $relationshipId = (int) $request['id'];
-        
-        $data = [
-            'action' => $request->get_param('action'), // renew, extend, cancel
-            'data' => $request->get_param('data'),
-        ];
-        
-        if (empty($data['action'])) {
-            return $this->error('Action is required', 400);
+        try {
+            $relationshipId = (int) $request['id'];
+            
+            $data = [
+                'action' => $request->get_param('action'), // renew, extend, cancel
+                'data' => $request->get_param('data'),
+            ];
+            
+            if (empty($data['action'])) {
+                error_log('Rejimde CRM: update_package - Action is required');
+                return $this->error('Action is required', 400);
+            }
+            
+            error_log('Rejimde CRM: update_package called for relationship ' . $relationshipId . ' with action: ' . $data['action']);
+            
+            $result = $this->clientService->updatePackage($relationshipId, $data);
+            
+            if (is_array($result) && isset($result['error'])) {
+                error_log('Rejimde CRM: update_package error - ' . $result['error']);
+                return $this->error($result['error'], 400);
+            }
+            
+            error_log('Rejimde CRM: update_package successful for relationship ' . $relationshipId);
+            return $this->success(['message' => 'Package updated successfully', 'package_id' => $result]);
+            
+        } catch (\Exception $e) {
+            error_log('Rejimde CRM: update_package exception - ' . $e->getMessage());
+            return $this->error('Failed to update package: ' . $e->getMessage(), 500);
         }
-        
-        $result = $this->clientService->updatePackage($relationshipId, $data);
-        
-        if (is_array($result) && isset($result['error'])) {
-            return $this->error($result['error'], 400);
-        }
-        
-        return $this->success(['message' => 'Package updated successfully']);
     }
 
     /**

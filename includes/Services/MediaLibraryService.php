@@ -19,6 +19,8 @@ class MediaLibraryService {
         global $wpdb;
         $table_media = $wpdb->prefix . 'rejimde_media_library';
         
+        error_log("Rejimde Media: getMediaItems called for expert $expertId");
+        
         $query = "SELECT * FROM $table_media WHERE expert_id = %d";
         $params = [$expertId];
         
@@ -48,6 +50,13 @@ class MediaLibraryService {
         $params[] = $offset;
         
         $items = $wpdb->get_results($wpdb->prepare($query, ...$params), ARRAY_A);
+        
+        if ($wpdb->last_error) {
+            error_log("Rejimde Media: Database error - " . $wpdb->last_error);
+        }
+        
+        $count = is_array($items) ? count($items) : 0;
+        error_log("Rejimde Media: Found $count media items for expert $expertId");
         
         return array_map(function($item) {
             return [
@@ -114,8 +123,11 @@ class MediaLibraryService {
         $table_media = $wpdb->prefix . 'rejimde_media_library';
         
         if (empty($data['title']) || empty($data['type']) || empty($data['url'])) {
+            error_log("Rejimde Media: addMedia failed - title, type, or URL missing");
             return ['error' => 'Title, type, and URL are required'];
         }
+        
+        error_log("Rejimde Media: Adding media for expert $expertId - title: {$data['title']}, type: {$data['type']}");
         
         $insertData = [
             'expert_id' => $expertId,
@@ -127,15 +139,20 @@ class MediaLibraryService {
             'folder_id' => isset($data['folder_id']) ? (int) $data['folder_id'] : null,
             'tags' => isset($data['tags']) ? json_encode($data['tags']) : null,
             'usage_count' => 0,
+            'created_at' => current_time('mysql'),
         ];
         
         $result = $wpdb->insert($table_media, $insertData);
         
         if ($result === false) {
+            error_log("Rejimde Media: Database insert failed - " . $wpdb->last_error);
             return ['error' => 'Failed to add media'];
         }
         
-        return $wpdb->insert_id;
+        $mediaId = $wpdb->insert_id;
+        error_log("Rejimde Media: Successfully created media ID $mediaId for expert $expertId");
+        
+        return $mediaId;
     }
     
     /**
