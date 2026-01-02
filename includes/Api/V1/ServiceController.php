@@ -88,7 +88,7 @@ class ServiceController extends WP_REST_Controller {
             return $this->success($services);
         } catch (\Exception $e) {
             error_log('Rejimde Services Error: ' . $e->getMessage());
-            return $this->error('Failed to fetch services: ' . $e->getMessage(), 500);
+            return $this->error('Failed to fetch services', 500);
         }
     }
 
