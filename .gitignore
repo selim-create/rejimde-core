@@ -28,3 +28,6 @@ Thumbs.db
 # Temporary files
 /tmp/
 *.tmp
+
+# Validation scripts (temporary test files)
+validate_*.php

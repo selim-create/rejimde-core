@@ -28,6 +28,39 @@ class RejiScoreService {
     private $metricsTableExists = null; // Cache table existence check
     
     /**
+     * Get expert's professional post ID from user meta
+     * Checks both 'professional_profile_id' and 'related_pro_post_id' for compatibility
+     * Falls back to reverse lookup from post meta if needed
+     *
+     * @param int $expertId Expert user ID
+     * @return int|null Post ID or null if not found
+     */
+    private function getExpertPostId(int $expertId): ?int {
+        // Try legacy key first (for backward compatibility)
+        $postId = get_user_meta($expertId, 'professional_profile_id', true);
+        if (!empty($postId)) {
+            return (int) $postId;
+        }
+        
+        // Try current standard key
+        $postId = get_user_meta($expertId, 'related_pro_post_id', true);
+        if (!empty($postId)) {
+            return (int) $postId;
+        }
+        
+        // Fallback: reverse lookup from post meta
+        global $wpdb;
+        $postId = $wpdb->get_var($wpdb->prepare("
+            SELECT post_id FROM {$wpdb->postmeta} 
+            WHERE meta_key = 'related_user_id' 
+            AND meta_value = %d
+            LIMIT 1
+        ", $expertId));
+        
+        return $postId ? (int) $postId : null;
+    }
+    
+    /**
      * Calculate complete RejiScore for an expert
      *
      * @param int $expertId Expert user ID
@@ -100,7 +133,7 @@ class RejiScoreService {
     private function calculateTrustScore(int $expertId): int {
         global $wpdb;
         
-        $postId = get_user_meta($expertId, 'professional_profile_id', true);
+        $postId = $this->getExpertPostId($expertId);
         if (!$postId) return 50; // Default for new experts
         
         $table = $wpdb->prefix . 'comments';
@@ -272,7 +305,7 @@ class RejiScoreService {
         }
         
         // Check if profile is claimed
-        $postId = get_user_meta($expertId, 'professional_profile_id', true);
+        $postId = $this->getExpertPostId($expertId);
         if ($postId) {
             $isClaimed = get_post_meta($postId, 'is_claimed', true);
             if ($isClaimed === '1' || $isClaimed === true || $isClaimed === 1) {
@@ -336,7 +369,7 @@ class RejiScoreService {
     private function getExpertStats(int $expertId): array {
         global $wpdb;
         
-        $postId = get_user_meta($expertId, 'professional_profile_id', true);
+        $postId = $this->getExpertPostId($expertId);
         
         // User rating (average)
         $userRating = $postId ? (float) get_post_meta($postId, 'puan', true) : 0;
@@ -388,7 +421,7 @@ class RejiScoreService {
     public function getSuccessStats(int $expertId): array {
         global $wpdb;
         
-        $postId = get_user_meta($expertId, 'professional_profile_id', true);
+        $postId = $this->getExpertPostId($expertId);
         
         // Score impact from post meta
         $scoreImpact = $postId ? get_post_meta($postId, 'skor_etkisi', true) : '--';
