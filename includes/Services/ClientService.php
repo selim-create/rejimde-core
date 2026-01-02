@@ -528,17 +528,96 @@ class ClientService {
         
         $action = $data['action'] ?? 'renew';
         
+        error_log("Rejimde CRM: updatePackage called with action: $action for relationship: $relationshipId");
+        
         if ($action === 'cancel') {
             // Cancel current active package
-            return $wpdb->update(
+            $result = $wpdb->update(
                 $table_packages,
-                ['status' => 'cancelled'],
-                ['relationship_id' => $relationshipId, 'status' => 'active']
-            ) !== false;
+                ['status' => 'cancelled', 'updated_at' => current_time('mysql')],
+                ['relationship_id' => $relationshipId, 'status' => 'active'],
+                ['%s', '%s'],
+                ['%d', '%s']
+            );
+            
+            if ($result === false) {
+                error_log("Rejimde CRM: Failed to cancel package for relationship: $relationshipId");
+            }
+            
+            return $result !== false;
         }
         
-        // For renew or extend, create new package
-        return $this->createPackage($relationshipId, $data);
+        if ($action === 'extend') {
+            // Extend existing package by adding sessions
+            $packageData = $data['data'] ?? [];
+            
+            if (empty($packageData['sessions_to_add'])) {
+                error_log("Rejimde CRM: extend action requires 'sessions_to_add' in data");
+                return ['error' => 'sessions_to_add is required for extend action'];
+            }
+            
+            $sessionsToAdd = (int) $packageData['sessions_to_add'];
+            
+            // Get active package
+            $package = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM $table_packages WHERE relationship_id = %d AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+                $relationshipId
+            ), ARRAY_A);
+            
+            if (!$package) {
+                error_log("Rejimde CRM: No active package found for relationship: $relationshipId");
+                return ['error' => 'No active package found to extend'];
+            }
+            
+            // Check if package is unlimited (null total_sessions)
+            if (is_null($package['total_sessions'])) {
+                error_log("Rejimde CRM: Cannot extend unlimited package for relationship: $relationshipId");
+                return ['error' => 'Cannot extend unlimited package. Please create a new package instead.'];
+            }
+            
+            $currentTotal = (int) $package['total_sessions'];
+            $newTotal = $currentTotal + $sessionsToAdd;
+            
+            // Update total sessions
+            $result = $wpdb->update(
+                $table_packages,
+                [
+                    'total_sessions' => $newTotal,
+                    'updated_at' => current_time('mysql')
+                ],
+                ['id' => $package['id']],
+                ['%d', '%s'],
+                ['%d']
+            );
+            
+            if ($result === false) {
+                error_log("Rejimde CRM: Failed to extend package ID: {$package['id']}");
+                return ['error' => 'Failed to extend package'];
+            }
+            
+            error_log("Rejimde CRM: Successfully extended package ID: {$package['id']} from $currentTotal to $newTotal sessions");
+            
+            return (int) $package['id'];
+        }
+        
+        // For renew action, create new package
+        if ($action === 'renew') {
+            // First, mark existing package as completed
+            $wpdb->update(
+                $table_packages,
+                ['status' => 'completed', 'updated_at' => current_time('mysql')],
+                ['relationship_id' => $relationshipId, 'status' => 'active'],
+                ['%s', '%s'],
+                ['%d', '%s']
+            );
+            
+            error_log("Rejimde CRM: Creating new package for renew action");
+        }
+        
+        // Extract package data from 'data' field if it exists
+        $packageData = $data['data'] ?? $data;
+        
+        return $this->createPackage($relationshipId, $packageData);
     }
     
     /**

@@ -229,6 +229,8 @@ class AnnouncementController extends WP_REST_Controller {
     public function create_pro_announcement(WP_REST_Request $request): WP_REST_Response {
         $expertId = get_current_user_id();
         
+        error_log("Rejimde API: create_pro_announcement called by expert $expertId");
+        
         $data = [
             'title' => $request->get_param('title'),
             'content' => $request->get_param('content'),
@@ -242,10 +244,12 @@ class AnnouncementController extends WP_REST_Controller {
         $result = $this->announcementService->createProAnnouncement($expertId, $data);
         
         if (is_array($result) && isset($result['error'])) {
+            error_log("Rejimde API: create_pro_announcement error - " . $result['error']);
             return $this->error($result['error'], 400);
         }
         
-        return $this->success(['id' => $result], 'Announcement created successfully', 201);
+        error_log("Rejimde API: Successfully created announcement ID " . $result['id']);
+        return $this->success($result, 'Announcement created successfully', 201);
     }
 
     /**

@@ -234,17 +234,22 @@ class InboxController extends WP_REST_Controller {
         $expertId = get_current_user_id();
         $threadId = (int) $request['id'];
         
+        error_log("Rejimde Inbox: mark_as_read endpoint called for thread $threadId by expert $expertId");
+        
         // Verify ownership
         if (!$this->verifyThreadOwnership($expertId, $threadId, 'expert')) {
+            error_log("Rejimde Inbox: mark_as_read failed - ownership verification failed");
             return $this->error('Yetkiniz yok', 403);
         }
         
         $result = $this->inboxService->markAsRead($threadId, 'expert');
         
         if (!$result) {
+            error_log("Rejimde Inbox: mark_as_read failed - service returned false");
             return $this->error('İşlem başarısız', 500);
         }
         
+        error_log("Rejimde Inbox: mark_as_read successful for thread $threadId");
         return $this->success(['message' => 'Okundu olarak işaretlendi']);
     }
 

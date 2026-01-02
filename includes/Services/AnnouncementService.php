@@ -270,10 +270,19 @@ class AnnouncementService {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_announcements';
         
+        error_log("Rejimde Announcements: getProAnnouncements called for expert $expertId");
+        
         $announcements = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table WHERE expert_id = %d ORDER BY created_at DESC",
             $expertId
         ), ARRAY_A);
+        
+        if ($wpdb->last_error) {
+            error_log("Rejimde Announcements: Database error - " . $wpdb->last_error);
+        }
+        
+        $count = is_array($announcements) ? count($announcements) : 0;
+        error_log("Rejimde Announcements: Found $count announcements for expert $expertId");
         
         return array_map([$this, 'formatAnnouncement'], $announcements ?: []);
     }
@@ -283,34 +292,57 @@ class AnnouncementService {
      * 
      * @param int $expertId Expert user ID
      * @param array $data Announcement data
-     * @return int|array Announcement ID or error
+     * @return array Array with 'error' key on failure, or formatted announcement object on success
      */
     public function createProAnnouncement(int $expertId, array $data) {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_announcements';
         
         if (empty($data['title']) || empty($data['content'])) {
+            error_log("Rejimde Announcements: createProAnnouncement failed - title or content missing");
             return ['error' => 'Title and content are required'];
         }
         
-        $result = $wpdb->insert($table, [
+        error_log("Rejimde Announcements: Creating announcement for expert $expertId");
+        
+        $currentTime = current_time('mysql');
+        $endDate = $data['end_date'] ?? date('Y-m-d H:i:s', strtotime('+30 days'));
+        
+        $insertData = [
             'expert_id' => $expertId,
             'title' => sanitize_text_field($data['title']),
             'content' => wp_kses_post($data['content']),
             'type' => sanitize_text_field($data['type'] ?? 'info'),
             'target_roles' => json_encode(['rejimde_user']), // Pro's clients
-            'start_date' => $data['start_date'] ?? current_time('mysql'),
-            'end_date' => $data['end_date'] ?? date('Y-m-d H:i:s', strtotime('+30 days')),
+            'start_date' => $data['start_date'] ?? $currentTime,
+            'end_date' => $endDate,
             'is_dismissible' => $data['is_dismissible'] ?? 1,
             'priority' => $data['priority'] ?? 0,
-            'created_at' => current_time('mysql'),
-        ]);
+        ];
+        
+        $result = $wpdb->insert($table, $insertData);
         
         if ($result === false) {
+            error_log("Rejimde Announcements: Database insert failed - " . $wpdb->last_error);
             return ['error' => 'Failed to create announcement'];
         }
         
-        return $wpdb->insert_id;
+        $announcementId = $wpdb->insert_id;
+        error_log("Rejimde Announcements: Successfully created announcement ID $announcementId for expert $expertId");
+        
+        // Fetch the created record to get database-generated timestamps
+        $announcement = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table WHERE id = %d",
+            $announcementId
+        ), ARRAY_A);
+        
+        if (!$announcement) {
+            error_log("Rejimde Announcements: Failed to fetch created announcement");
+            return ['error' => 'Failed to retrieve created announcement'];
+        }
+        
+        // Return the full announcement object with actual database timestamps
+        return $this->formatAnnouncement($announcement);
     }
 
     /**
