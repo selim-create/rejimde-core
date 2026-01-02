@@ -39,7 +39,8 @@ class ProfileViewNotifications {
         $notificationsTable = $wpdb->prefix . 'rejimde_notifications';
         
         // Get date range for last week (Monday to Sunday)
-        // Calculate the start and end to ensure they're in the same week
+        // Note: '-7 days monday' gives us the Monday of last week (not 'last monday' which could be today)
+        // Then we add 6 days to get the Sunday of the same week
         $week_start_timestamp = strtotime('-7 days monday');
         $week_start = date('Y-m-d 00:00:00', $week_start_timestamp);
         $week_end = date('Y-m-d 23:59:59', strtotime('+6 days', $week_start_timestamp));

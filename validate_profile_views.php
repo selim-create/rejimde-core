@@ -115,11 +115,9 @@ if (strpos($controllerContent, '-30 minutes') !== false) {
 }
 
 // Check for self-view prevention with strict comparison
-if (strpos($controllerContent, 'viewer_user_id === $expert_user_id') !== false || 
-    strpos($controllerContent, '$viewer_user_id === $expert_user_id') !== false) {
+if (strpos($controllerContent, '$viewer_user_id === $expert_user_id') !== false) {
     echo "   ✓ Self-view prevention implemented (strict comparison)\n";
-} elseif (strpos($controllerContent, 'viewer_user_id == $expert_user_id') !== false || 
-          strpos($controllerContent, '$viewer_user_id == $expert_user_id') !== false) {
+} elseif (strpos($controllerContent, '$viewer_user_id == $expert_user_id') !== false) {
     echo "   ⚠ Self-view prevention implemented (loose comparison - should use ===)\n";
 } else {
     echo "   ✗ Self-view prevention NOT found\n";
