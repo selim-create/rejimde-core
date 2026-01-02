@@ -213,14 +213,19 @@ class Activator {
         $table_profile_views = $wpdb->prefix . 'rejimde_profile_views';
         $sql_profile_views = "CREATE TABLE {$table_profile_views} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            profile_user_id BIGINT UNSIGNED NOT NULL,
-            viewer_user_id BIGINT UNSIGNED DEFAULT NULL,
-            viewer_ip_hash VARCHAR(64) DEFAULT NULL,
-            source VARCHAR(50) DEFAULT 'direct',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expert_user_id BIGINT UNSIGNED NOT NULL COMMENT 'Profili görüntülenen uzmanın user ID si',
+            expert_slug VARCHAR(255) NOT NULL COMMENT 'Uzman slug - hızlı sorgu için',
+            viewer_user_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'Görüntüleyen kullanıcı (NULL = misafir)',
+            viewer_ip VARCHAR(45) DEFAULT NULL COMMENT 'IP adresi (anonim takip için)',
+            viewer_user_agent VARCHAR(500) DEFAULT NULL COMMENT 'User agent - DoS önleme için length limited',
+            is_member TINYINT(1) DEFAULT 0 COMMENT '1 = üye, 0 = misafir',
+            viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            session_id VARCHAR(255) DEFAULT NULL COMMENT 'Aynı oturumdaki tekrar ziyaretleri filtrelemek için',
             PRIMARY KEY (id),
-            INDEX idx_profile_date (profile_user_id, created_at),
-            INDEX idx_viewer (viewer_user_id)
+            INDEX idx_expert_user_id (expert_user_id),
+            INDEX idx_expert_slug (expert_slug),
+            INDEX idx_viewed_at (viewed_at),
+            INDEX idx_viewer_user_id (viewer_user_id)
         ) {$charset_collate};";
         dbDelta($sql_profile_views);
 
