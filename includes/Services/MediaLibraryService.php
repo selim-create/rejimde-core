@@ -139,7 +139,6 @@ class MediaLibraryService {
             'folder_id' => isset($data['folder_id']) ? (int) $data['folder_id'] : null,
             'tags' => isset($data['tags']) ? json_encode($data['tags']) : null,
             'usage_count' => 0,
-            'created_at' => current_time('mysql'),
         ];
         
         $result = $wpdb->insert($table_media, $insertData);

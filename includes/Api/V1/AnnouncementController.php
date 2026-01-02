@@ -248,16 +248,8 @@ class AnnouncementController extends WP_REST_Controller {
             return $this->error($result['error'], 400);
         }
         
-        // Get the full announcement to return
-        $announcement = $this->announcementService->getAnnouncement($result);
-        
-        if (!$announcement) {
-            error_log("Rejimde API: Failed to retrieve created announcement ID $result");
-            return $this->error('Announcement created but failed to retrieve', 500);
-        }
-        
-        error_log("Rejimde API: Successfully created announcement ID $result");
-        return $this->success($announcement, 'Announcement created successfully', 201);
+        error_log("Rejimde API: Successfully created announcement ID " . $result['id']);
+        return $this->success($result, 'Announcement created successfully', 201);
     }
 
     /**

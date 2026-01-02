@@ -292,7 +292,7 @@ class AnnouncementService {
      * 
      * @param int $expertId Expert user ID
      * @param array $data Announcement data
-     * @return int|array Announcement ID or error
+     * @return array Announcement object or error
      */
     public function createProAnnouncement(int $expertId, array $data) {
         global $wpdb;
@@ -305,17 +305,20 @@ class AnnouncementService {
         
         error_log("Rejimde Announcements: Creating announcement for expert $expertId");
         
+        $currentTime = current_time('mysql');
+        $endDate = $data['end_date'] ?? date('Y-m-d H:i:s', strtotime('+30 days'));
+        
         $insertData = [
             'expert_id' => $expertId,
             'title' => sanitize_text_field($data['title']),
             'content' => wp_kses_post($data['content']),
             'type' => sanitize_text_field($data['type'] ?? 'info'),
             'target_roles' => json_encode(['rejimde_user']), // Pro's clients
-            'start_date' => $data['start_date'] ?? current_time('mysql'),
-            'end_date' => $data['end_date'] ?? date('Y-m-d H:i:s', strtotime('+30 days')),
+            'start_date' => $data['start_date'] ?? $currentTime,
+            'end_date' => $endDate,
             'is_dismissible' => $data['is_dismissible'] ?? 1,
             'priority' => $data['priority'] ?? 0,
-            'created_at' => current_time('mysql'),
+            'created_at' => $currentTime,
         ];
         
         $result = $wpdb->insert($table, $insertData);
@@ -328,7 +331,20 @@ class AnnouncementService {
         $announcementId = $wpdb->insert_id;
         error_log("Rejimde Announcements: Successfully created announcement ID $announcementId for expert $expertId");
         
-        return $announcementId;
+        // Return the full announcement object instead of just ID
+        return [
+            'id' => (int) $announcementId,
+            'title' => $insertData['title'],
+            'content' => $insertData['content'],
+            'type' => $insertData['type'],
+            'target_roles' => ['rejimde_user'],
+            'start_date' => $insertData['start_date'],
+            'end_date' => $insertData['end_date'],
+            'is_dismissible' => (bool) $insertData['is_dismissible'],
+            'priority' => (int) $insertData['priority'],
+            'created_at' => $currentTime,
+            'updated_at' => $currentTime,
+        ];
     }
 
     /**
