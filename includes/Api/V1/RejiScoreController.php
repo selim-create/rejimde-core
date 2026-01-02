@@ -99,7 +99,7 @@ class RejiScoreController {
             );
         }
         
-        $scoreData = $this->scoreService->calculate($userId);
+        $scoreData = $this->scoreService->calculate((int) $userId);
         
         return new WP_REST_Response([
             'success' => true,

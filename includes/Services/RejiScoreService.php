@@ -80,7 +80,7 @@ class RejiScoreService {
         
         global $wpdb;
         $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($metricsTable) . "'");
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($metricsTable)));
         $this->metricsTableExists = ($tableExists !== null);
         
         return $this->metricsTableExists;
@@ -127,7 +127,8 @@ class RejiScoreService {
             if ($rating < 1 || $rating > 5) continue;
             
             // Weight: verified client = 3, regular user = 1
-            $weight = $review->is_verified_client ? 3 : 1;
+            // Explicit string comparison to handle '0', '1', null, etc.
+            $weight = ($review->is_verified_client == '1') ? 3 : 1;
             
             $totalWeight += $weight;
             $weightedSum += ($rating * $weight);

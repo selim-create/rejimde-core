@@ -10,6 +10,12 @@ class ProfessionalController extends WP_REST_Controller {
 
     protected $namespace = 'rejimde/v1';
     protected $base = 'professionals';
+    private $rejiScoreService;
+    
+    public function __construct() {
+        // Initialize RejiScore service once for reuse
+        $this->rejiScoreService = new \Rejimde\Services\RejiScoreService();
+    }
 
     public function register_routes() {
         register_rest_route($this->namespace, '/' . $this->base, [
@@ -349,10 +355,9 @@ class ProfessionalController extends WP_REST_Controller {
         ];
 
         // RejiScore hesapla ve ekle
-        $rejiScoreService = new \Rejimde\Services\RejiScoreService();
         $rejiScoreData = [];
         if ($user_id) {
-            $rejiScoreData = $rejiScoreService->calculate((int) $user_id);
+            $rejiScoreData = $this->rejiScoreService->calculate((int) $user_id);
         }
 
         // RejiScore verilerini response'a ekle
