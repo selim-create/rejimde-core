@@ -190,7 +190,7 @@ class CalendarController extends WP_REST_Controller {
         $status = $request->get_param('status');
         $limit = $request->get_param('limit');
         
-        if (!$startDate || !$endDate) {
+        if (empty($startDate) || empty($endDate)) {
             return $this->error('start_date and end_date are required', 400);
         }
         

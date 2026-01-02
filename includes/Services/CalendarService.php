@@ -780,6 +780,6 @@ class CalendarService {
             $serviceId
         ));
         
-        return $name ?: null;
+        return $name;
     }
 }
