@@ -50,6 +50,9 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Cron/NotificationJobs.php')) require_once REJIMDE_PATH . 'includes/Cron/NotificationJobs.php';
         if (file_exists(REJIMDE_PATH . 'includes/Cron/ProfileViewNotifications.php')) require_once REJIMDE_PATH . 'includes/Cron/ProfileViewNotifications.php';
 
+        // Traits (API Controllers'dan önce yüklenmeli)
+        if (file_exists(REJIMDE_PATH . 'includes/Traits/ProAuthTrait.php')) require_once REJIMDE_PATH . 'includes/Traits/ProAuthTrait.php';
+
         // API Controllers
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/MascotController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/MascotController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AuthController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AuthController.php';
