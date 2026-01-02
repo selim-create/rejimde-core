@@ -18,12 +18,30 @@ class ServiceManager {
         global $wpdb;
         $table_services = $wpdb->prefix . 'rejimde_services';
         
+        // Tablo var mı kontrol et
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_services));
+        if (!$tableExists) {
+            // Tablo yoksa boş array dön (hata yerine)
+            error_log('Rejimde: Services table does not exist');
+            return [];
+        }
+        
         $services = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table_services 
              WHERE expert_id = %d 
              ORDER BY sort_order ASC, created_at DESC",
             $expertId
         ), ARRAY_A);
+        
+        // Database hatası kontrolü
+        if ($wpdb->last_error) {
+            error_log('Rejimde Services: DB Error - ' . $wpdb->last_error);
+            return [];
+        }
+        
+        if (!$services || !is_array($services)) {
+            return [];
+        }
         
         return array_map(function($service) {
             return [

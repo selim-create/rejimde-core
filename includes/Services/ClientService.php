@@ -164,7 +164,9 @@ class ClientService {
     public function getClient(int $expertId, int $relationshipId): ?array {
         global $wpdb;
         $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+        $table_packages = $wpdb->prefix . 'rejimde_client_packages';
         
+        // Relationship'i al
         $relationship = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $table_relationships WHERE id = %d AND expert_id = %d",
             $relationshipId,
@@ -175,15 +177,53 @@ class ClientService {
             return null;
         }
         
+        // Client bilgilerini al
         $clientId = (int) $relationship['client_id'];
-        $client = get_userdata($clientId);
+        $clientUser = get_userdata($clientId);
         
-        if (!$client) {
+        if (!$clientUser) {
             return null;
         }
         
-        // Get active package
-        $package = $this->getActivePackage($relationshipId);
+        // Aktif paketi al
+        $package = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_packages 
+             WHERE relationship_id = %d AND status = 'active' 
+             ORDER BY created_at DESC LIMIT 1",
+            $relationshipId
+        ), ARRAY_A);
+        
+        // Paket bilgilerini formatla
+        $packageData = null;
+        if ($package) {
+            $total = (int) ($package['total_sessions'] ?? 0);
+            $used = (int) ($package['used_sessions'] ?? 0);
+            $remaining = max(0, $total - $used);
+            $progressPercent = $total > 0 ? round(($used / $total) * 100) : 0;
+            
+            $packageData = [
+                'name' => $package['package_name'] ?? 'Paket',
+                'type' => $package['package_type'] ?? 'session',
+                'total' => $total,
+                'used' => $used,
+                'remaining' => $remaining,
+                'progress_percent' => $progressPercent,
+                'start_date' => $package['start_date'] ?? null,
+                'end_date' => $package['end_date'] ?? null,
+                'price' => (float) ($package['price'] ?? 0),
+            ];
+        }
+        
+        // Agreement bilgilerini formatla
+        $agreementData = [
+            'start_date' => $relationship['started_at'] ?? $relationship['created_at'],
+            'end_date' => $packageData['end_date'] ?? null,
+            'package_name' => $packageData['name'] ?? 'Paket Yok',
+            'total_sessions' => $packageData['total'] ?? null,
+            'used_sessions' => $packageData['used'] ?? 0,
+            'remaining_sessions' => $packageData['remaining'] ?? null,
+            'price' => (float) ($packageData['price'] ?? 0),
+        ];
         
         // Get stats
         $score = (int) get_user_meta($clientId, 'rejimde_total_score', true);
@@ -199,37 +239,38 @@ class ClientService {
         // Get recent activity
         $activity = $this->getClientActivity($clientId, 10);
         
+        // Calculate risk status
+        $riskStatus = $this->calculateRiskStatus($clientId);
+        
         return [
-            'id' => $relationshipId,
-            'relationship_id' => $relationshipId,
+            'id' => (int) $relationship['id'],
+            'relationship_id' => (int) $relationship['id'],
             'client' => [
                 'id' => $clientId,
-                'name' => $client->display_name,
-                'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: 'https://placehold.co/150',
-                'email' => $client->user_email,
-                'phone' => get_user_meta($clientId, 'phone', true) ?: '',
-                'birth_date' => get_user_meta($clientId, 'birth_date', true) ?: '',
-                'gender' => get_user_meta($clientId, 'gender', true) ?: ''
+                'name' => $clientUser->display_name,
+                'avatar' => get_user_meta($clientId, 'avatar_url', true) ?: $this->getDefaultAvatar($clientId),
+                'email' => $clientUser->user_email,
+                'phone' => get_user_meta($clientId, 'phone', true) ?: null,
+                'birth_date' => get_user_meta($clientId, 'birth_date', true) ?: null,
+                'gender' => get_user_meta($clientId, 'gender', true) ?: null,
             ],
             'status' => $relationship['status'],
-            'agreement' => $package ? [
-                'start_date' => $package['start_date'],
-                'end_date' => $package['end_date'],
-                'package_name' => $package['name'],
-                'total_sessions' => $package['total'],
-                'used_sessions' => $package['used'],
-                'remaining_sessions' => $package['remaining'],
-                'price' => (float) $package['price']
-            ] : null,
+            'source' => $relationship['source'],
+            'started_at' => $relationship['started_at'],
+            'package' => $packageData,
+            'agreement' => $agreementData,
             'stats' => [
                 'score' => $score,
                 'streak' => $streak,
-                'completed_plans' => 0, // TODO: Calculate from progress table
+                'completed_plans' => 0, // TODO: Calculate from plans
                 'last_activity' => $lastActivity
             ],
             'notes' => $notes,
             'recent_activity' => $activity,
-            'assigned_plans' => $plans
+            'assigned_plans' => $plans,
+            'risk_status' => $riskStatus['status'] ?? 'normal',
+            'risk_reason' => $riskStatus['reason'] ?? null,
+            'created_at' => $relationship['created_at'],
         ];
     }
     
@@ -970,5 +1011,44 @@ class ClientService {
                 'created_at' => $note['created_at']
             ];
         }, $notes);
+    }
+    
+    /**
+     * Get default avatar for user
+     * 
+     * @param int $userId User ID
+     * @return string
+     */
+    private function getDefaultAvatar(int $userId): string {
+        return defined('REJIMDE_DEFAULT_AVATAR') 
+            ? REJIMDE_DEFAULT_AVATAR 
+            : 'https://placehold.co/150';
+    }
+    
+    /**
+     * Update package end date
+     * 
+     * @param int $relationshipId Relationship ID
+     * @param string $endDate New end date (YYYY-MM-DD format)
+     * @return bool
+     */
+    public function updatePackageEndDate(int $relationshipId, string $endDate): bool {
+        global $wpdb;
+        $table_packages = $wpdb->prefix . 'rejimde_client_packages';
+        
+        // Validate date format
+        $dateObj = \DateTime::createFromFormat('Y-m-d', $endDate);
+        if (!$dateObj || $dateObj->format('Y-m-d') !== $endDate) {
+            error_log('Rejimde: Invalid date format for package end_date - ' . $endDate);
+            return false;
+        }
+        
+        $result = $wpdb->update(
+            $table_packages,
+            ['end_date' => $endDate, 'updated_at' => current_time('mysql')],
+            ['relationship_id' => $relationshipId, 'status' => 'active']
+        );
+        
+        return $result !== false;
     }
 }

@@ -76,11 +76,20 @@ class ServiceController extends WP_REST_Controller {
      * GET /pro/services
      */
     public function get_services(WP_REST_Request $request): WP_REST_Response {
-        $expertId = get_current_user_id();
-        
-        $services = $this->serviceManager->getServices($expertId);
-        
-        return $this->success($services);
+        try {
+            $expertId = get_current_user_id();
+            
+            if (!$expertId) {
+                return $this->error('Not authenticated', 401);
+            }
+            
+            $services = $this->serviceManager->getServices($expertId);
+            
+            return $this->success($services);
+        } catch (\Exception $e) {
+            error_log('Rejimde Services Error: ' . $e->getMessage());
+            return $this->error('Failed to fetch services', 500);
+        }
     }
 
     /**
