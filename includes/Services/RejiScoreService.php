@@ -36,13 +36,13 @@ class RejiScoreService {
      * @return int|null Post ID or null if not found
      */
     private function getExpertPostId(int $expertId): ?int {
-        // Try primary key
+        // Try legacy key first (for backward compatibility)
         $postId = get_user_meta($expertId, 'professional_profile_id', true);
         if (!empty($postId)) {
             return (int) $postId;
         }
         
-        // Fallback to alternative key
+        // Try current standard key
         $postId = get_user_meta($expertId, 'related_pro_post_id', true);
         if (!empty($postId)) {
             return (int) $postId;
