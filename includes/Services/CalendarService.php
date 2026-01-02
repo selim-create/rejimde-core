@@ -506,7 +506,8 @@ class CalendarService {
                     'is_member' => $isMember
                 ],
                 'service' => $req['service_id'] ? [
-                    'id' => (int) $req['service_id']
+                    'id' => (int) $req['service_id'],
+                    'name' => $this->getServiceName((int) $req['service_id'])
                 ] : null,
                 'preferred_date' => $req['preferred_date'],
                 'preferred_time' => substr($req['preferred_time'], 0, 5),
@@ -762,5 +763,23 @@ class CalendarService {
         $endTime = date('H:i:s', strtotime($time) + ($duration * 60));
         
         return !$this->checkConflict($expertId, $date, $startTime, $endTime);
+    }
+
+    /**
+     * Get service name by ID
+     * 
+     * @param int $serviceId Service ID
+     * @return string|null Service name or null if not found
+     */
+    private function getServiceName(int $serviceId): ?string {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_services';
+        
+        $name = $wpdb->get_var($wpdb->prepare(
+            "SELECT name FROM {$table} WHERE id = %d",
+            $serviceId
+        ));
+        
+        return $name ?: null;
     }
 }

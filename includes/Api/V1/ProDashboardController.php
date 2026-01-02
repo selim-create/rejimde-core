@@ -28,65 +28,74 @@ class ProDashboardController extends WP_REST_Controller {
     }
 
     public function get_dashboard(WP_REST_Request $request) {
-        $expertId = get_current_user_id();
-        
-        // Initialize services
-        $clientService = new ClientService();
-        $inboxService = new InboxService();
-        $calendarService = new CalendarService();
-        $financeService = new FinanceService();
-        
-        // Get client summary
-        $clientsResult = $clientService->getClients($expertId, ['limit' => 1]);
-        $clientsMeta = $clientsResult['meta'] ?? ['total' => 0, 'active' => 0, 'pending' => 0];
-        
-        // Get inbox summary
-        $unreadCount = $inboxService->getUnreadCount($expertId);
-        
-        // Get calendar summary
-        $today = date('Y-m-d');
-        $weekEnd = date('Y-m-d', strtotime('+7 days'));
-        $todayAppointments = $calendarService->getAppointments($expertId, $today, $today, 'confirmed');
-        $weekAppointments = $calendarService->getAppointments($expertId, $today, $weekEnd);
-        $pendingRequests = $calendarService->getRequests($expertId, 'pending');
-        
-        // Get finance summary
-        $financeDashboard = $financeService->getDashboard($expertId, 'this_month');
-        
-        // Get at-risk clients count
-        global $wpdb;
-        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
-        $atRiskCount = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $table_relationships 
-             WHERE expert_id = %d AND status = 'active' 
-             AND (risk_status = 'warning' OR risk_status = 'danger')",
-            $expertId
-        )) ?: 0;
-        
-        return new WP_REST_Response([
-            'status' => 'success',
-            'data' => [
-                'clients' => [
-                    'total' => $clientsMeta['total'] ?? 0,
-                    'active' => $clientsMeta['active'] ?? 0,
-                    'pending' => $clientsMeta['pending'] ?? 0,
-                    'at_risk' => (int) $atRiskCount
-                ],
-                'inbox' => [
-                    'unread_count' => $unreadCount
-                ],
-                'calendar' => [
-                    'today_appointments' => count($todayAppointments),
-                    'pending_requests' => $pendingRequests['meta']['pending'] ?? 0,
-                    'this_week_count' => count($weekAppointments)
-                ],
-                'finance' => [
-                    'month_revenue' => $financeDashboard['summary']['total_revenue'] ?? 0,
-                    'pending_payments' => $financeDashboard['summary']['total_pending'] ?? 0,
-                    'overdue_payments' => $financeDashboard['summary']['total_overdue'] ?? 0
+        try {
+            $expertId = get_current_user_id();
+            
+            // Initialize services
+            $clientService = new ClientService();
+            $inboxService = new InboxService();
+            $calendarService = new CalendarService();
+            $financeService = new FinanceService();
+            
+            // Get client summary
+            $clientsResult = $clientService->getClients($expertId, ['limit' => 1]);
+            $clientsMeta = $clientsResult['meta'] ?? ['total' => 0, 'active' => 0, 'pending' => 0];
+            
+            // Get inbox summary
+            $unreadCount = $inboxService->getUnreadCount($expertId);
+            
+            // Get calendar summary
+            $today = date('Y-m-d');
+            $weekEnd = date('Y-m-d', strtotime('+7 days'));
+            $todayAppointments = $calendarService->getAppointments($expertId, $today, $today, 'confirmed');
+            $weekAppointments = $calendarService->getAppointments($expertId, $today, $weekEnd);
+            $pendingRequests = $calendarService->getRequests($expertId, 'pending');
+            
+            // Get finance summary
+            $financeDashboard = $financeService->getDashboard($expertId, 'this_month');
+            
+            // Get at-risk clients count
+            global $wpdb;
+            $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+            $atRiskCount = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $table_relationships 
+                 WHERE expert_id = %d AND status = 'active' 
+                 AND (risk_status = 'warning' OR risk_status = 'danger')",
+                $expertId
+            )) ?: 0;
+            
+            return new WP_REST_Response([
+                'status' => 'success',
+                'data' => [
+                    'clients' => [
+                        'total' => $clientsMeta['total'] ?? 0,
+                        'active' => $clientsMeta['active'] ?? 0,
+                        'pending' => $clientsMeta['pending'] ?? 0,
+                        'at_risk' => (int) $atRiskCount
+                    ],
+                    'inbox' => [
+                        'unread_count' => $unreadCount
+                    ],
+                    'calendar' => [
+                        'today_appointments' => count($todayAppointments),
+                        'pending_requests' => $pendingRequests['meta']['pending'] ?? 0,
+                        'this_week_count' => count($weekAppointments)
+                    ],
+                    'finance' => [
+                        'month_revenue' => $financeDashboard['summary']['total_revenue'] ?? 0,
+                        'pending_payments' => $financeDashboard['summary']['total_pending'] ?? 0,
+                        'overdue_payments' => $financeDashboard['summary']['total_overdue'] ?? 0
+                    ]
                 ]
-            ]
-        ], 200);
+            ], 200);
+        } catch (\Exception $e) {
+            error_log('ProDashboard Error: ' . $e->getMessage());
+            return new WP_REST_Response([
+                'status' => 'error',
+                'message' => 'Failed to load dashboard data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function check_expert_auth(): bool {

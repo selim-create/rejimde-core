@@ -34,6 +34,13 @@ class CalendarController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
 
+        // GET /pro/calendar/appointments - Get appointments with filters
+        register_rest_route($this->namespace, '/' . $this->base . '/appointments', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_appointments'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
         // GET /pro/calendar/availability - Get availability template
         register_rest_route($this->namespace, '/' . $this->base . '/availability', [
             'methods' => 'GET',
@@ -170,6 +177,31 @@ class CalendarController extends WP_REST_Controller {
             'appointments' => $appointments,
             'blocked_times' => $blockedTimes
         ]);
+    }
+
+    /**
+     * GET /pro/calendar/appointments
+     */
+    public function get_appointments(WP_REST_Request $request) {
+        $expertId = get_current_user_id();
+        
+        $startDate = $request->get_param('start_date');
+        $endDate = $request->get_param('end_date');
+        $status = $request->get_param('status');
+        $limit = $request->get_param('limit');
+        
+        if (!$startDate || !$endDate) {
+            return $this->error('start_date and end_date are required', 400);
+        }
+        
+        $appointments = $this->calendarService->getAppointments($expertId, $startDate, $endDate, $status);
+        
+        // Apply limit if specified
+        if ($limit && is_numeric($limit)) {
+            $appointments = array_slice($appointments, 0, (int) $limit);
+        }
+        
+        return $this->success($appointments);
     }
 
     /**
