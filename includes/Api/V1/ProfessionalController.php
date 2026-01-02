@@ -10,6 +10,12 @@ class ProfessionalController extends WP_REST_Controller {
 
     protected $namespace = 'rejimde/v1';
     protected $base = 'professionals';
+    private $rejiScoreService;
+    
+    public function __construct() {
+        // Initialize RejiScore service once for reuse
+        $this->rejiScoreService = new \Rejimde\Services\RejiScoreService();
+    }
 
     public function register_routes() {
         register_rest_route($this->namespace, '/' . $this->base, [
@@ -347,6 +353,22 @@ class ProfessionalController extends WP_REST_Controller {
             // Görünürlük ayarları (frontend'in bilmesi için)
             'privacy_settings'  => $privacy_settings,
         ];
+
+        // RejiScore hesapla ve ekle
+        $rejiScoreData = [];
+        if ($user_id) {
+            $rejiScoreData = $this->rejiScoreService->calculate((int) $user_id);
+        }
+
+        // RejiScore verilerini response'a ekle
+        $data['reji_score'] = $rejiScoreData['reji_score'] ?? 50;
+        $data['trust_score'] = $rejiScoreData['trust_score'] ?? 50;
+        $data['contribution_score'] = $rejiScoreData['contribution_score'] ?? 50;
+        $data['freshness_score'] = $rejiScoreData['freshness_score'] ?? 50;
+        $data['trend_percentage'] = $rejiScoreData['trend_percentage'] ?? 0;
+        $data['trend_direction'] = $rejiScoreData['trend_direction'] ?? 'stable';
+        $data['score_level'] = $rejiScoreData['level'] ?? 1;
+        $data['score_level_label'] = $rejiScoreData['level_label'] ?? 'Yeni';
 
         return new WP_REST_Response($data, 200);
     }
