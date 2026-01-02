@@ -321,6 +321,12 @@ class ClientController extends WP_REST_Controller {
             return $this->error('End date is required', 400);
         }
         
+        // Validate date format
+        $dateObj = \DateTime::createFromFormat('Y-m-d', $endDate);
+        if (!$dateObj || $dateObj->format('Y-m-d') !== $endDate) {
+            return $this->error('Invalid date format. Expected YYYY-MM-DD', 400);
+        }
+        
         $result = $this->clientService->updatePackageEndDate($relationshipId, $endDate);
         
         if (!$result) {

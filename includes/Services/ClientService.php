@@ -1029,12 +1029,19 @@ class ClientService {
      * Update package end date
      * 
      * @param int $relationshipId Relationship ID
-     * @param string $endDate New end date
+     * @param string $endDate New end date (YYYY-MM-DD format)
      * @return bool
      */
     public function updatePackageEndDate(int $relationshipId, string $endDate): bool {
         global $wpdb;
         $table_packages = $wpdb->prefix . 'rejimde_client_packages';
+        
+        // Validate date format
+        $dateObj = \DateTime::createFromFormat('Y-m-d', $endDate);
+        if (!$dateObj || $dateObj->format('Y-m-d') !== $endDate) {
+            error_log('Rejimde: Invalid date format for package end_date - ' . $endDate);
+            return false;
+        }
         
         $result = $wpdb->update(
             $table_packages,
