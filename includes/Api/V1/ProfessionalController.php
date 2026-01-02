@@ -369,6 +369,10 @@ class ProfessionalController extends WP_REST_Controller {
         $data['trend_direction'] = $rejiScoreData['trend_direction'] ?? 'stable';
         $data['score_level'] = $rejiScoreData['level'] ?? 1;
         $data['score_level_label'] = $rejiScoreData['level_label'] ?? 'Yeni';
+        $data['review_count'] = $rejiScoreData['review_count'] ?? 0;
+        $data['content_count'] = $rejiScoreData['content_count'] ?? 0;
+        // Yeni alanlar
+        $data['goal_success_rate'] = $rejiScoreData['goal_success_rate'] ?? 85;
 
         return new WP_REST_Response($data, 200);
     }
