@@ -30,7 +30,9 @@ echo "\n2. Checking PHP Syntax:\n";
 foreach ($files as $file) {
     $path = __DIR__ . '/' . $file;
     if (file_exists($path)) {
-        exec("php -l $path 2>&1", $output, $return_code);
+        // Escape shell argument to prevent command injection
+        $escapedPath = escapeshellarg($path);
+        exec("php -l $escapedPath 2>&1", $output, $return_code);
         if ($return_code === 0) {
             echo "   ✓ $file syntax OK\n";
         } else {
@@ -50,7 +52,7 @@ $requiredColumns = [
     'expert_slug VARCHAR(255) NOT NULL',
     'viewer_user_id BIGINT UNSIGNED DEFAULT NULL',
     'viewer_ip VARCHAR(45) DEFAULT NULL',
-    'viewer_user_agent TEXT DEFAULT NULL',
+    'viewer_user_agent VARCHAR(500) DEFAULT NULL',
     'is_member TINYINT(1) DEFAULT 0',
     'viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP',
     'session_id VARCHAR(255) DEFAULT NULL',

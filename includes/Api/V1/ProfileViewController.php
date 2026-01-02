@@ -70,8 +70,8 @@ class ProfileViewController extends WP_REST_Controller {
         // Get current user ID (null for guests)
         $viewer_user_id = is_user_logged_in() ? get_current_user_id() : null;
         
-        // Don't track self-views
-        if ($viewer_user_id && $viewer_user_id === $expert_user_id) {
+        // Don't track self-views (strict comparison for both checks)
+        if ($viewer_user_id !== null && $viewer_user_id === $expert_user_id) {
             return $this->success(null, 'Self-view not tracked', 200);
         }
         

@@ -217,7 +217,7 @@ class Activator {
             expert_slug VARCHAR(255) NOT NULL COMMENT 'Uzman slug - hızlı sorgu için',
             viewer_user_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'Görüntüleyen kullanıcı (NULL = misafir)',
             viewer_ip VARCHAR(45) DEFAULT NULL COMMENT 'IP adresi (anonim takip için)',
-            viewer_user_agent TEXT DEFAULT NULL,
+            viewer_user_agent VARCHAR(500) DEFAULT NULL COMMENT 'User agent - DoS önleme için length limited',
             is_member TINYINT(1) DEFAULT 0 COMMENT '1 = üye, 0 = misafir',
             viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             session_id VARCHAR(255) DEFAULT NULL COMMENT 'Aynı oturumdaki tekrar ziyaretleri filtrelemek için',
