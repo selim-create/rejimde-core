@@ -1,20 +1,12 @@
 <?php
 namespace Rejimde\Cron;
 
-use Rejimde\Services\NotificationService;
-
 /**
  * Profile View Notifications
  * 
  * Weekly cron job to send profile view summary notifications to experts
  */
 class ProfileViewNotifications {
-    
-    private $notificationService;
-    
-    public function __construct() {
-        $this->notificationService = new NotificationService();
-    }
     
     /**
      * Register cron job

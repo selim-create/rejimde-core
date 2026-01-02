@@ -99,7 +99,8 @@ class ProfileViewController extends WP_REST_Controller {
         if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $viewer_ip = sanitize_text_field($_SERVER['HTTP_CF_CONNECTING_IP']);
         } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $viewer_ip = sanitize_text_field(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+            $forwarded_ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $viewer_ip = !empty($forwarded_ips[0]) ? sanitize_text_field(trim($forwarded_ips[0])) : null;
         } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
             $viewer_ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
         }
@@ -164,8 +165,8 @@ class ProfileViewController extends WP_REST_Controller {
         $expert_user_id = get_current_user_id();
         $table = $wpdb->prefix . 'rejimde_profile_views';
         
-        // Get this week's count
-        $week_start = date('Y-m-d 00:00:00', strtotime('monday this week'));
+        // Get this week's count (from last Monday to now)
+        $week_start = date('Y-m-d 00:00:00', strtotime('last monday'));
         $this_week = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$table} WHERE expert_user_id = %d AND viewed_at >= %s",
             $expert_user_id,
