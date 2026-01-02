@@ -815,28 +815,76 @@ class CommentController extends WP_REST_Controller {
     }
 
     /**
-     * YENİ: DOĞRULANMIŞ DANIŞAN KONTROLÜ
      * Kullanıcının bu uzmanla gerçek bir danışan ilişkisi olup olmadığını kontrol et
+     * 
+     * Kontrol edilen durumlar:
+     * 1. Randevu geçmişi (completed, confirmed, pending)
+     * 2. Uzmanın relationships tablosunda kayıtlı mı
+     * 3. Uzmanın user meta'sında danışan listesinde mi
+     * 
+     * @param int $user_id Danışan kullanıcı ID
+     * @param int $expert_post_id Uzman post ID
+     * @return bool
      */
     private function check_verified_client($user_id, $expert_post_id) {
-        // Appointment history check
         global $wpdb;
-        $table = $wpdb->prefix . 'rejimde_appointments';
         
-        // Get expert's user_id
+        // Uzmanın user_id'sini al
         $expert_user_id = get_post_meta($expert_post_id, 'related_user_id', true) 
                           ?: get_post_meta($expert_post_id, 'user_id', true)
                           ?: get_post_field('post_author', $expert_post_id);
         
         if (!$expert_user_id) return false;
         
-        // Has completed appointment?
-        $has_appointment = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $table WHERE client_id = %d AND expert_id = %d AND status = 'completed'",
-            $user_id, $expert_user_id
-        ));
+        // 1. Randevu geçmişi kontrolü (completed, confirmed, pending)
+        $appointments_table = $wpdb->prefix . 'rejimde_appointments';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$appointments_table'");
         
-        return $has_appointment > 0;
+        if ($table_exists) {
+            $has_appointment = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $appointments_table 
+                 WHERE client_id = %d AND expert_id = %d 
+                 AND status IN ('completed', 'confirmed', 'pending')",
+                $user_id, $expert_user_id
+            ));
+            
+            if ($has_appointment > 0) return true;
+        }
+        
+        // 2. Uzmanın relationships tablosunda kayıtlı mı?
+        $relationships_table = $wpdb->prefix . 'rejimde_relationships';
+        $relationships_table_exists = $wpdb->get_var("SHOW TABLES LIKE '$relationships_table'");
+        
+        if ($relationships_table_exists) {
+            $is_in_relationships = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $relationships_table 
+                 WHERE client_id = %d AND expert_id = %d 
+                 AND status IN ('active', 'pending', 'paused')",
+                $user_id, $expert_user_id
+            ));
+            
+            if ($is_in_relationships > 0) return true;
+        }
+        
+        // 3. Uzmanın user meta'sında danışan listesinde mi?
+        $expert_clients_meta = get_user_meta($expert_user_id, 'rejimde_clients', true);
+        if (is_array($expert_clients_meta) && in_array($user_id, $expert_clients_meta)) {
+            return true;
+        }
+        
+        // 4. Alternatif meta key kontrolü
+        $client_list = get_user_meta($expert_user_id, 'client_list', true);
+        if (is_array($client_list) && in_array($user_id, $client_list)) {
+            return true;
+        }
+        
+        // 5. Post meta üzerinden client kontrolü (bazı sistemlerde böyle saklanıyor)
+        $post_clients = get_post_meta($expert_post_id, 'clients', true);
+        if (is_array($post_clients) && in_array($user_id, $post_clients)) {
+            return true;
+        }
+        
+        return false;
     }
 
     // --- YARDIMCILAR ---
