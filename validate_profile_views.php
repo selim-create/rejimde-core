@@ -112,12 +112,29 @@ if (strpos($controllerContent, '-30 minutes') !== false) {
     echo "   ✗ 30-minute session throttling NOT found\n";
 }
 
-// Check for self-view prevention
-if (strpos($controllerContent, 'viewer_user_id == $expert_user_id') !== false || 
-    strpos($controllerContent, '$viewer_user_id == $expert_user_id') !== false) {
-    echo "   ✓ Self-view prevention implemented\n";
+// Check for self-view prevention with strict comparison
+if (strpos($controllerContent, 'viewer_user_id === $expert_user_id') !== false || 
+    strpos($controllerContent, '$viewer_user_id === $expert_user_id') !== false) {
+    echo "   ✓ Self-view prevention implemented (strict comparison)\n";
+} elseif (strpos($controllerContent, 'viewer_user_id == $expert_user_id') !== false || 
+          strpos($controllerContent, '$viewer_user_id == $expert_user_id') !== false) {
+    echo "   ⚠ Self-view prevention implemented (loose comparison - should use ===)\n";
 } else {
     echo "   ✗ Self-view prevention NOT found\n";
+}
+
+// Check for input sanitization
+if (strpos($controllerContent, 'sanitize_text_field') !== false) {
+    echo "   ✓ Input sanitization implemented\n";
+} else {
+    echo "   ⚠ Input sanitization NOT found (recommended for security)\n";
+}
+
+// Check for IP validation
+if (strpos($controllerContent, 'FILTER_VALIDATE_IP') !== false) {
+    echo "   ✓ IP validation implemented\n";
+} else {
+    echo "   ⚠ IP validation NOT found (recommended for security)\n";
 }
 
 // Check for dicebear fallback

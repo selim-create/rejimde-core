@@ -71,7 +71,7 @@ class ProfileViewController extends WP_REST_Controller {
         $viewer_user_id = is_user_logged_in() ? get_current_user_id() : null;
         
         // Don't track self-views
-        if ($viewer_user_id && $viewer_user_id == $expert_user_id) {
+        if ($viewer_user_id && $viewer_user_id === $expert_user_id) {
             return $this->success(null, 'Self-view not tracked', 200);
         }
         
@@ -97,15 +97,25 @@ class ProfileViewController extends WP_REST_Controller {
         // Get IP address (check CloudFlare header first)
         $viewer_ip = null;
         if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
-            $viewer_ip = $_SERVER['HTTP_CF_CONNECTING_IP'];
+            $viewer_ip = sanitize_text_field($_SERVER['HTTP_CF_CONNECTING_IP']);
         } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $viewer_ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+            $viewer_ip = sanitize_text_field(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
         } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
-            $viewer_ip = $_SERVER['REMOTE_ADDR'];
+            $viewer_ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
         }
         
-        // Get user agent
-        $viewer_user_agent = !empty($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : null;
+        // Validate IP format
+        if ($viewer_ip && !filter_var($viewer_ip, FILTER_VALIDATE_IP)) {
+            $viewer_ip = null;
+        }
+        
+        // Get user agent and sanitize
+        $viewer_user_agent = !empty($_SERVER['HTTP_USER_AGENT']) ? wp_strip_all_tags($_SERVER['HTTP_USER_AGENT']) : null;
+        
+        // Limit user agent length to prevent abuse
+        if ($viewer_user_agent && strlen($viewer_user_agent) > 500) {
+            $viewer_user_agent = substr($viewer_user_agent, 0, 500);
+        }
         
         // Determine if member
         $is_member = $viewer_user_id ? 1 : 0;
@@ -115,12 +125,12 @@ class ProfileViewController extends WP_REST_Controller {
             $table,
             [
                 'expert_user_id' => $expert_user_id,
-                'expert_slug' => $expert_slug,
+                'expert_slug' => sanitize_text_field($expert_slug),
                 'viewer_user_id' => $viewer_user_id,
                 'viewer_ip' => $viewer_ip,
                 'viewer_user_agent' => $viewer_user_agent,
                 'is_member' => $is_member,
-                'session_id' => $session_id,
+                'session_id' => sanitize_text_field($session_id),
                 'viewed_at' => current_time('mysql')
             ],
             [
