@@ -318,7 +318,6 @@ class AnnouncementService {
             'end_date' => $endDate,
             'is_dismissible' => $data['is_dismissible'] ?? 1,
             'priority' => $data['priority'] ?? 0,
-            'created_at' => $currentTime,
         ];
         
         $result = $wpdb->insert($table, $insertData);

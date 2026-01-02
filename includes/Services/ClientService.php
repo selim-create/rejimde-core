@@ -569,9 +569,13 @@ class ClientService {
                 return ['error' => 'No active package found to extend'];
             }
             
-            // Note: null total_sessions means unlimited package - we treat it as 0 for extension
-            // to maintain the unlimited status but track usage. Consider package type instead.
-            $currentTotal = $package['total_sessions'] !== null ? (int) $package['total_sessions'] : 0;
+            // Check if package is unlimited (null total_sessions)
+            if ($package['total_sessions'] === null) {
+                error_log("Rejimde CRM: Cannot extend unlimited package for relationship: $relationshipId");
+                return ['error' => 'Cannot extend unlimited package. Please create a new package instead.'];
+            }
+            
+            $currentTotal = (int) $package['total_sessions'];
             $newTotal = $currentTotal + $sessionsToAdd;
             
             // Update total sessions
