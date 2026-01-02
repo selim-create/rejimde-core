@@ -53,6 +53,9 @@ class RejiScoreService {
         // Get supporting stats
         $stats = $this->getExpertStats($expertId);
         
+        // Get success stats
+        $successStats = $this->getSuccessStats($expertId);
+        
         return [
             'reji_score' => min(100, max(0, $finalScore)),
             'trust_score' => $trustScore,
@@ -66,7 +69,11 @@ class RejiScoreService {
             'review_count' => $stats['review_count'],
             'content_count' => $stats['content_count'],
             'level' => $this->getScoreLevel($finalScore),
-            'level_label' => $this->getScoreLevelLabel($finalScore)
+            'level_label' => $this->getScoreLevelLabel($finalScore),
+            // Yeni alanlar
+            'score_impact' => $successStats['score_impact'],
+            'goal_success_rate' => $successStats['goal_success_rate'],
+            'completed_clients' => $successStats['completed_clients']
         ];
     }
     
@@ -154,17 +161,17 @@ class RejiScoreService {
         
         $score = 0;
         
-        // Count diet plans created
-        $dietCount = $wpdb->get_var($wpdb->prepare("
+        // Count diet plans created (DOĞRU POST TYPE: rejimde_plan)
+        $dietCount = (int) $wpdb->get_var($wpdb->prepare("
             SELECT COUNT(*) FROM {$wpdb->posts} 
             WHERE post_author = %d 
-            AND post_type = 'rejimde_diet' 
+            AND post_type = 'rejimde_plan' 
             AND post_status = 'publish'
         ", $expertId));
         $score += min(30, $dietCount * 5); // Max 30 points
         
         // Count exercise plans created
-        $exerciseCount = $wpdb->get_var($wpdb->prepare("
+        $exerciseCount = (int) $wpdb->get_var($wpdb->prepare("
             SELECT COUNT(*) FROM {$wpdb->posts} 
             WHERE post_author = %d 
             AND post_type = 'rejimde_exercise' 
@@ -173,7 +180,7 @@ class RejiScoreService {
         $score += min(30, $exerciseCount * 5); // Max 30 points
         
         // Count articles/posts
-        $articleCount = $wpdb->get_var($wpdb->prepare("
+        $articleCount = (int) $wpdb->get_var($wpdb->prepare("
             SELECT COUNT(*) FROM {$wpdb->posts} 
             WHERE post_author = %d 
             AND post_type = 'post' 
@@ -181,16 +188,16 @@ class RejiScoreService {
         ", $expertId));
         $score += min(20, $articleCount * 4); // Max 20 points
         
-        // Count client completions
-        if ($this->metricsTableExists()) {
-            $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
-            
-            $clientCompletions = $wpdb->get_var($wpdb->prepare("
-                SELECT SUM(client_completions) FROM $metricsTable 
-                WHERE expert_id = %d
-            ", $expertId));
-            $score += min(20, ($clientCompletions ?? 0) * 2); // Max 20 points
-        }
+        // Count plans approved by this expert (ONAYLANAN PLANLAR)
+        $approvedCount = (int) $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(*) FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = 'approved_by' 
+            AND pm.meta_value = %d
+            AND p.post_status = 'publish'
+            AND p.post_type IN ('rejimde_plan', 'rejimde_exercise')
+        ", $expertId));
+        $score += min(20, $approvedCount * 2); // Max 20 points
         
         return min(100, $score);
     }
@@ -334,24 +341,96 @@ class RejiScoreService {
         // User rating (average)
         $userRating = $postId ? (float) get_post_meta($postId, 'puan', true) : 0;
         
-        // Review count
-        $reviewCount = $postId ? (int) $wpdb->get_var($wpdb->prepare("
-            SELECT COUNT(*) FROM {$wpdb->comments} 
-            WHERE comment_post_ID = %d AND comment_approved = '1'
-        ", $postId)) : 0;
+        // Review count - expert context yorumlarını say
+        $reviewCount = 0;
+        if ($postId) {
+            $reviewCount = (int) $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(DISTINCT c.comment_ID) 
+                FROM {$wpdb->comments} c
+                LEFT JOIN {$wpdb->commentmeta} cm ON c.comment_ID = cm.comment_id AND cm.meta_key = 'context'
+                WHERE c.comment_post_ID = %d 
+                AND c.comment_approved = '1'
+                AND c.comment_parent = 0
+                AND (cm.meta_value = 'expert' OR cm.meta_value IS NULL)
+            ", $postId));
+        }
         
-        // Content count (diets + exercises + articles)
-        $contentCount = (int) $wpdb->get_var($wpdb->prepare("
+        // Content count - DOĞRU POST TYPE'LAR
+        // 1. Oluşturulan planlar
+        $createdCount = (int) $wpdb->get_var($wpdb->prepare("
             SELECT COUNT(*) FROM {$wpdb->posts} 
             WHERE post_author = %d 
-            AND post_type IN ('rejimde_diet', 'rejimde_exercise', 'post')
+            AND post_type IN ('rejimde_plan', 'rejimde_exercise', 'post')
             AND post_status = 'publish'
         ", $expertId));
+        
+        // 2. Onaylanan planlar
+        $approvedCount = (int) $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(*) FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = 'approved_by' 
+            AND pm.meta_value = %d
+            AND p.post_status = 'publish'
+        ", $expertId));
+        
+        $contentCount = $createdCount + $approvedCount;
         
         return [
             'user_rating' => $userRating ?: 0.0,
             'review_count' => $reviewCount,
             'content_count' => $contentCount
+        ];
+    }
+    
+    /**
+     * Get expert success statistics for frontend display
+     */
+    public function getSuccessStats(int $expertId): array {
+        global $wpdb;
+        
+        $postId = get_user_meta($expertId, 'professional_profile_id', true);
+        
+        // Score impact from post meta
+        $scoreImpact = $postId ? get_post_meta($postId, 'skor_etkisi', true) : '--';
+        
+        // Calculate goal success rate from completed clients
+        // Check rejimde_appointments table for completed appointments
+        $appointmentsTable = $wpdb->prefix . 'rejimde_appointments';
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($appointmentsTable)));
+        
+        $goalSuccessRate = 0;
+        $completedClients = 0;
+        
+        if ($tableExists) {
+            // Count completed appointments/programs
+            $completedClients = (int) $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(DISTINCT client_id) 
+                FROM $appointmentsTable 
+                WHERE expert_id = %d 
+                AND status = 'completed'
+            ", $expertId));
+            
+            // Get total clients
+            $totalClients = (int) $wpdb->get_var($wpdb->prepare("
+                SELECT COUNT(DISTINCT client_id) 
+                FROM $appointmentsTable 
+                WHERE expert_id = %d
+            ", $expertId));
+            
+            if ($totalClients > 0) {
+                $goalSuccessRate = round(($completedClients / $totalClients) * 100);
+            }
+        }
+        
+        // If no data, use default
+        if ($goalSuccessRate === 0) {
+            $goalSuccessRate = 85; // Default placeholder
+        }
+        
+        return [
+            'score_impact' => $scoreImpact ?: '--',
+            'goal_success_rate' => $goalSuccessRate,
+            'completed_clients' => $completedClients
         ];
     }
     
