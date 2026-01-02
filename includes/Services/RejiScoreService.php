@@ -116,7 +116,7 @@ class RejiScoreService {
                 COALESCE(cm_verified.meta_value, 0) as is_verified_client
             FROM $table c
             LEFT JOIN $metaTable cm_rating 
-                ON c.comment_ID = cm_rating.comment_id AND cm_rating.meta_key = 'rating'
+                ON c.comment_ID = cm_rating.comment_id AND cm_rating.meta_key = 'rejimde_rating'
             LEFT JOIN $metaTable cm_verified 
                 ON c.comment_ID = cm_verified.comment_id AND cm_verified.meta_key = 'verified_client'
             WHERE c.comment_post_ID = %d
@@ -347,7 +347,7 @@ class RejiScoreService {
             $reviewCount = (int) $wpdb->get_var($wpdb->prepare("
                 SELECT COUNT(DISTINCT c.comment_ID) 
                 FROM {$wpdb->comments} c
-                LEFT JOIN {$wpdb->commentmeta} cm ON c.comment_ID = cm.comment_id AND cm.meta_key = 'context'
+                LEFT JOIN {$wpdb->commentmeta} cm ON c.comment_ID = cm.comment_id AND cm.meta_key = 'rejimde_context'
                 WHERE c.comment_post_ID = %d 
                 AND c.comment_approved = '1'
                 AND c.comment_parent = 0
