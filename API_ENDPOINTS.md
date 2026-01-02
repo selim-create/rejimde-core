@@ -391,3 +391,236 @@ Available event types are defined in `includes/Config/ScoringRules.php`. Common 
 
 ### Migration from Old Endpoints
 The new `/rejimde/v1/events/dispatch` endpoint is fully compatible with the existing `/rejimde/v1/gamification/earn` endpoint. Both use the same underlying `EventDispatcher` system.
+
+---
+
+## Expert Reviews (Enhanced)
+
+### GET `/rejimde/v1/comments`
+Get comments with advanced filtering support for expert evaluations.
+
+**Query Parameters:**
+- `post` (required): Expert post ID
+- `context`: Filter by context (expert, diet, exercise)
+- `goal_tag`: Filter by goal (weight_loss, muscle_gain, healthy_eating, etc.)
+- `program_type`: Filter by program type (online, face_to_face, package, group)
+- `verified_only`: Only verified clients (true/false)
+- `featured_only`: Only featured reviews (true/false)
+- `with_stories`: Only reviews with success stories (true/false)
+- `rating_min`: Minimum rating (1-5)
+
+**Example Request:**
+```bash
+curl -X GET "https://rejimde.com/wp-json/rejimde/v1/comments?post=123&context=expert&verified_only=true&rating_min=4"
+```
+
+**Response:**
+```json
+{
+  "comments": [
+    {
+      "id": 456,
+      "content": "Harika bir deneyimdi...",
+      "rating": 5,
+      "is_anonymous": false,
+      "goal_tag": "weight_loss",
+      "program_type": "online",
+      "process_weeks": 12,
+      "success_story": "12 haftada 10 kilo verdim...",
+      "would_recommend": true,
+      "verified_client": true,
+      "is_featured": false,
+      "author": { ... },
+      "date": "2025-11-15 10:30:00",
+      "timeAgo": "2 ay önce"
+    }
+  ],
+  "stats": {
+    "average": 4.8,
+    "total": 127,
+    "distribution": { ... },
+    "verified_client_count": 98,
+    "average_process_weeks": 8,
+    "recommend_rate": 92,
+    "goal_distribution": [
+      {"goal": "weight_loss", "count": 45},
+      {"goal": "muscle_gain", "count": 32}
+    ]
+  },
+  "filters_applied": {
+    "goal_tag": null,
+    "program_type": null,
+    "verified_only": true,
+    "featured_only": false,
+    "with_stories": false,
+    "rating_min": 4
+  }
+}
+```
+
+### POST `/rejimde/v1/comments`
+Create a new expert review with enhanced metadata.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "post": 123,
+  "content": "Harika bir deneyimdi, çok memnunum!",
+  "context": "expert",
+  "rating": 5,
+  "is_anonymous": false,
+  "goal_tag": "weight_loss",
+  "program_type": "online",
+  "process_weeks": 12,
+  "success_story": "12 haftada 10 kilo verdim ve hedefime ulaştım. Süreç boyunca uzmanım bana çok destek oldu.",
+  "would_recommend": true
+}
+```
+
+**Parameters:**
+- `post` (required): Expert post ID
+- `content` (required): Review content
+- `context`: Context type (default: "general")
+- `rating`: Rating 1-5
+- `parent`: Parent comment ID for replies
+- `is_anonymous`: Anonymous review (default: false)
+- `goal_tag`: Goal tag (weight_loss, muscle_gain, healthy_eating, etc.)
+- `program_type`: Program type (online, face_to_face, package, group)
+- `process_weeks`: Journey duration in weeks
+- `success_story`: Success story text
+- `would_recommend`: Would recommend (default: true)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 456,
+    "content": "Harika bir deneyimdi...",
+    "rating": 5,
+    "verified_client": true,
+    ...
+  },
+  "earned_points": 10,
+  "message": "Değerlendirmeniz alındı, uzman onayından sonra yayınlanacaktır.",
+  "status": "pending"
+}
+```
+
+### POST `/rejimde/v1/comments/{id}/feature`
+Toggle featured status for a comment. Only the expert who owns the profile can feature comments. Maximum 3 featured comments allowed.
+
+**Authentication:** Required (Expert owner only)
+
+**Example Request:**
+```bash
+curl -X POST https://rejimde.com/wp-json/rejimde/v1/comments/456/feature \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "is_featured": true,
+  "message": "Yorum öne çıkarıldı."
+}
+```
+
+**Error Response (Limit Reached):**
+```json
+{
+  "code": "limit_reached",
+  "message": "Maksimum 3 yorum öne çıkarılabilir.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+### GET `/rejimde/v1/experts/{id}/impact`
+Get expert's community impact statistics.
+
+**Example Request:**
+```bash
+curl -X GET https://rejimde.com/wp-json/rejimde/v1/experts/123/impact
+```
+
+**Response:**
+```json
+{
+  "total_clients_supported": 127,
+  "programs_completed": 89,
+  "average_journey_weeks": 8,
+  "recommend_rate": 92,
+  "verified_client_count": 98,
+  "goal_distribution": [
+    {"goal_tag": "weight_loss", "count": 45},
+    {"goal_tag": "muscle_gain", "count": 32},
+    {"goal_tag": "healthy_eating", "count": 25}
+  ],
+  "context": {
+    "message": "Son 6 ayda 45 danışana destek oldu",
+    "highlight": "Her 5 danışandan 4'i tavsiye ediyor"
+  }
+}
+```
+
+**Fields:**
+- `total_clients_supported`: Total unique clients from appointments
+- `programs_completed`: Number of completed programs
+- `average_journey_weeks`: Average duration of client journeys
+- `recommend_rate`: Percentage of clients who would recommend (0-100)
+- `verified_client_count`: Number of verified clients who left reviews
+- `goal_distribution`: Distribution of client goals
+- `context.message`: Contextual message about recent activity
+- `context.highlight`: Key highlight metric
+
+### GET `/rejimde/v1/experts/{id}/success-stories`
+Get expert's success stories from client reviews.
+
+**Query Parameters:**
+- `limit`: Number of stories to return (default: 10)
+
+**Example Request:**
+```bash
+curl -X GET "https://rejimde.com/wp-json/rejimde/v1/experts/123/success-stories?limit=5"
+```
+
+**Response:**
+```json
+{
+  "stories": [
+    {
+      "id": 456,
+      "author_initials": "A.K.",
+      "author_name": null,
+      "is_anonymous": true,
+      "goal_tag": "weight_loss",
+      "program_type": "online",
+      "process_weeks": 12,
+      "story": "12 haftada hedefime ulaştım ve hayatım değişti...",
+      "rating": 5,
+      "verified_client": true,
+      "created_at": "2025-11-15 10:30:00",
+      "time_ago": "2 ay önce"
+    }
+  ],
+  "total": 5
+}
+```
+
+**Fields:**
+- `author_initials`: Initials of the author (e.g., "A.K.")
+- `author_name`: Full name (null if anonymous)
+- `is_anonymous`: Whether the review is anonymous
+- `goal_tag`: Client's goal
+- `program_type`: Type of program
+- `process_weeks`: Duration in weeks
+- `story`: Success story text
+- `rating`: Rating given by client
+- `verified_client`: Whether client is verified
+- `created_at`: ISO timestamp
+- `time_ago`: Human-readable time ago
