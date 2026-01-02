@@ -236,15 +236,26 @@ class Activator {
             started_at DATETIME DEFAULT NULL,
             ended_at DATETIME DEFAULT NULL,
             notes TEXT DEFAULT NULL,
+            risk_status VARCHAR(20) DEFAULT NULL,
+            risk_reason TEXT DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY unique_relationship (expert_id, client_id),
             INDEX idx_expert (expert_id),
             INDEX idx_client (client_id),
-            INDEX idx_status (status)
+            INDEX idx_status (status),
+            INDEX idx_risk_status (risk_status)
         ) {$charset_collate};";
         dbDelta($sql_relationships);
+
+        // Add risk_status and risk_reason columns to existing tables (for upgrades)
+        $column_exists = $wpdb->get_var("SHOW COLUMNS FROM $table_relationships LIKE 'risk_status'");
+        if (!$column_exists) {
+            $wpdb->query("ALTER TABLE $table_relationships ADD COLUMN risk_status VARCHAR(20) DEFAULT NULL AFTER notes");
+            $wpdb->query("ALTER TABLE $table_relationships ADD COLUMN risk_reason TEXT DEFAULT NULL AFTER risk_status");
+            $wpdb->query("ALTER TABLE $table_relationships ADD INDEX idx_risk_status (risk_status)");
+        }
 
         // 13. CRM: Client Packages Table
         $table_packages = $wpdb->prefix . 'rejimde_client_packages';
