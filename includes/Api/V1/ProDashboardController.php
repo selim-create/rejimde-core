@@ -18,6 +18,12 @@ class ProDashboardController extends WP_REST_Controller {
 
     protected $namespace = 'rejimde/v1';
     protected $base = 'pro/dashboard';
+    
+    /**
+     * Cache for column existence check to avoid repeated queries
+     * @var bool|null
+     */
+    private static $risk_status_column_exists = null;
 
     public function register_routes() {
         register_rest_route($this->namespace, '/' . $this->base, [
@@ -57,12 +63,27 @@ class ProDashboardController extends WP_REST_Controller {
             // Get at-risk clients count
             global $wpdb;
             $table_relationships = $wpdb->prefix . 'rejimde_relationships';
-            $atRiskCount = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_relationships 
-                 WHERE expert_id = %d AND status = 'active' 
-                 AND (risk_status = 'warning' OR risk_status = 'danger')",
-                $expertId
-            )) ?: 0;
+            
+            // Suppress database errors to prevent HTML output in JSON response
+            $wpdb->suppress_errors(true);
+            
+            // Check if risk_status column exists (cached to avoid repeated queries)
+            if (self::$risk_status_column_exists === null) {
+                self::$risk_status_column_exists = (bool) $wpdb->get_var("SHOW COLUMNS FROM $table_relationships LIKE 'risk_status'");
+            }
+            
+            $atRiskCount = 0;
+            if (self::$risk_status_column_exists) {
+                $atRiskCount = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM $table_relationships 
+                     WHERE expert_id = %d AND status = 'active' 
+                     AND (risk_status = 'warning' OR risk_status = 'danger')",
+                    $expertId
+                )) ?: 0;
+            }
+            
+            // Re-enable error reporting (restore default)
+            $wpdb->suppress_errors(false);
             
             return new WP_REST_Response([
                 'status' => 'success',
