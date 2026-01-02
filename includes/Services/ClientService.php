@@ -535,7 +535,9 @@ class ClientService {
             $result = $wpdb->update(
                 $table_packages,
                 ['status' => 'cancelled', 'updated_at' => current_time('mysql')],
-                ['relationship_id' => $relationshipId, 'status' => 'active']
+                ['relationship_id' => $relationshipId, 'status' => 'active'],
+                ['%s', '%s'],
+                ['%d', '%s']
             );
             
             if ($result === false) {
@@ -577,7 +579,9 @@ class ClientService {
                     'total_sessions' => $newTotal,
                     'updated_at' => current_time('mysql')
                 ],
-                ['id' => $package['id']]
+                ['id' => $package['id']],
+                ['%d', '%s'],
+                ['%d']
             );
             
             if ($result === false) {
@@ -596,7 +600,9 @@ class ClientService {
             $wpdb->update(
                 $table_packages,
                 ['status' => 'completed', 'updated_at' => current_time('mysql')],
-                ['relationship_id' => $relationshipId, 'status' => 'active']
+                ['relationship_id' => $relationshipId, 'status' => 'active'],
+                ['%s', '%s'],
+                ['%d', '%s']
             );
             
             error_log("Rejimde CRM: Creating new package for renew action");
