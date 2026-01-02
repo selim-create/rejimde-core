@@ -39,9 +39,10 @@ class ProfileViewNotifications {
         $notificationsTable = $wpdb->prefix . 'rejimde_notifications';
         
         // Get date range for last week (Monday to Sunday)
-        // Using explicit calculation for consistency
-        $week_start = date('Y-m-d 00:00:00', strtotime('-7 days monday'));
-        $week_end = date('Y-m-d 23:59:59', strtotime('-7 days sunday'));
+        // Calculate the start and end to ensure they're in the same week
+        $week_start_timestamp = strtotime('-7 days monday');
+        $week_start = date('Y-m-d 00:00:00', $week_start_timestamp);
+        $week_end = date('Y-m-d 23:59:59', strtotime('+6 days', $week_start_timestamp));
         
         // Get all experts who received views last week
         $experts = $wpdb->get_results($wpdb->prepare(

@@ -14,7 +14,7 @@ Bu API, rejimde_pro üyelerinin kendi slug sayfalarını kimlerin (üye/misafir)
 | expert_slug | VARCHAR(255) | Uzman slug - hızlı sorgu için |
 | viewer_user_id | BIGINT UNSIGNED | Görüntüleyen kullanıcı (NULL = misafir) |
 | viewer_ip | VARCHAR(45) | IP adresi (anonim takip için) |
-| viewer_user_agent | TEXT | User agent bilgisi |
+| viewer_user_agent | VARCHAR(500) | User agent bilgisi (DoS önleme için length limited) |
 | is_member | TINYINT(1) | 1 = üye, 0 = misafir |
 | viewed_at | DATETIME | Görüntülenme zamanı |
 | session_id | VARCHAR(255) | Aynı oturumdaki tekrar ziyaretleri filtrelemek için |
