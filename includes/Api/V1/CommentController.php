@@ -838,7 +838,7 @@ class CommentController extends WP_REST_Controller {
         
         // 1. Randevu geçmişi kontrolü (completed, confirmed, pending)
         $appointments_table = $wpdb->prefix . 'rejimde_appointments';
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$appointments_table'");
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $appointments_table));
         
         if ($table_exists) {
             $has_appointment = $wpdb->get_var($wpdb->prepare(
@@ -853,7 +853,7 @@ class CommentController extends WP_REST_Controller {
         
         // 2. Uzmanın relationships tablosunda kayıtlı mı?
         $relationships_table = $wpdb->prefix . 'rejimde_relationships';
-        $relationships_table_exists = $wpdb->get_var("SHOW TABLES LIKE '$relationships_table'");
+        $relationships_table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $relationships_table));
         
         if ($relationships_table_exists) {
             $is_in_relationships = $wpdb->get_var($wpdb->prepare(
@@ -868,19 +868,19 @@ class CommentController extends WP_REST_Controller {
         
         // 3. Uzmanın user meta'sında danışan listesinde mi?
         $expert_clients_meta = get_user_meta($expert_user_id, 'rejimde_clients', true);
-        if (is_array($expert_clients_meta) && in_array($user_id, $expert_clients_meta)) {
+        if (is_array($expert_clients_meta) && in_array((int)$user_id, array_map('intval', $expert_clients_meta), true)) {
             return true;
         }
         
         // 4. Alternatif meta key kontrolü
         $client_list = get_user_meta($expert_user_id, 'client_list', true);
-        if (is_array($client_list) && in_array($user_id, $client_list)) {
+        if (is_array($client_list) && in_array((int)$user_id, array_map('intval', $client_list), true)) {
             return true;
         }
         
         // 5. Post meta üzerinden client kontrolü (bazı sistemlerde böyle saklanıyor)
         $post_clients = get_post_meta($expert_post_id, 'clients', true);
-        if (is_array($post_clients) && in_array($user_id, $post_clients)) {
+        if (is_array($post_clients) && in_array((int)$user_id, array_map('intval', $post_clients), true)) {
             return true;
         }
         
