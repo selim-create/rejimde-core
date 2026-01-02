@@ -48,6 +48,7 @@ class Loader {
         // Cron
         if (file_exists(REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php')) require_once REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php';
         if (file_exists(REJIMDE_PATH . 'includes/Cron/NotificationJobs.php')) require_once REJIMDE_PATH . 'includes/Cron/NotificationJobs.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Cron/ProfileViewNotifications.php')) require_once REJIMDE_PATH . 'includes/Cron/ProfileViewNotifications.php';
 
         // API Controllers
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/MascotController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/MascotController.php';
@@ -103,6 +104,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/UserDashboardController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/UserDashboardController.php';
         // YENİ: Expert Settings Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ExpertSettingsController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ExpertSettingsController.php';
+        // YENİ: Profile View Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProfileViewController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProfileViewController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -181,6 +184,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\UserDashboardController')) (new \Rejimde\Api\V1\UserDashboardController())->register_routes();
             // YENİ: Expert Settings Routes
             if (class_exists('Rejimde\\Api\\V1\\ExpertSettingsController')) (new \Rejimde\Api\V1\ExpertSettingsController())->register_routes();
+            // YENİ: Profile View Routes
+            if (class_exists('Rejimde\\Api\\V1\\ProfileViewController')) (new \Rejimde\Api\V1\ProfileViewController())->register_routes();
         });
 
         // CPT Kayıtları
@@ -233,6 +238,12 @@ class Loader {
         if (class_exists('Rejimde\\Cron\\NotificationJobs')) {
             $notificationJobs = new \Rejimde\Cron\NotificationJobs();
             $notificationJobs->register();
+        }
+        
+        // YENİ: Cron Jobs (Profile View Notifications)
+        if (class_exists('Rejimde\\Cron\\ProfileViewNotifications')) {
+            $profileViewNotifications = new \Rejimde\Cron\ProfileViewNotifications();
+            $profileViewNotifications->register();
         }
         
         // Admin: Yorum listesine Şikayet kolonu ekle
