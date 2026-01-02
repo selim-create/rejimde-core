@@ -18,6 +18,15 @@ class RejiScoreService {
     private const WEIGHT_FRESHNESS = 0.25;
     private const WEIGHT_VERIFICATION = 0.20;
     
+    // Freshness score calculation weights
+    private const FRESHNESS_WEIGHT_VIEWS = 10;      // Divide profile views by this
+    private const FRESHNESS_WEIGHT_UNIQUE = 5;      // Divide unique viewers by this
+    private const FRESHNESS_WEIGHT_RATINGS = 5;     // Multiply new ratings by this
+    private const FRESHNESS_WEIGHT_ACTIVE_DAYS = 1; // Multiply active days by this
+    private const FRESHNESS_GROWTH_DIVISOR = 5;     // Convert growth % to bonus points
+    
+    private $metricsTableExists = null; // Cache table existence check
+    
     /**
      * Calculate complete RejiScore for an expert
      *
@@ -59,6 +68,22 @@ class RejiScoreService {
             'level' => $this->getScoreLevel($finalScore),
             'level_label' => $this->getScoreLevelLabel($finalScore)
         ];
+    }
+    
+    /**
+     * Check if expert metrics table exists (cached)
+     */
+    private function metricsTableExists(): bool {
+        if ($this->metricsTableExists !== null) {
+            return $this->metricsTableExists;
+        }
+        
+        global $wpdb;
+        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
+        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($metricsTable) . "'");
+        $this->metricsTableExists = ($tableExists !== null);
+        
+        return $this->metricsTableExists;
     }
     
     /**
@@ -157,10 +182,10 @@ class RejiScoreService {
         $score += min(20, $articleCount * 4); // Max 20 points
         
         // Count client completions
-        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($metricsTable) . "'");
-        
-        if ($tableExists) {
+        if ($this->metricsTableExists()) {
+            global $wpdb;
+            $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
+            
             $clientCompletions = $wpdb->get_var($wpdb->prepare("
                 SELECT SUM(client_completions) FROM $metricsTable 
                 WHERE expert_id = %d
@@ -177,11 +202,11 @@ class RejiScoreService {
     private function calculateFreshnessScore(int $expertId): int {
         global $wpdb;
         
-        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
+        if (!$this->metricsTableExists()) {
+            return 50; // Default score if metrics table doesn't exist
+        }
         
-        // Check if table exists
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($metricsTable) . "'");
-        if (!$tableExists) return 50;
+        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
         
         // Get last 30 days metrics
         $last30Days = $wpdb->get_row($wpdb->prepare("
@@ -207,21 +232,23 @@ class RejiScoreService {
         $score = 50; // Base score
         
         // Activity bonus (up to 30 points)
+        // Weighted by: views/10 + unique_viewers/5 + ratings*5 + active_days*1
         if ($last30Days) {
             $activityScore = min(30, 
-                ($last30Days->total_views ?? 0) / 10 + 
-                ($last30Days->unique_views ?? 0) / 5 +
-                ($last30Days->new_ratings ?? 0) * 5 +
-                ($last30Days->active_days ?? 0)
+                ($last30Days->total_views ?? 0) / self::FRESHNESS_WEIGHT_VIEWS + 
+                ($last30Days->unique_views ?? 0) / self::FRESHNESS_WEIGHT_UNIQUE +
+                ($last30Days->new_ratings ?? 0) * self::FRESHNESS_WEIGHT_RATINGS +
+                ($last30Days->active_days ?? 0) * self::FRESHNESS_WEIGHT_ACTIVE_DAYS
             );
             $score += $activityScore;
         }
         
         // Trend bonus (up to 20 points)
+        // Growth percentage divided by 5 converts to bonus points
         if ($prev30Days && $prev30Days->total_views > 0 && $last30Days) {
             $growth = (($last30Days->total_views - $prev30Days->total_views) / $prev30Days->total_views) * 100;
             if ($growth > 0) {
-                $score += min(20, $growth / 5);
+                $score += min(20, $growth / self::FRESHNESS_GROWTH_DIVISOR);
             }
         }
         
@@ -256,13 +283,11 @@ class RejiScoreService {
     private function calculateTrend(int $expertId): array {
         global $wpdb;
         
-        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
-        
-        // Check if table exists
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '" . $wpdb->esc_like($metricsTable) . "'");
-        if (!$tableExists) {
+        if (!$this->metricsTableExists()) {
             return ['percentage' => 0, 'direction' => 'stable'];
         }
+        
+        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
         
         // Current period (last 7 days)
         $current = $wpdb->get_var($wpdb->prepare("
