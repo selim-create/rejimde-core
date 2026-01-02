@@ -20,10 +20,11 @@ class RejiScoreController {
      */
     public function register_routes(): void {
         // Get RejiScore by expert post ID
+        // Permission: Public - RejiScore is publicly visible expert data
         register_rest_route('rejimde/v1', '/experts/(?P<id>\d+)/reji-score', [
             'methods' => 'GET',
             'callback' => [$this, 'get_reji_score'],
-            'permission_callback' => '__return_true',
+            'permission_callback' => '__return_true', // Public endpoint - scores are public data
             'args' => [
                 'id' => [
                     'required' => true,
@@ -36,10 +37,11 @@ class RejiScoreController {
         ]);
         
         // Get RejiScore by user ID
+        // Permission: Public - RejiScore is publicly visible expert data
         register_rest_route('rejimde/v1', '/users/(?P<id>\d+)/reji-score', [
             'methods' => 'GET',
             'callback' => [$this, 'get_reji_score_by_user'],
-            'permission_callback' => '__return_true',
+            'permission_callback' => '__return_true', // Public endpoint - scores are public data
             'args' => [
                 'id' => [
                     'required' => true,

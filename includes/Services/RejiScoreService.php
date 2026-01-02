@@ -157,11 +157,16 @@ class RejiScoreService {
         $score += min(20, $articleCount * 4); // Max 20 points
         
         // Count client completions
-        $clientCompletions = $wpdb->get_var($wpdb->prepare("
-            SELECT SUM(client_completions) FROM {$wpdb->prefix}rejimde_expert_metrics 
-            WHERE expert_id = %d
-        ", $expertId));
-        $score += min(20, ($clientCompletions ?? 0) * 2); // Max 20 points
+        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $metricsTable));
+        
+        if ($tableExists) {
+            $clientCompletions = $wpdb->get_var($wpdb->prepare("
+                SELECT SUM(client_completions) FROM {$wpdb->prefix}rejimde_expert_metrics 
+                WHERE expert_id = %d
+            ", $expertId));
+            $score += min(20, ($clientCompletions ?? 0) * 2); // Max 20 points
+        }
         
         return min(100, $score);
     }
@@ -175,7 +180,7 @@ class RejiScoreService {
         $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
         
         // Check if table exists
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '$metricsTable'");
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $metricsTable));
         if (!$tableExists) return 50;
         
         // Get last 30 days metrics
@@ -254,7 +259,7 @@ class RejiScoreService {
         $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
         
         // Check if table exists
-        $tableExists = $wpdb->get_var("SHOW TABLES LIKE '$metricsTable'");
+        $tableExists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $metricsTable));
         if (!$tableExists) {
             return ['percentage' => 0, 'direction' => 'stable'];
         }
