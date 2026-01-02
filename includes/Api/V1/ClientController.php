@@ -74,6 +74,13 @@ class ClientController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_expert_auth'],
         ]);
 
+        // PATCH/POST /pro/clients/{id}/package/end-date - Update package end date
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/package/end-date', [
+            'methods' => ['PATCH', 'POST'],
+            'callback' => [$this, 'update_package_end_date'],
+            'permission_callback' => [$this, 'check_expert_auth'],
+        ]);
+
         // POST /pro/clients/{id}/use-session - Use session from package
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/use-session', [
             'methods' => 'POST',
@@ -301,6 +308,26 @@ class ClientController extends WP_REST_Controller {
         }
         
         return $this->success(['message' => 'Package updated successfully']);
+    }
+
+    /**
+     * PATCH/POST /pro/clients/{id}/package/end-date
+     */
+    public function update_package_end_date(WP_REST_Request $request): WP_REST_Response {
+        $relationshipId = (int) $request['id'];
+        $endDate = $request->get_param('end_date');
+        
+        if (empty($endDate)) {
+            return $this->error('End date is required', 400);
+        }
+        
+        $result = $this->clientService->updatePackageEndDate($relationshipId, $endDate);
+        
+        if (!$result) {
+            return $this->error('Failed to update end date', 500);
+        }
+        
+        return $this->success(['message' => 'End date updated successfully']);
     }
 
     /**
