@@ -500,28 +500,15 @@ class EventDispatcher {
                         // Get content information for the notification URL
                         $postId = $payload['entity_id'] ?? $parentComment->comment_post_ID;
                         $post = get_post($postId);
-                        $contentType = 'post';
-                        $contentSlug = '';
-                        
-                        if ($post) {
-                            $contentSlug = $post->post_name;
-                            // Map post types to content types
-                            if ($post->post_type === 'rejimde_blog') {
-                                $contentType = 'blog';
-                            } elseif ($post->post_type === 'rejimde_diet') {
-                                $contentType = 'diet';
-                            } elseif ($post->post_type === 'rejimde_exercise') {
-                                $contentType = 'exercise';
-                            }
-                        }
+                        $contentInfo = $this->getContentTypeAndSlug($post);
                         
                         $this->notificationService->create((int) $parentComment->user_id, 'comment_reply', [
                             'actor_id' => $userId,
                             'entity_type' => $payload['entity_type'] ?? 'comment',
                             'entity_id' => $payload['entity_id'] ?? null,
                             'comment_id' => $payload['comment_id'] ?? null,
-                            'content_type' => $contentType,
-                            'content_slug' => $contentSlug
+                            'content_type' => $contentInfo['content_type'],
+                            'content_slug' => $contentInfo['content_slug']
                         ]);
                     }
                 } else {
@@ -530,18 +517,8 @@ class EventDispatcher {
                     if ($postId) {
                         $post = get_post($postId);
                         if ($post && (int) $post->post_author != $userId) {
-                            $contentType = 'post';
-                            $contentSlug = $post->post_name;
+                            $contentInfo = $this->getContentTypeAndSlug($post);
                             $contentName = $post->post_title;
-                            
-                            // Map post types to content types
-                            if ($post->post_type === 'rejimde_blog') {
-                                $contentType = 'blog';
-                            } elseif ($post->post_type === 'rejimde_diet') {
-                                $contentType = 'diet';
-                            } elseif ($post->post_type === 'rejimde_exercise') {
-                                $contentType = 'exercise';
-                            }
                             
                             // Notify content owner about new comment
                             $this->notificationService->create((int) $post->post_author, 'comment_on_content', [
@@ -549,8 +526,8 @@ class EventDispatcher {
                                 'entity_type' => $payload['entity_type'] ?? 'comment',
                                 'entity_id' => $postId,
                                 'comment_id' => $payload['comment_id'] ?? null,
-                                'content_type' => $contentType,
-                                'content_slug' => $contentSlug,
+                                'content_type' => $contentInfo['content_type'],
+                                'content_slug' => $contentInfo['content_slug'],
                                 'content_name' => $contentName
                             ]);
                         }
@@ -582,28 +559,15 @@ class EventDispatcher {
                         // Get content information for the notification URL
                         $postId = $comment->comment_post_ID;
                         $post = get_post($postId);
-                        $contentType = 'post';
-                        $contentSlug = '';
-                        
-                        if ($post) {
-                            $contentSlug = $post->post_name;
-                            // Map post types to content types
-                            if ($post->post_type === 'rejimde_blog') {
-                                $contentType = 'blog';
-                            } elseif ($post->post_type === 'rejimde_diet') {
-                                $contentType = 'diet';
-                            } elseif ($post->post_type === 'rejimde_exercise') {
-                                $contentType = 'exercise';
-                            }
-                        }
+                        $contentInfo = $this->getContentTypeAndSlug($post);
                         
                         $this->notificationService->create((int) $comment->user_id, 'comment_liked', [
                             'actor_id' => $userId,
                             'entity_type' => 'comment',
                             'entity_id' => $payload['comment_id'],
                             'comment_id' => $payload['comment_id'],
-                            'content_type' => $contentType,
-                            'content_slug' => $contentSlug
+                            'content_type' => $contentInfo['content_type'],
+                            'content_slug' => $contentInfo['content_slug']
                         ]);
                     }
                 }
@@ -682,6 +646,35 @@ class EventDispatcher {
                 }
                 break;
         }
+    }
+    
+    /**
+     * Get content type and slug from a post
+     * 
+     * @param \WP_Post|null $post WordPress post object
+     * @return array ['content_type' => string, 'content_slug' => string]
+     */
+    private function getContentTypeAndSlug($post): array {
+        $contentType = 'post';
+        $contentSlug = '';
+        
+        if ($post) {
+            $contentSlug = $post->post_name;
+            
+            // Map post types to content types
+            if ($post->post_type === 'rejimde_blog') {
+                $contentType = 'blog';
+            } elseif ($post->post_type === 'rejimde_diet') {
+                $contentType = 'diet';
+            } elseif ($post->post_type === 'rejimde_exercise') {
+                $contentType = 'exercise';
+            }
+        }
+        
+        return [
+            'content_type' => $contentType,
+            'content_slug' => $contentSlug
+        ];
     }
     
     /**
