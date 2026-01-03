@@ -22,6 +22,18 @@ if (!defined('REJIMDE_FRONTEND_URL')) {
     define('REJIMDE_FRONTEND_URL', 'https://rejimde.com');
 }
 
+// Allowed CORS origins
+if (!defined('REJIMDE_ALLOWED_ORIGINS')) {
+    define('REJIMDE_ALLOWED_ORIGINS', [
+        'http://localhost:3000',
+        'https://rejimde.com',
+        'http://127.0.0.1:3000',
+        'http://192.168.48.90:3000',
+        'https://192.168.48.89:3000',
+        'https://www.rejimde.com',
+    ]);
+}
+
 // Eğer Composer kullanıyorsanız (JWT vb. kütüphaneler için) aşağıdaki satırı açabilirsiniz:
 // if (file_exists(REJIMDE_PATH . 'vendor/autoload.php')) require_once REJIMDE_PATH . 'vendor/autoload.php';
 
@@ -81,14 +93,7 @@ add_action('init', function() {
  * Priority 1 ile en erken çalışarak rate limit/error yanıtlarında da header'ları ekler
  */
 add_action('init', function() {
-    $allowed_origins = [
-        'http://localhost:3000',
-        'https://rejimde.com',
-        'http://127.0.0.1:3000',
-        'http://192.168.48.90:3000',
-        'https://192.168.48.89:3000',
-        'https://www.rejimde.com',
-    ];
+    $allowed_origins = REJIMDE_ALLOWED_ORIGINS;
 
     // get_http_origin() yerine direkt $_SERVER kullan - daha güvenilir
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
@@ -102,7 +107,7 @@ add_action('init', function() {
     }
 
     // OPTIONS preflight request'leri için erken çıkış
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         status_header(200);
         exit();
     }
@@ -113,14 +118,7 @@ add_action('init', function() {
  * Bu filter rate limit (429) veya diğer error yanıtlarında da çalışır
  */
 add_filter('rest_pre_serve_request', function($served, $result, $request, $server) {
-    $allowed_origins = [
-        'http://localhost:3000',
-        'https://rejimde.com',
-        'http://127.0.0.1:3000',
-        'http://192.168.48.90:3000',
-        'https://192.168.48.89:3000',
-        'https://www.rejimde.com',
-    ];
+    $allowed_origins = REJIMDE_ALLOWED_ORIGINS;
     
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
     
