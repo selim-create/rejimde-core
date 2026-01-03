@@ -1,0 +1,131 @@
+/**
+ * Rejimde Task Admin Styles
+ */
+
+.rejimde-tab-content {
+    background: #fff;
+    padding: 20px;
+    margin-top: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Task Type Badges */
+.task-type-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #fff;
+}
+
+.task-type-daily {
+    background-color: #4CAF50;
+}
+
+.task-type-weekly {
+    background-color: #2196F3;
+}
+
+.task-type-monthly {
+    background-color: #FF9800;
+}
+
+.task-type-circle {
+    background-color: #9C27B0;
+}
+
+.task-type-mentor {
+    background-color: #607D8B;
+}
+
+/* Status Badges */
+.status-active {
+    color: #46b450;
+    font-weight: 600;
+}
+
+.status-inactive {
+    color: #999;
+    font-weight: 600;
+}
+
+/* Form Styling */
+.rejimde-tab-content .form-table th {
+    width: 200px;
+    padding: 15px 10px 15px 0;
+}
+
+.rejimde-tab-content .form-table td {
+    padding: 15px 10px;
+}
+
+/* Button Styling */
+.delete-task {
+    color: #a00;
+}
+
+.delete-task:hover {
+    color: #dc3232;
+}
+
+/* Notice Styling */
+.rejimde-tab-content .notice {
+    margin: 0 0 20px 0;
+}
+
+/* Condition Panels */
+.condition-panel {
+    padding: 15px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.condition-panel label {
+    font-weight: 600;
+}
+
+/* Table Styling */
+.rejimde-tab-content table.wp-list-table {
+    margin-top: 20px;
+}
+
+.rejimde-tab-content table.wp-list-table th,
+.rejimde-tab-content table.wp-list-table td {
+    vertical-align: middle;
+}
+
+.rejimde-tab-content table.wp-list-table code {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* Loading State */
+.rejimde-loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Success/Error Messages */
+.rejimde-message {
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+.rejimde-message.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.rejimde-message.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}

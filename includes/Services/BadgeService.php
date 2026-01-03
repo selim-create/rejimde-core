@@ -15,25 +15,50 @@ class BadgeService {
     }
     
     /**
-     * Get all badge definitions
+     * Get all badge definitions (Config + PostType merged)
      * 
      * @return array Array of badge definitions
      */
     public function getAllBadges(): array {
-        global $wpdb;
-        $table = $wpdb->prefix . 'rejimde_badge_definitions';
+        // 1. Config'den rozetleri al
+        $configBadges = require REJIMDE_PATH . 'includes/Config/BadgeRules.php';
         
-        $results = $wpdb->get_results(
-            "SELECT * FROM $table WHERE is_active = 1 ORDER BY category, tier, id",
-            ARRAY_A
-        );
+        // 2. PostType'dan rozetleri al
+        $postBadges = get_posts([
+            'post_type' => 'rejimde_badge',
+            'post_status' => 'publish',
+            'numberposts' => -1
+        ]);
         
-        // Decode JSON conditions
-        foreach ($results as &$badge) {
-            $badge['conditions'] = json_decode($badge['conditions'], true) ?? [];
+        $allBadges = [];
+        
+        // Config badges
+        foreach ($configBadges as $slug => $badge) {
+            $badge['slug'] = $slug;
+            $badge['source'] = 'config';
+            $badge['id'] = 'config_' . $slug;
+            $allBadges[$slug] = $badge;
         }
         
-        return $results;
+        // PostType badges (can override config with same slug)
+        foreach ($postBadges as $post) {
+            $slug = $post->post_name;
+            $badge = [
+                'id' => $post->ID,
+                'slug' => $slug,
+                'title' => $post->post_title,
+                'description' => $post->post_content,
+                'icon' => get_post_meta($post->ID, 'badge_icon', true) ?: '🏅',
+                'category' => get_post_meta($post->ID, 'badge_category', true) ?: 'milestone',
+                'tier' => get_post_meta($post->ID, 'badge_tier', true) ?: 'bronze',
+                'max_progress' => (int) (get_post_meta($post->ID, 'max_progress', true) ?: 1),
+                'conditions' => get_post_meta($post->ID, 'badge_conditions', true) ?: [],
+                'source' => 'post_type'
+            ];
+            $allBadges[$slug] = $badge;
+        }
+        
+        return $allBadges;
     }
     
     /**
