@@ -44,6 +44,14 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/RejiScoreService.php')) require_once REJIMDE_PATH . 'includes/Services/RejiScoreService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/ServiceRequestService.php')) require_once REJIMDE_PATH . 'includes/Services/ServiceRequestService.php';
         
+        // Task & Badge Services
+        if (file_exists(REJIMDE_PATH . 'includes/Services/PeriodService.php')) require_once REJIMDE_PATH . 'includes/Services/PeriodService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/TaskService.php')) require_once REJIMDE_PATH . 'includes/Services/TaskService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/TaskProgressService.php')) require_once REJIMDE_PATH . 'includes/Services/TaskProgressService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/CircleTaskService.php')) require_once REJIMDE_PATH . 'includes/Services/CircleTaskService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/BadgeRuleEngine.php')) require_once REJIMDE_PATH . 'includes/Services/BadgeRuleEngine.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/BadgeService.php')) require_once REJIMDE_PATH . 'includes/Services/BadgeService.php';
+        
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
         
@@ -115,6 +123,9 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/RejiScoreController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/RejiScoreController.php';
         // YENİ: Service Request Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ServiceRequestController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ServiceRequestController.php';
+        // YENİ: Task & Badge Controllers
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/TaskController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/TaskController.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/BadgeController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/BadgeController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -199,6 +210,9 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\RejiScoreController')) (new \Rejimde\Api\V1\RejiScoreController())->register_routes();
             // YENİ: Service Request Routes
             if (class_exists('Rejimde\\Api\\V1\\ServiceRequestController')) (new \Rejimde\Api\V1\ServiceRequestController())->register_routes();
+            // YENİ: Task & Badge Routes
+            if (class_exists('Rejimde\\Api\\V1\\TaskController')) (new \Rejimde\Api\V1\TaskController())->register_routes();
+            if (class_exists('Rejimde\\Api\\V1\\BadgeController')) (new \Rejimde\Api\V1\BadgeController())->register_routes();
         });
 
         // CPT Kayıtları
