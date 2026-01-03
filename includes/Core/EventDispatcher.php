@@ -6,6 +6,9 @@ use Rejimde\Services\ScoreService;
 use Rejimde\Services\StreakService;
 use Rejimde\Services\MilestoneService;
 use Rejimde\Services\NotificationService;
+use Rejimde\Services\TaskProgressService;
+use Rejimde\Services\BadgeService;
+use Rejimde\Services\CircleTaskService;
 
 /**
  * Event Dispatcher
@@ -21,6 +24,9 @@ class EventDispatcher {
     private $streakService;
     private $milestoneService;
     private $notificationService;
+    private $taskProgressService;
+    private $badgeService;
+    private $circleTaskService;
     private $config;
     
     private function __construct() {
@@ -29,6 +35,9 @@ class EventDispatcher {
         $this->streakService = new StreakService();
         $this->milestoneService = new MilestoneService();
         $this->notificationService = new NotificationService();
+        $this->taskProgressService = new TaskProgressService();
+        $this->badgeService = new BadgeService();
+        $this->circleTaskService = new CircleTaskService();
         $this->config = require __DIR__ . '/../Config/ScoringRules.php';
     }
     
@@ -262,6 +271,53 @@ class EventDispatcher {
             }
         }
         
+        // Process task progress (after points awarded)
+        // Note: This adds ~3-5 database queries per event. For high-traffic scenarios,
+        // consider implementing async processing via Action Scheduler or similar.
+        $taskData = null;
+        if ($points > 0 || in_array($eventType, ['login_success', 'exercise_completed', 'diet_completed'])) {
+            $updatedTasks = $this->taskProgressService->processEvent($userId, $eventType, $context);
+            if (!empty($updatedTasks)) {
+                $taskData = [
+                    'tasks_updated' => count($updatedTasks),
+                    'tasks' => $updatedTasks
+                ];
+            }
+        }
+        
+        // Process circle task contributions
+        // Note: Only triggered for specific event types to minimize performance impact
+        $circleTaskData = null;
+        $circleId = get_user_meta($userId, 'circle_id', true);
+        if ($circleId && in_array($eventType, ['exercise_completed', 'steps_logged'])) {
+            // Get active circle tasks for this event type
+            global $wpdb;
+            $taskDefsTable = $wpdb->prefix . 'rejimde_task_definitions';
+            $circleTasks = $wpdb->get_results($wpdb->prepare(
+                "SELECT id FROM $taskDefsTable 
+                 WHERE task_type = 'circle' 
+                 AND is_active = 1
+                 AND JSON_CONTAINS(scoring_event_types, %s)",
+                json_encode($eventType)
+            ), ARRAY_A);
+            
+            foreach ($circleTasks as $taskDef) {
+                $this->circleTaskService->addContribution($circleId, $userId, $taskDef['id'], 1);
+            }
+        }
+        
+        // Process badge progress (after points and tasks)
+        // Note: Badge evaluation includes complex rule engine queries.
+        // Results are cached in user_badges table to minimize repeated evaluations.
+        $badgeData = null;
+        $newBadge = $this->badgeService->processEvent($userId, $eventType, $context);
+        if ($newBadge) {
+            $badgeData = [
+                'badge_earned' => true,
+                'badge' => $newBadge
+            ];
+        }
+        
         // Get rule label
         $label = $rule['label'] ?? $eventType;
         
@@ -274,6 +330,8 @@ class EventDispatcher {
             'daily_score' => $scoreResult['daily_score'],
             'streak' => $streakData,
             'milestone' => $milestoneData,
+            'tasks' => $taskData,
+            'badge' => $badgeData,
             'message' => $label . ' tamamlandı!' . ($points > 0 ? " +{$points} puan kazandın." : '')
         ];
         
