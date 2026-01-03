@@ -272,6 +272,8 @@ class EventDispatcher {
         }
         
         // Process task progress (after points awarded)
+        // Note: This adds ~3-5 database queries per event. For high-traffic scenarios,
+        // consider implementing async processing via Action Scheduler or similar.
         $taskData = null;
         if ($points > 0 || in_array($eventType, ['login_success', 'exercise_completed', 'diet_completed'])) {
             $updatedTasks = $this->taskProgressService->processEvent($userId, $eventType, $context);
@@ -284,6 +286,7 @@ class EventDispatcher {
         }
         
         // Process circle task contributions
+        // Note: Only triggered for specific event types to minimize performance impact
         $circleTaskData = null;
         $circleId = get_user_meta($userId, 'circle_id', true);
         if ($circleId && in_array($eventType, ['exercise_completed', 'steps_logged'])) {
@@ -304,6 +307,8 @@ class EventDispatcher {
         }
         
         // Process badge progress (after points and tasks)
+        // Note: Badge evaluation includes complex rule engine queries.
+        // Results are cached in user_badges table to minimize repeated evaluations.
         $badgeData = null;
         $newBadge = $this->badgeService->processEvent($userId, $eventType, $context);
         if ($newBadge) {

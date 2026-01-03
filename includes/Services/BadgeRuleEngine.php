@@ -96,11 +96,16 @@ class BadgeRuleEngine {
         $sql = "SELECT COUNT(*) FROM $eventsTable WHERE user_id = %d AND event_type = %s";
         $params = [$userId, $event];
         
-        // Apply context filter if provided
+        // Apply context filter if provided (validate keys against allowlist)
         if ($contextFilter && is_array($contextFilter)) {
+            $allowedKeys = ['time_of_day', 'location', 'difficulty', 'category'];
             foreach ($contextFilter as $key => $value) {
-                $sql .= " AND JSON_EXTRACT(context, '$.$key') = %s";
-                $params[] = $value;
+                // Only allow whitelisted keys to prevent JSON injection
+                if (in_array($key, $allowedKeys, true)) {
+                    $sql .= " AND JSON_EXTRACT(context, %s) = %s";
+                    $params[] = '$.' . $key;
+                    $params[] = $value;
+                }
             }
         }
         
