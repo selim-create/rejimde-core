@@ -624,3 +624,104 @@ curl -X GET "https://rejimde.com/wp-json/rejimde/v1/experts/123/success-stories?
 - `verified_client`: Whether client is verified
 - `created_at`: ISO timestamp
 - `time_ago`: Human-readable time ago
+
+---
+
+## Profile Following Activity
+
+### GET `/rejimde/v1/profile/following`
+
+Get the activity feed of users that the current user is following. This endpoint returns a list of followed users along with their most recent activities from the events system.
+
+**Authentication:** Required (logged-in users only)
+
+**Example Request:**
+```bash
+curl -X GET https://rejimde.com/wp-json/rejimde/v1/profile/following \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (with following):**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 123,
+      "name": "Ahmet Yılmaz",
+      "slug": "ahmet-yilmaz",
+      "avatar_url": "https://rejimde.com/uploads/avatar-123.jpg",
+      "last_activity": {
+        "type": "exercise_completed",
+        "label": "Egzersiz tamamladı",
+        "icon": "💪",
+        "time_ago": "2 saat önce"
+      }
+    },
+    {
+      "id": 456,
+      "name": "Ayşe Demir",
+      "slug": "ayse-demir",
+      "avatar_url": "https://api.dicebear.com/9.x/personas/svg?seed=ayse-demir",
+      "last_activity": {
+        "type": "water_added",
+        "label": "Su hedefini tamamladı",
+        "icon": "💧",
+        "time_ago": "5 dakika önce"
+      }
+    }
+  ],
+  "total_following": 15
+}
+```
+
+**Response (no following):**
+```json
+{
+  "status": "success",
+  "data": [],
+  "total_following": 0,
+  "message": "Henüz kimseyi takip etmiyorsun."
+}
+```
+
+**Response Fields:**
+- `status`: Request status ("success")
+- `data`: Array of followed users with their last activities
+  - `id`: User ID
+  - `name`: User's display name
+  - `slug`: URL-friendly username (nicename)
+  - `avatar_url`: User's avatar URL (custom or generated)
+  - `last_activity`: Object containing the user's most recent activity
+    - `type`: Event type from the events table
+    - `label`: Human-readable activity description
+    - `icon`: Emoji icon representing the activity
+    - `time_ago`: Human-readable time since the activity
+- `total_following`: Total number of users being followed
+- `message`: Informational message (only when no following)
+
+**Supported Activity Types:**
+- `water_added`: "Su hedefini tamamladı" 💧
+- `steps_logged`: "Adım hedefini tamamladı" 👟
+- `meal_photo_uploaded`: "Öğün fotoğrafı yükledi" 📸
+- `diet_completed`: "Diyet tamamladı" 🥗
+- `exercise_completed`: "Egzersiz tamamladı" 💪
+- `login_success`: "Giriş yaptı" ✅
+- `blog_points_claimed`: "Blog okudu" 📚
+- `comment_created`: "Yorum yaptı" 💬
+- `highfive_sent`: "Beşlik çaktı" ✋
+- `follow_accepted`: "Birini takip etti" 👥
+- `calculator_saved`: "Hesaplayıcı kullandı" 🧮
+- `circle_joined`: "Circle'a katıldı" 🎯
+- `diet_started`: "Diyet başlattı" 🍽️
+- `exercise_started`: "Egzersiz başlattı" 🏃
+- `rating_submitted`: "Uzman değerlendirdi" ⭐
+- `milestone_*`: "Bir başarı kazandı" 🏆 (e.g., `milestone_weight_loss_5kg`, `milestone_streak_7_days`)
+- Default: "Aktivite gerçekleştirdi" 📌
+
+**Notes:**
+- Only returns users that are currently in the database (skips deleted users)
+- Activities are fetched from the `{prefix}rejimde_events` table (where {prefix} is the WordPress table prefix)
+- Returns the most recent activity for each followed user
+- Uses optimized SQL query for performance
+- Avatar URLs fall back to DiceBear API if no custom avatar is set
