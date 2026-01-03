@@ -60,6 +60,50 @@ class CircleController extends WP_REST_Controller {
             'callback' => [$this, 'update_settings'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+        
+        // Circle Görevleri
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_tasks'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks', [
+            'methods' => 'POST',
+            'callback' => [$this, 'create_task'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>\d+)', [
+            'methods' => 'PUT',
+            'callback' => [$this, 'update_task'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>\d+)', [
+            'methods' => 'DELETE',
+            'callback' => [$this, 'delete_task'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>\d+)/assign', [
+            'methods' => 'POST',
+            'callback' => [$this, 'assign_task'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        // Üye yönetimi
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/members', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_members'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/members/(?P<member_id>\d+)/remove', [
+            'methods' => 'POST',
+            'callback' => [$this, 'remove_member'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
     }
 
     public function check_auth() {
@@ -125,7 +169,15 @@ class CircleController extends WP_REST_Controller {
         // Kullanıcı zaten bir circle'da mı?
         $current_circle = get_user_meta($user_id, 'circle_id', true);
         if ($current_circle) {
-            return new WP_Error('already_in_circle', 'Zaten bir Circle\'dasınız.', ['status' => 400]);
+            // Circle gerçekten var mı kontrol et
+            $circle = get_post($current_circle);
+            if ($circle && $circle->post_type === 'rejimde_circle' && $circle->post_status === 'publish') {
+                return new WP_Error('already_in_circle', 'Zaten bir Circle\'dasınız.', ['status' => 400]);
+            }
+            
+            // Circle artık yok veya geçersiz - kullanıcı meta'sını temizle
+            delete_user_meta($user_id, 'circle_id');
+            delete_user_meta($user_id, 'circle_role');
         }
 
         $params = $request->get_json_params();
@@ -229,7 +281,15 @@ class CircleController extends WP_REST_Controller {
         // Check if user is already in a circle
         $current_circle_id = get_user_meta($user_id, 'circle_id', true);
         if ($current_circle_id) {
-            return new WP_Error('already_in_circle', 'Önce mevcut circle\'dan ayrılmalısınız.', ['status' => 400]);
+            // Circle gerçekten var mı kontrol et
+            $existing_circle = get_post($current_circle_id);
+            if ($existing_circle && $existing_circle->post_type === 'rejimde_circle' && $existing_circle->post_status === 'publish') {
+                return new WP_Error('already_in_circle', 'Önce mevcut circle\'dan ayrılmalısınız.', ['status' => 400]);
+            }
+            
+            // Eski circle artık yok - meta'yı temizle
+            delete_user_meta($user_id, 'circle_id');
+            delete_user_meta($user_id, 'circle_role');
         }
 
         // Validate circle exists and is published
@@ -491,5 +551,264 @@ class CircleController extends WP_REST_Controller {
         update_post_meta($circle_id, 'total_score', $total_score);
         
         return $total_score;
+    }
+    
+    /**
+     * Circle görevlerini getir
+     */
+    public function get_tasks($request) {
+        $circle_id = $request->get_param('id');
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        $tasks = get_post_meta($circle_id, 'circle_tasks', true);
+        if (!is_array($tasks)) $tasks = [];
+        
+        return new WP_REST_Response($tasks, 200);
+    }
+
+    /**
+     * Yeni görev oluştur
+     */
+    public function create_task($request) {
+        $user_id = get_current_user_id();
+        $circle_id = $request->get_param('id');
+        $params = $request->get_json_params();
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        // Sadece mentor görev oluşturabilir
+        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
+        if ((int)$mentor_id !== $user_id && !current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Görev oluşturma yetkiniz yok.', ['status' => 403]);
+        }
+        
+        $tasks = get_post_meta($circle_id, 'circle_tasks', true);
+        if (!is_array($tasks)) $tasks = [];
+        
+        $new_task = [
+            'id' => time() . '_' . wp_rand(1000, 9999),
+            'title' => sanitize_text_field($params['title'] ?? ''),
+            'description' => sanitize_textarea_field($params['description'] ?? ''),
+            'points' => (int) ($params['points'] ?? 10),
+            'deadline' => sanitize_text_field($params['deadline'] ?? ''),
+            'assigned_to' => [],
+            'completed_by' => [],
+            'status' => 'active',
+            'created_at' => current_time('mysql'),
+            'created_by' => $user_id
+        ];
+        
+        if (empty($new_task['title'])) {
+            return new WP_Error('missing_title', 'Görev başlığı zorunludur.', ['status' => 400]);
+        }
+        
+        $tasks[] = $new_task;
+        update_post_meta($circle_id, 'circle_tasks', $tasks);
+        
+        return new WP_REST_Response([
+            'message' => 'Görev oluşturuldu!',
+            'task' => $new_task
+        ], 201);
+    }
+
+    /**
+     * Görev güncelle
+     */
+    public function update_task($request) {
+        $user_id = get_current_user_id();
+        $circle_id = $request->get_param('id');
+        $task_id = $request->get_param('task_id');
+        $params = $request->get_json_params();
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
+        if ((int)$mentor_id !== $user_id && !current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Bu işlem için yetkiniz yok.', ['status' => 403]);
+        }
+        
+        $tasks = get_post_meta($circle_id, 'circle_tasks', true);
+        if (!is_array($tasks)) $tasks = [];
+        
+        $task_index = array_search($task_id, array_column($tasks, 'id'));
+        if ($task_index === false) {
+            return new WP_Error('not_found', 'Görev bulunamadı.', ['status' => 404]);
+        }
+        
+        if (isset($params['title'])) $tasks[$task_index]['title'] = sanitize_text_field($params['title']);
+        if (isset($params['description'])) $tasks[$task_index]['description'] = sanitize_textarea_field($params['description']);
+        if (isset($params['points'])) $tasks[$task_index]['points'] = (int) $params['points'];
+        if (isset($params['deadline'])) $tasks[$task_index]['deadline'] = sanitize_text_field($params['deadline']);
+        if (isset($params['status'])) $tasks[$task_index]['status'] = sanitize_text_field($params['status']);
+        
+        update_post_meta($circle_id, 'circle_tasks', $tasks);
+        
+        return new WP_REST_Response([
+            'message' => 'Görev güncellendi!',
+            'task' => $tasks[$task_index]
+        ], 200);
+    }
+
+    /**
+     * Görev sil
+     */
+    public function delete_task($request) {
+        $user_id = get_current_user_id();
+        $circle_id = $request->get_param('id');
+        $task_id = $request->get_param('task_id');
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
+        if ((int)$mentor_id !== $user_id && !current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Bu işlem için yetkiniz yok.', ['status' => 403]);
+        }
+        
+        $tasks = get_post_meta($circle_id, 'circle_tasks', true);
+        if (!is_array($tasks)) $tasks = [];
+        
+        $tasks = array_filter($tasks, function($task) use ($task_id) {
+            return $task['id'] !== $task_id;
+        });
+        
+        update_post_meta($circle_id, 'circle_tasks', array_values($tasks));
+        
+        return new WP_REST_Response(['message' => 'Görev silindi!'], 200);
+    }
+
+    /**
+     * Görevi üyeye ata
+     */
+    public function assign_task($request) {
+        $user_id = get_current_user_id();
+        $circle_id = $request->get_param('id');
+        $task_id = $request->get_param('task_id');
+        $params = $request->get_json_params();
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
+        if ((int)$mentor_id !== $user_id && !current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Görev atama yetkiniz yok.', ['status' => 403]);
+        }
+        
+        $member_ids = $params['member_ids'] ?? [];
+        if (empty($member_ids) || !is_array($member_ids)) {
+            return new WP_Error('invalid_members', 'En az bir üye seçmelisiniz.', ['status' => 400]);
+        }
+        
+        $tasks = get_post_meta($circle_id, 'circle_tasks', true);
+        if (!is_array($tasks)) $tasks = [];
+        
+        $task_index = array_search($task_id, array_column($tasks, 'id'));
+        if ($task_index === false) {
+            return new WP_Error('not_found', 'Görev bulunamadı.', ['status' => 404]);
+        }
+        
+        $tasks[$task_index]['assigned_to'] = array_map('intval', $member_ids);
+        update_post_meta($circle_id, 'circle_tasks', $tasks);
+        
+        return new WP_REST_Response([
+            'message' => 'Görev atandı!',
+            'task' => $tasks[$task_index]
+        ], 200);
+    }
+
+    /**
+     * Circle üyelerini getir (detaylı)
+     */
+    public function get_members($request) {
+        $circle_id = $request->get_param('id');
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        $members = get_users([
+            'meta_key' => 'circle_id',
+            'meta_value' => $circle_id
+        ]);
+        
+        $members_data = [];
+        foreach ($members as $member) {
+            $members_data[] = [
+                'id' => $member->ID,
+                'name' => $member->display_name,
+                'email' => $member->user_email,
+                'avatar' => get_user_meta($member->ID, 'avatar_url', true),
+                'role' => get_user_meta($member->ID, 'circle_role', true),
+                'score' => (int) get_user_meta($member->ID, 'rejimde_total_score', true),
+                'joined_at' => get_user_meta($member->ID, 'circle_joined_at', true)
+            ];
+        }
+        
+        // Skora göre sırala
+        usort($members_data, function($a, $b) {
+            return $b['score'] - $a['score'];
+        });
+        
+        return new WP_REST_Response($members_data, 200);
+    }
+
+    /**
+     * Üyeyi circle'dan çıkar
+     */
+    public function remove_member($request) {
+        $user_id = get_current_user_id();
+        $circle_id = $request->get_param('id');
+        $member_id = (int) $request->get_param('member_id');
+        
+        $circle = get_post($circle_id);
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            return new WP_Error('not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
+        if ((int)$mentor_id !== $user_id && !current_user_can('manage_options')) {
+            return new WP_Error('forbidden', 'Üye çıkarma yetkiniz yok.', ['status' => 403]);
+        }
+        
+        // Mentor kendini çıkaramaz
+        if ($member_id === (int)$mentor_id) {
+            return new WP_Error('forbidden', 'Mentor kendini circle\'dan çıkaramaz.', ['status' => 400]);
+        }
+        
+        // Üye bu circle'da mı kontrol et
+        $member_circle = get_user_meta($member_id, 'circle_id', true);
+        if ((int)$member_circle !== (int)$circle_id) {
+            return new WP_Error('not_member', 'Bu kullanıcı circle üyesi değil.', ['status' => 400]);
+        }
+        
+        // Üyenin puanını circle'dan düş
+        $member_score = (int) get_user_meta($member_id, 'rejimde_total_score', true);
+        $circle_score = (int) get_post_meta($circle_id, 'total_score', true);
+        update_post_meta($circle_id, 'total_score', max(0, $circle_score - $member_score));
+        
+        // Üye sayısını güncelle
+        $count = (int) get_post_meta($circle_id, 'member_count', true);
+        if ($count > 0) update_post_meta($circle_id, 'member_count', $count - 1);
+        
+        // Üyeyi circle'dan çıkar
+        delete_user_meta($member_id, 'circle_id');
+        delete_user_meta($member_id, 'circle_role');
+        
+        return new WP_REST_Response(['message' => 'Üye circle\'dan çıkarıldı.'], 200);
     }
 }
