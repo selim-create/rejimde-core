@@ -74,19 +74,19 @@ class CircleController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_auth'],
         ]);
 
-        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>\d+)', [
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>[a-f0-9\-]+)', [
             'methods' => 'PUT',
             'callback' => [$this, 'update_task'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
 
-        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>\d+)', [
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>[a-f0-9\-]+)', [
             'methods' => 'DELETE',
             'callback' => [$this, 'delete_task'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
 
-        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>\d+)/assign', [
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/tasks/(?P<task_id>[a-f0-9\-]+)/assign', [
             'methods' => 'POST',
             'callback' => [$this, 'assign_task'],
             'permission_callback' => [$this, 'check_auth'],
