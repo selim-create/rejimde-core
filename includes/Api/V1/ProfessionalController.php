@@ -455,8 +455,11 @@ class ProfessionalController extends WP_REST_Controller {
     /**
      * Kullanıcının online olup olmadığını kontrol et
      * Son 15 dakika içinde aktivite varsa online kabul edilir
+     * 
+     * @param int $user_id WordPress user ID
+     * @return bool True if user is online, false otherwise
      */
-    private function isUserOnline($user_id) {
+    private function isUserOnline($user_id): bool {
         if (!$user_id) return false;
         
         $last_activity = get_user_meta($user_id, 'last_activity', true);
