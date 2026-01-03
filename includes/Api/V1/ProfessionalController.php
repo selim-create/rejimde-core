@@ -112,7 +112,7 @@ class ProfessionalController extends WP_REST_Controller {
                     'score_impact'  => get_post_meta($post_id, 'skor_etkisi', true) ?: '--',
                     'is_verified'   => get_post_meta($post_id, 'onayli', true) === '1',
                     'is_featured'   => get_post_meta($post_id, 'editor_secimi', true) === '1',
-                    'is_online'     => true,
+                    'is_online'     => $this->isUserOnline($user_id),
                     'location'      => $location,
                     'brand'         => get_post_meta($post_id, 'kurum', true) ?: get_user_meta($user_id, 'brand_name', true),
                     'is_claimed'    => $is_claimed
@@ -305,6 +305,7 @@ class ProfessionalController extends WP_REST_Controller {
             'is_verified'   => get_post_meta($post_id, 'onayli', true) === '1',
             'is_featured'   => get_post_meta($post_id, 'editor_secimi', true) === '1',
             'is_claimed'    => $is_claimed,
+            'is_online'     => $this->isUserOnline($user_id),
             
             // Görünürlük ayarlarına göre filtrelenmiş veriler
             'location'      => $location_visible,
@@ -444,5 +445,19 @@ class ProfessionalController extends WP_REST_Controller {
         ));
         
         return (int) $count;
+    }
+    
+    /**
+     * Kullanıcının online olup olmadığını kontrol et
+     * Son 15 dakika içinde aktivite varsa online kabul edilir
+     */
+    private function isUserOnline($user_id) {
+        if (!$user_id) return false;
+        
+        $last_activity = get_user_meta($user_id, 'last_activity', true);
+        if (!$last_activity) return false;
+        
+        $fifteen_minutes_ago = time() - (15 * 60);
+        return (int)$last_activity > $fifteen_minutes_ago;
     }
 }

@@ -68,6 +68,13 @@ class ProfileController extends WP_REST_Controller {
         }
 
         $user_id = $user->ID;
+        
+        // Update last activity for the current user viewing the profile
+        $current_user_id = get_current_user_id();
+        if ($current_user_id) {
+            update_user_meta($current_user_id, 'last_activity', time());
+        }
+        
         $roles = (array) $user->roles;
         $is_expert = in_array('rejimde_pro', $roles);
 

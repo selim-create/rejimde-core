@@ -217,6 +217,9 @@ class AuthController extends WP_REST_Controller {
             return $this->error($token_data->get_error_message(), 500);
         }
         
+        // Update last activity for online status tracking
+        update_user_meta($user->ID, 'last_activity', time());
+        
         // Dispatch login_success event
         $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
         $dispatcher->dispatch('login_success', [
@@ -306,6 +309,9 @@ class AuthController extends WP_REST_Controller {
         if (is_wp_error($token_data)) {
             return $this->error($token_data->get_error_message(), 500);
         }
+        
+        // Update last activity for online status tracking
+        update_user_meta($user->ID, 'last_activity', time());
         
         // Dispatch login_success event
         $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
