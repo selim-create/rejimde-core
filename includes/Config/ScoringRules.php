@@ -139,8 +139,8 @@ return [
 
     // FEATURE FLAGS (varsayılan değerler)
     'feature_flags' => [
-        'enable_water_tracking' => false,
-        'enable_steps_tracking' => false,
+        'enable_water_tracking' => true,
+        'enable_steps_tracking' => true,
         'enable_meal_photos' => true,
         'enable_circle_creation_points' => false,
         'enable_daily_score_cap' => false, // günlük max puan limiti
