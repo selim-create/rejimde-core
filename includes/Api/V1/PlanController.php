@@ -148,6 +148,12 @@ class PlanController extends WP_REST_Controller {
             'order' => 'DESC'
         ];
 
+        // Author filtresi - GET parametresinden veya request'ten alınır
+        $author = $request->get_param('author');
+        if ($author) {
+            $args['author'] = intval($author);
+        }
+
         // Filtreleme parametreleri eklenebilir
         // if ($request['category']) ...
 

@@ -12,6 +12,11 @@ class ProfessionalController extends WP_REST_Controller {
     protected $base = 'professionals';
     private $rejiScoreService;
     
+    /**
+     * Online status timeout in seconds (15 minutes)
+     */
+    private const ONLINE_TIMEOUT_SECONDS = 900; // 15 * 60
+    
     public function __construct() {
         // Initialize RejiScore service once for reuse
         $this->rejiScoreService = new \Rejimde\Services\RejiScoreService();
@@ -112,7 +117,7 @@ class ProfessionalController extends WP_REST_Controller {
                     'score_impact'  => get_post_meta($post_id, 'skor_etkisi', true) ?: '--',
                     'is_verified'   => get_post_meta($post_id, 'onayli', true) === '1',
                     'is_featured'   => get_post_meta($post_id, 'editor_secimi', true) === '1',
-                    'is_online'     => true,
+                    'is_online'     => $this->isUserOnline($user_id),
                     'location'      => $location,
                     'brand'         => get_post_meta($post_id, 'kurum', true) ?: get_user_meta($user_id, 'brand_name', true),
                     'is_claimed'    => $is_claimed
@@ -305,6 +310,7 @@ class ProfessionalController extends WP_REST_Controller {
             'is_verified'   => get_post_meta($post_id, 'onayli', true) === '1',
             'is_featured'   => get_post_meta($post_id, 'editor_secimi', true) === '1',
             'is_claimed'    => $is_claimed,
+            'is_online'     => $this->isUserOnline($user_id),
             
             // Görünürlük ayarlarına göre filtrelenmiş veriler
             'location'      => $location_visible,
@@ -444,5 +450,22 @@ class ProfessionalController extends WP_REST_Controller {
         ));
         
         return (int) $count;
+    }
+    
+    /**
+     * Kullanıcının online olup olmadığını kontrol et
+     * Son 15 dakika içinde aktivite varsa online kabul edilir
+     * 
+     * @param int $user_id WordPress user ID
+     * @return bool True if user is online, false otherwise
+     */
+    private function isUserOnline($user_id): bool {
+        if (!$user_id) return false;
+        
+        $last_activity = get_user_meta($user_id, 'last_activity', true);
+        if (!$last_activity) return false;
+        
+        $timeout_threshold = time() - self::ONLINE_TIMEOUT_SECONDS;
+        return (int)$last_activity > $timeout_threshold;
     }
 }
