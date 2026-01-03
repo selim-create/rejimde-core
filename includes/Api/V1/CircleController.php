@@ -593,7 +593,7 @@ class CircleController extends WP_REST_Controller {
         if (!is_array($tasks)) $tasks = [];
         
         $new_task = [
-            'id' => time() . '_' . wp_rand(1000, 9999),
+            'id' => wp_generate_uuid4(),
             'title' => sanitize_text_field($params['title'] ?? ''),
             'description' => sanitize_textarea_field($params['description'] ?? ''),
             'points' => (int) ($params['points'] ?? 10),
@@ -680,10 +680,12 @@ class CircleController extends WP_REST_Controller {
         $tasks = get_post_meta($circle_id, 'circle_tasks', true);
         if (!is_array($tasks)) $tasks = [];
         
-        $tasks = array_filter($tasks, function($task) use ($task_id) {
-            return $task['id'] !== $task_id;
-        });
+        $task_index = array_search($task_id, array_column($tasks, 'id'));
+        if ($task_index === false) {
+            return new WP_Error('not_found', 'Görev bulunamadı.', ['status' => 404]);
+        }
         
+        unset($tasks[$task_index]);
         update_post_meta($circle_id, 'circle_tasks', array_values($tasks));
         
         return new WP_REST_Response(['message' => 'Görev silindi!'], 200);
