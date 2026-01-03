@@ -498,7 +498,8 @@ class EventDispatcher {
                     $parentComment = get_comment($payload['parent_comment_id']);
                     if ($parentComment && (int) $parentComment->user_id != $userId) {
                         // Get content information for the notification URL
-                        $postId = $payload['entity_id'] ?? $parentComment->comment_post_ID;
+                        // Use entity_id if explicitly provided, otherwise use the comment's post ID
+                        $postId = isset($payload['entity_id']) ? $payload['entity_id'] : $parentComment->comment_post_ID;
                         $post = get_post($postId);
                         $contentInfo = $this->getContentTypeAndSlug($post);
                         
@@ -514,7 +515,7 @@ class EventDispatcher {
                 } else {
                     // Not a reply - check if it's a comment on user's own content
                     $postId = $payload['entity_id'] ?? null;
-                    if ($postId) {
+                    if ($postId !== null) {
                         $post = get_post($postId);
                         if ($post && (int) $post->post_author != $userId) {
                             $contentInfo = $this->getContentTypeAndSlug($post);
@@ -580,21 +581,9 @@ class EventDispatcher {
                 if ($result['points_earned'] > 0) {
                     $contentName = $payload['context']['content_name'] ?? 'İçerik';
                     
-                    // Determine content type label
-                    $contentTypeLabel = 'İçerik';
-                    $contentType = '';
+                    // Determine content type label and type from event
+                    $contentInfo = $this->getContentTypeFromEvent($eventType);
                     $contentSlug = '';
-                    
-                    if ($eventType === 'blog_points_claimed') {
-                        $contentTypeLabel = 'Blog';
-                        $contentType = 'blog';
-                    } elseif ($eventType === 'diet_completed') {
-                        $contentTypeLabel = 'Diyet';
-                        $contentType = 'diet';
-                    } elseif ($eventType === 'exercise_completed') {
-                        $contentTypeLabel = 'Egzersiz';
-                        $contentType = 'exercise';
-                    }
                     
                     // Get content slug if entity_id is available
                     if (isset($payload['entity_id'])) {
@@ -606,8 +595,8 @@ class EventDispatcher {
                     
                     $this->notificationService->create($userId, 'content_completed', [
                         'content_name' => $contentName,
-                        'content_type_label' => $contentTypeLabel,
-                        'content_type' => $contentType,
+                        'content_type_label' => $contentInfo['content_type_label'],
+                        'content_type' => $contentInfo['content_type'],
                         'content_slug' => $contentSlug,
                         'points' => $result['points_earned'],
                         'entity_type' => $payload['entity_type'] ?? null,
@@ -674,6 +663,33 @@ class EventDispatcher {
         return [
             'content_type' => $contentType,
             'content_slug' => $contentSlug
+        ];
+    }
+    
+    /**
+     * Get content type label from event type
+     * 
+     * @param string $eventType Event type
+     * @return array ['content_type_label' => string, 'content_type' => string]
+     */
+    private function getContentTypeFromEvent(string $eventType): array {
+        $contentTypeLabel = 'İçerik';
+        $contentType = '';
+        
+        if ($eventType === 'blog_points_claimed') {
+            $contentTypeLabel = 'Blog';
+            $contentType = 'blog';
+        } elseif ($eventType === 'diet_completed') {
+            $contentTypeLabel = 'Diyet';
+            $contentType = 'diet';
+        } elseif ($eventType === 'exercise_completed') {
+            $contentTypeLabel = 'Egzersiz';
+            $contentType = 'exercise';
+        }
+        
+        return [
+            'content_type_label' => $contentTypeLabel,
+            'content_type' => $contentType
         ];
     }
     
