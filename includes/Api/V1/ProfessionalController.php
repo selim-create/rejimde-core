@@ -105,6 +105,23 @@ class ProfessionalController extends WP_REST_Controller {
                     $location = get_post_meta($post_id, 'konum', true);
                 }
 
+                // RejiScore hesapla
+                $rejiScoreData = [];
+                if ($user_id) {
+                    $rejiScoreData = $this->rejiScoreService->calculate((int) $user_id);
+                }
+
+                // Deneyim yılı hesapla
+                $experience_years = 0;
+                if ($user_id) {
+                    $career_start = get_user_meta($user_id, 'career_start_date', true);
+                    if ($career_start) {
+                        $start_year = (int) substr($career_start, 0, 4);
+                        $current_year = (int) date('Y');
+                        $experience_years = max(0, $current_year - $start_year);
+                    }
+                }
+
                 $experts[] = [
                     'id'            => $post_id,
                     'name'          => get_the_title(),
@@ -120,11 +137,42 @@ class ProfessionalController extends WP_REST_Controller {
                     'is_online'     => $this->isUserOnline($user_id),
                     'location'      => $location,
                     'brand'         => get_post_meta($post_id, 'kurum', true) ?: get_user_meta($user_id, 'brand_name', true),
-                    'is_claimed'    => $is_claimed
+                    'is_claimed'    => $is_claimed,
+                    
+                    // RejiScore verileri
+                    'reji_score'       => $rejiScoreData['reji_score'] ?? 50,
+                    'trend_percentage' => $rejiScoreData['trend_percentage'] ?? 0,
+                    'trend_direction'  => $rejiScoreData['trend_direction'] ?? 'stable',
+                    'trust_score'      => $rejiScoreData['trust_score'] ?? 50,
+                    'contribution_score' => $rejiScoreData['contribution_score'] ?? 50,
+                    'freshness_score'  => $rejiScoreData['freshness_score'] ?? 50,
+                    
+                    // Sosyal veriler
+                    'followers_count'  => is_array(get_user_meta($user_id, 'rejimde_followers', true)) 
+                                          ? count(get_user_meta($user_id, 'rejimde_followers', true)) : 0,
+                    'client_count'     => $user_id ? $this->getActiveClientCount($user_id) : 0,
+                    'content_count'    => $rejiScoreData['content_count'] ?? 0,
+                    
+                    // Deneyim
+                    'experience_years' => $experience_years,
                 ];
             }
             wp_reset_postdata();
         }
+
+        // Sıralama: 1. is_featured (Editörün Seçimi), 2. is_verified (Onaylı), 3. reji_score
+        usort($experts, function($a, $b) {
+            // 1. Önce Editörün Seçimi
+            if ($a['is_featured'] && !$b['is_featured']) return -1;
+            if (!$a['is_featured'] && $b['is_featured']) return 1;
+            
+            // 2. Sonra Onaylı Uzmanlar
+            if ($a['is_verified'] && !$b['is_verified']) return -1;
+            if (!$a['is_verified'] && $b['is_verified']) return 1;
+            
+            // 3. Son olarak RejiScore'a göre (yüksekten düşüğe)
+            return ($b['reji_score'] ?? 0) - ($a['reji_score'] ?? 0);
+        });
 
         return new WP_REST_Response($experts, 200);
     }
