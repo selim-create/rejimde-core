@@ -514,7 +514,8 @@ class EventDispatcher {
                     }
                 } else {
                     // Not a reply - check if it's a comment on user's own content
-                    $postId = $payload['entity_id'] ?? null;
+                    // For comment_created events, entity_id is the comment ID, post ID is in context
+                    $postId = $payload['context']['post_id'] ?? null;
                     if ($postId !== null && $postId > 0) {
                         $post = get_post($postId);
                         if ($post && (int) $post->post_author != $userId) {
@@ -525,7 +526,7 @@ class EventDispatcher {
                             $this->notificationService->create((int) $post->post_author, 'comment_on_content', [
                                 'actor_id' => $userId,
                                 'entity_type' => $payload['entity_type'] ?? 'comment',
-                                'entity_id' => $postId,
+                                'entity_id' => $payload['entity_id'] ?? null,  // This is the comment ID
                                 'comment_id' => $payload['comment_id'] ?? null,
                                 'content_type' => $contentInfo['content_type'],
                                 'content_slug' => $contentInfo['content_slug'],
