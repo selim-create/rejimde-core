@@ -213,4 +213,178 @@ class TaskService {
         
         return $created;
     }
+    
+    /**
+     * Get all task definitions (Config + Database merged)
+     * 
+     * @param string|null $type Filter by task type
+     * @return array Array of task definitions
+     */
+    public function getAllTaskDefinitions(string $type = null): array {
+        // 1. Config'den görevleri al
+        $configTasks = require REJIMDE_PATH . 'includes/Config/TaskDefinitions.php';
+        
+        // 2. Database'den dinamik görevleri al
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_task_definitions';
+        $dbTasks = $wpdb->get_results("SELECT * FROM $table WHERE is_active = 1", ARRAY_A);
+        
+        // 3. Merge et (database slug'ları config'i override edebilir)
+        $allTasks = [];
+        
+        foreach ($configTasks as $slug => $task) {
+            $task['slug'] = $slug;
+            $task['source'] = 'config';
+            if ($type === null || $task['task_type'] === $type) {
+                $allTasks[$slug] = $task;
+            }
+        }
+        
+        foreach ($dbTasks as $task) {
+            $task['source'] = 'database';
+            $task['scoring_event_types'] = json_decode($task['scoring_event_types'], true) ?? [];
+            if ($type === null || $task['task_type'] === $type) {
+                $allTasks[$task['slug']] = $task;
+            }
+        }
+        
+        return $allTasks;
+    }
+    
+    /**
+     * Create dynamic task (database)
+     * 
+     * @param array $data Task data
+     * @return int|false Task ID or false on failure
+     */
+    public function createTask(array $data): int|false {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_task_definitions';
+        
+        // Validate required fields
+        if (empty($data['slug']) || empty($data['title']) || empty($data['task_type'])) {
+            return false;
+        }
+        
+        // Check if slug already exists
+        $exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table WHERE slug = %s",
+            $data['slug']
+        ));
+        
+        if ($exists) {
+            return false; // Slug must be unique
+        }
+        
+        // Prepare data for insertion
+        $insert_data = [
+            'slug' => $data['slug'],
+            'title' => $data['title'],
+            'description' => $data['description'] ?? '',
+            'task_type' => $data['task_type'],
+            'target_value' => $data['target_value'] ?? 1,
+            'scoring_event_types' => json_encode($data['scoring_event_types'] ?? []),
+            'reward_score' => $data['reward_score'] ?? 0,
+            'badge_progress_contribution' => $data['badge_progress_contribution'] ?? 0,
+            'reward_badge_id' => $data['reward_badge_id'] ?? null,
+            'is_active' => $data['is_active'] ?? 1,
+        ];
+        
+        $result = $wpdb->insert($table, $insert_data);
+        
+        return $result ? $wpdb->insert_id : false;
+    }
+    
+    /**
+     * Update dynamic task
+     * 
+     * @param int $id Task ID
+     * @param array $data Task data
+     * @return bool Success
+     */
+    public function updateTask(int $id, array $data): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_task_definitions';
+        
+        // Prepare data for update
+        $update_data = [];
+        
+        $allowed_fields = [
+            'slug', 'title', 'description', 'task_type', 'target_value',
+            'scoring_event_types', 'reward_score', 'badge_progress_contribution',
+            'reward_badge_id', 'is_active'
+        ];
+        
+        foreach ($allowed_fields as $field) {
+            if (isset($data[$field])) {
+                if ($field === 'scoring_event_types') {
+                    $update_data[$field] = json_encode($data[$field]);
+                } else {
+                    $update_data[$field] = $data[$field];
+                }
+            }
+        }
+        
+        if (empty($update_data)) {
+            return false;
+        }
+        
+        $result = $wpdb->update(
+            $table,
+            $update_data,
+            ['id' => $id],
+            null,
+            ['%d']
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * Delete dynamic task
+     * 
+     * @param int $id Task ID
+     * @return bool Success
+     */
+    public function deleteTask(int $id): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_task_definitions';
+        
+        $result = $wpdb->delete($table, ['id' => $id], ['%d']);
+        
+        return $result !== false;
+    }
+    
+    /**
+     * Toggle task active status
+     * 
+     * @param int $id Task ID
+     * @return int|false New status (1 or 0) or false on failure
+     */
+    public function toggleTaskStatus(int $id): int|false {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_task_definitions';
+        
+        // Get current status
+        $current = $wpdb->get_var($wpdb->prepare(
+            "SELECT is_active FROM $table WHERE id = %d",
+            $id
+        ));
+        
+        if ($current === null) {
+            return false;
+        }
+        
+        $new_status = $current ? 0 : 1;
+        
+        $result = $wpdb->update(
+            $table,
+            ['is_active' => $new_status],
+            ['id' => $id],
+            ['%d'],
+            ['%d']
+        );
+        
+        return $result !== false ? $new_status : false;
+    }
 }

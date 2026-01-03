@@ -143,6 +143,7 @@ class Loader {
             if (file_exists(REJIMDE_PATH . 'includes/Admin/VerificationPage.php')) require_once REJIMDE_PATH . 'includes/Admin/VerificationPage.php';
             if (file_exists(REJIMDE_PATH . 'includes/Admin/ImporterPage.php')) require_once REJIMDE_PATH . 'includes/Admin/ImporterPage.php';
             if (file_exists(REJIMDE_PATH . 'includes/Admin/MascotSettings.php')) require_once REJIMDE_PATH . 'includes/Admin/MascotSettings.php';
+            if (file_exists(REJIMDE_PATH . 'includes/Admin/TaskAdminPage.php')) require_once REJIMDE_PATH . 'includes/Admin/TaskAdminPage.php';
         }
     }
 
@@ -247,6 +248,7 @@ class Loader {
             if (class_exists('Rejimde\\Admin\\VerificationPage')) (new \Rejimde\Admin\VerificationPage())->run();
             if (class_exists('Rejimde\\Admin\\ImporterPage')) (new \Rejimde\Admin\ImporterPage())->run();
             if (class_exists('Rejimde\\Admin\\MascotSettings')) (new \Rejimde\Admin\MascotSettings())->run();
+            if (class_exists('Rejimde\\Admin\\TaskAdminPage')) (new \Rejimde\Admin\TaskAdminPage())->register();
         }
 
         // Meta Alanları
