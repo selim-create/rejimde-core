@@ -77,7 +77,8 @@ add_action('init', function() {
 });
 
 /**
- * GÜVENLİ CORS AYARLARI
+ * GÜVENLİ CORS AYARLARI - TÜM YANITLARDA ÇALIŞACAK ŞEKİLDE
+ * Priority 1 ile en erken çalışarak rate limit/error yanıtlarında da header'ları ekler
  */
 add_action('init', function() {
     $allowed_origins = [
@@ -89,17 +90,47 @@ add_action('init', function() {
         'https://www.rejimde.com',
     ];
 
-    $origin = get_http_origin();
+    // get_http_origin() yerine direkt $_SERVER kullan - daha güvenilir
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 
     if (in_array($origin, $allowed_origins)) {
         header("Access-Control-Allow-Origin: " . $origin);
         header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE, PATCH");
-        header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With, Content-Disposition");
+        header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With, Content-Disposition, Accept, Origin");
         header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Max-Age: 86400"); // 24 saat preflight cache
     }
 
-    if ('OPTIONS' == $_SERVER['REQUEST_METHOD']) {
+    // OPTIONS preflight request'leri için erken çıkış
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         status_header(200);
         exit();
     }
-});
+}, 1); // Priority 1 - En erken çalışsın
+
+/**
+ * REST API yanıtlarında da CORS header'larını garantile
+ * Bu filter rate limit (429) veya diğer error yanıtlarında da çalışır
+ */
+add_filter('rest_pre_serve_request', function($served, $result, $request, $server) {
+    $allowed_origins = [
+        'http://localhost:3000',
+        'https://rejimde.com',
+        'http://127.0.0.1:3000',
+        'http://192.168.48.90:3000',
+        'https://192.168.48.89:3000',
+        'https://www.rejimde.com',
+    ];
+    
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+    
+    if (in_array($origin, $allowed_origins)) {
+        // Header zaten gönderilmemişse ekle
+        if (!headers_sent()) {
+            header("Access-Control-Allow-Origin: " . $origin);
+            header("Access-Control-Allow-Credentials: true");
+        }
+    }
+    
+    return $served;
+}, 10, 4);
