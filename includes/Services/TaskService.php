@@ -24,6 +24,16 @@ class TaskService {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_task_definitions';
         
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SHOW TABLES LIKE %s",
+            $table
+        ));
+        
+        if (!$table_exists) {
+            return [];
+        }
+        
         $sql = "SELECT * FROM $table WHERE is_active = 1";
         
         if ($type) {
