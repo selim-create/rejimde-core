@@ -11,11 +11,13 @@ class ProfileController extends WP_REST_Controller {
     protected $base = 'profile';
 
     public function register_routes() {
-        // Kullanıcı Profilini Getir (Username ile)
-        register_rest_route($this->namespace, '/' . $this->base . '/(?P<username>[a-zA-Z0-9_-]+)', [
+        // SPECIFIC routes first (order matters!)
+        
+        // Takip Edilen Kullanıcılar ve Aktiviteleri - MUST be before /{username}
+        register_rest_route($this->namespace, '/' . $this->base . '/following', [
             'methods' => 'GET',
-            'callback' => [$this, 'get_profile_by_username'],
-            'permission_callback' => '__return_true',
+            'callback' => [$this, 'get_following'],
+            'permission_callback' => [$this, 'check_auth'],
         ]);
 
         // Takip Et / Bırak
@@ -32,11 +34,12 @@ class ProfileController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_auth'],
         ]);
         
-        // Takip Edilen Kullanıcılar ve Aktiviteleri
-        register_rest_route($this->namespace, '/' . $this->base . '/following', [
+        // PARAMETERIZED routes last
+        // Kullanıcı Profilini Getir (Username ile) - MUST be last
+        register_rest_route($this->namespace, '/' . $this->base . '/(?P<username>[a-zA-Z0-9_-]+)', [
             'methods' => 'GET',
-            'callback' => [$this, 'get_following'],
-            'permission_callback' => [$this, 'check_auth'],
+            'callback' => [$this, 'get_profile_by_username'],
+            'permission_callback' => '__return_true',
         ]);
     }
 

@@ -73,69 +73,88 @@ class BadgeController extends BaseController {
      * Get user's badge progress
      */
     public function get_my_badges(WP_REST_Request $request) {
-        $userId = get_current_user_id();
-        
-        if (!$userId) {
-            return $this->error('User not authenticated', 401);
-        }
-        
-        $badges = $this->badgeService->getUserBadgeProgress($userId);
-        
-        // Format badges
-        $formatted = [];
-        foreach ($badges as $badge) {
-            $formatted[] = [
-                'slug' => $badge['slug'],
-                'title' => $badge['title'],
-                'description' => $badge['description'],
-                'icon' => $badge['icon'],
-                'category' => $badge['category'],
-                'tier' => $badge['tier'],
-                'progress' => (int)$badge['current_progress'],
-                'max_progress' => (int)$badge['max_progress'],
-                'percent' => $badge['percent'],
-                'is_earned' => (bool)$badge['is_earned'],
-                'earned_at' => $badge['earned_at']
-            ];
-        }
-        
-        // Get badges by category
-        $byCategory = [
-            'behavior' => [],
-            'discipline' => [],
-            'social' => [],
-            'milestone' => []
-        ];
-        
-        foreach ($formatted as $badge) {
-            $category = $badge['category'];
-            if (isset($byCategory[$category])) {
-                $byCategory[$category][] = $badge;
+        try {
+            $userId = get_current_user_id();
+            
+            if (!$userId) {
+                return $this->error('User not authenticated', 401);
             }
-        }
-        
-        // Get recently earned
-        $recentlyEarned = $this->badgeService->getRecentlyEarnedBadges($userId, 5);
-        $recentFormatted = [];
-        foreach ($recentlyEarned as $badge) {
-            $recentFormatted[] = [
-                'slug' => $badge['slug'],
-                'title' => $badge['title'],
-                'icon' => $badge['icon'],
-                'tier' => $badge['tier'],
-                'earned_at' => $badge['earned_at']
+            
+            $badges = $this->badgeService->getUserBadgeProgress($userId);
+            
+            // Format badges
+            $formatted = [];
+            foreach ($badges as $badge) {
+                $formatted[] = [
+                    'slug' => $badge['slug'],
+                    'title' => $badge['title'],
+                    'description' => $badge['description'],
+                    'icon' => $badge['icon'],
+                    'category' => $badge['category'],
+                    'tier' => $badge['tier'],
+                    'progress' => (int)$badge['current_progress'],
+                    'max_progress' => (int)$badge['max_progress'],
+                    'percent' => $badge['percent'],
+                    'is_earned' => (bool)$badge['is_earned'],
+                    'earned_at' => $badge['earned_at']
+                ];
+            }
+            
+            // Get badges by category
+            $byCategory = [
+                'behavior' => [],
+                'discipline' => [],
+                'social' => [],
+                'milestone' => []
             ];
+            
+            foreach ($formatted as $badge) {
+                $category = $badge['category'];
+                if (isset($byCategory[$category])) {
+                    $byCategory[$category][] = $badge;
+                }
+            }
+            
+            // Get recently earned
+            $recentlyEarned = $this->badgeService->getRecentlyEarnedBadges($userId, 5);
+            $recentFormatted = [];
+            foreach ($recentlyEarned as $badge) {
+                $recentFormatted[] = [
+                    'slug' => $badge['slug'],
+                    'title' => $badge['title'],
+                    'icon' => $badge['icon'],
+                    'tier' => $badge['tier'],
+                    'earned_at' => $badge['earned_at']
+                ];
+            }
+            
+            // Get stats
+            $stats = $this->badgeService->getBadgeStats($userId);
+            
+            return $this->success([
+                'badges' => $formatted,
+                'by_category' => $byCategory,
+                'recently_earned' => $recentFormatted,
+                'stats' => $stats
+            ]);
+        } catch (\Exception $e) {
+            error_log('BadgeController::get_my_badges error: ' . $e->getMessage());
+            return $this->success([
+                'badges' => [],
+                'by_category' => [
+                    'behavior' => [],
+                    'discipline' => [],
+                    'social' => [],
+                    'milestone' => []
+                ],
+                'recently_earned' => [],
+                'stats' => [
+                    'total_earned' => 0,
+                    'total_available' => 0,
+                    'percent_complete' => 0
+                ]
+            ]);
         }
-        
-        // Get stats
-        $stats = $this->badgeService->getBadgeStats($userId);
-        
-        return $this->success([
-            'badges' => $formatted,
-            'by_category' => $byCategory,
-            'recently_earned' => $recentFormatted,
-            'stats' => $stats
-        ]);
     }
     
     /**

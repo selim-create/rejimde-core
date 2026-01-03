@@ -94,6 +94,16 @@ class BadgeService {
         $badgeDefsTable = $wpdb->prefix . 'rejimde_badge_definitions';
         $userBadgesTable = $wpdb->prefix . 'rejimde_user_badges';
         
+        // Check if tables exist
+        $defs_table_exists = $wpdb->get_var($wpdb->prepare(
+            "SHOW TABLES LIKE %s",
+            $badgeDefsTable
+        ));
+        
+        if (!$defs_table_exists) {
+            return [];
+        }
+        
         $sql = "SELECT 
                     bd.*,
                     ub.current_progress,

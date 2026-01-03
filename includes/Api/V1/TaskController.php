@@ -101,43 +101,58 @@ class TaskController extends BaseController {
      * Get user's task status (all types with progress)
      */
     public function get_my_tasks(WP_REST_Request $request) {
-        $userId = get_current_user_id();
-        
-        if (!$userId) {
-            return $this->error('User not authenticated', 401);
+        try {
+            $userId = get_current_user_id();
+            
+            if (!$userId) {
+                return $this->error('User not authenticated', 401);
+            }
+            
+            // Initialize tasks for current periods if needed
+            $this->taskService->initializeUserTasks($userId, 'daily');
+            $this->taskService->initializeUserTasks($userId, 'weekly');
+            $this->taskService->initializeUserTasks($userId, 'monthly');
+            
+            // Get all user tasks
+            $allTasks = $this->taskService->getAllUserTasks($userId);
+            
+            // Format tasks for response
+            $daily = $this->formatUserTasks($allTasks['daily'], 'daily');
+            $weekly = $this->formatUserTasks($allTasks['weekly'], 'weekly');
+            $monthly = $this->formatUserTasks($allTasks['monthly'], 'monthly');
+            
+            // Get circle tasks if user is in a circle
+            $circle = [];
+            $circleId = get_user_meta($userId, 'circle_id', true);
+            if ($circleId) {
+                $circleTasks = $this->circleTaskService->getCircleTasks($circleId);
+                $circle = $this->formatCircleTasks($circleTasks);
+            }
+            
+            // Calculate summary
+            $summary = $this->calculateSummary($userId);
+            
+            return $this->success([
+                'daily' => $daily,
+                'weekly' => $weekly,
+                'monthly' => $monthly,
+                'circle' => $circle,
+                'summary' => $summary
+            ]);
+        } catch (\Exception $e) {
+            error_log('TaskController::get_my_tasks error: ' . $e->getMessage());
+            return $this->success([
+                'daily' => [],
+                'weekly' => [],
+                'monthly' => [],
+                'circle' => [],
+                'summary' => [
+                    'completed_today' => 0,
+                    'completed_this_week' => 0,
+                    'completed_this_month' => 0
+                ]
+            ]);
         }
-        
-        // Initialize tasks for current periods if needed
-        $this->taskService->initializeUserTasks($userId, 'daily');
-        $this->taskService->initializeUserTasks($userId, 'weekly');
-        $this->taskService->initializeUserTasks($userId, 'monthly');
-        
-        // Get all user tasks
-        $allTasks = $this->taskService->getAllUserTasks($userId);
-        
-        // Format tasks for response
-        $daily = $this->formatUserTasks($allTasks['daily'], 'daily');
-        $weekly = $this->formatUserTasks($allTasks['weekly'], 'weekly');
-        $monthly = $this->formatUserTasks($allTasks['monthly'], 'monthly');
-        
-        // Get circle tasks if user is in a circle
-        $circle = [];
-        $circleId = get_user_meta($userId, 'circle_id', true);
-        if ($circleId) {
-            $circleTasks = $this->circleTaskService->getCircleTasks($circleId);
-            $circle = $this->formatCircleTasks($circleTasks);
-        }
-        
-        // Calculate summary
-        $summary = $this->calculateSummary($userId);
-        
-        return $this->success([
-            'daily' => $daily,
-            'weekly' => $weekly,
-            'monthly' => $monthly,
-            'circle' => $circle,
-            'summary' => $summary
-        ]);
     }
     
     /**
