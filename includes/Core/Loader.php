@@ -42,6 +42,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Services/UserDashboardService.php')) require_once REJIMDE_PATH . 'includes/Services/UserDashboardService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/ExpertSettingsService.php')) require_once REJIMDE_PATH . 'includes/Services/ExpertSettingsService.php';
         if (file_exists(REJIMDE_PATH . 'includes/Services/RejiScoreService.php')) require_once REJIMDE_PATH . 'includes/Services/RejiScoreService.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Services/ServiceRequestService.php')) require_once REJIMDE_PATH . 'includes/Services/ServiceRequestService.php';
         
         // Core
         if (file_exists(REJIMDE_PATH . 'includes/Core/EventDispatcher.php')) require_once REJIMDE_PATH . 'includes/Core/EventDispatcher.php';
@@ -112,6 +113,8 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ProfileViewController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ProfileViewController.php';
         // YENİ: RejiScore Controller
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/RejiScoreController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/RejiScoreController.php';
+        // YENİ: Service Request Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/ServiceRequestController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/ServiceRequestController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -194,6 +197,8 @@ class Loader {
             if (class_exists('Rejimde\\Api\\V1\\ProfileViewController')) (new \Rejimde\Api\V1\ProfileViewController())->register_routes();
             // YENİ: RejiScore Routes
             if (class_exists('Rejimde\\Api\\V1\\RejiScoreController')) (new \Rejimde\Api\V1\RejiScoreController())->register_routes();
+            // YENİ: Service Request Routes
+            if (class_exists('Rejimde\\Api\\V1\\ServiceRequestController')) (new \Rejimde\Api\V1\ServiceRequestController())->register_routes();
         });
 
         // CPT Kayıtları
