@@ -374,6 +374,35 @@ class ProfessionalController extends WP_REST_Controller {
         // Yeni alanlar
         $data['goal_success_rate'] = $rejiScoreData['goal_success_rate'] ?? 85;
 
+        // ===============================================
+        // YENİ ALANLAR: Sosyal ve Danışan Verileri
+        // ===============================================
+        
+        // Takipçi & Sosyal Veriler (API'den çekilecek, localStorage'dan DEĞİL)
+        if ($user_id) {
+            $followers = get_user_meta($user_id, 'rejimde_followers', true);
+            $data['followers_count'] = is_array($followers) ? count($followers) : 0;
+            
+            $following = get_user_meta($user_id, 'rejimde_following', true);
+            $data['following_count'] = is_array($following) ? count($following) : 0;
+            
+            // Check if current user follows this expert
+            $current_user_id = get_current_user_id();
+            if ($current_user_id) {
+                $data['is_following'] = is_array($followers) && in_array($current_user_id, $followers);
+            } else {
+                $data['is_following'] = false;
+            }
+            
+            // Dinamik Danışan Sayısı (Gerçek danışan sayısı)
+            $data['client_count'] = $this->getActiveClientCount($user_id);
+        } else {
+            $data['followers_count'] = 0;
+            $data['following_count'] = 0;
+            $data['is_following'] = false;
+            $data['client_count'] = 0;
+        }
+
         return new WP_REST_Response($data, 200);
     }
 
@@ -397,5 +426,23 @@ class ProfessionalController extends WP_REST_Controller {
         }
         
         return $fallback;
+    }
+    
+    /**
+     * Uzmanın aktif danışan sayısını hesapla
+     */
+    private function getActiveClientCount($expert_user_id) {
+        global $wpdb;
+        $table_relationships = $wpdb->prefix . 'rejimde_relationships';
+        
+        $count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table_relationships 
+            WHERE expert_id = %d 
+            AND status = 'active' 
+            AND client_id > 0",
+            $expert_user_id
+        ));
+        
+        return (int) $count;
     }
 }

@@ -722,7 +722,29 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_expert_settings);
 
-        // 35. Terminoloji Migrasyonu
+        // 35. Service Requests Table (Package Requests)
+        $table_service_requests = $wpdb->prefix . 'rejimde_service_requests';
+        $sql_service_requests = "CREATE TABLE {$table_service_requests} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            expert_id BIGINT UNSIGNED NOT NULL COMMENT 'Uzmanın user_id si',
+            user_id BIGINT UNSIGNED NOT NULL COMMENT 'Talep eden kullanıcı',
+            service_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'İlgili hizmet paketi',
+            message TEXT DEFAULT NULL,
+            contact_preference VARCHAR(50) DEFAULT 'message' COMMENT 'message, video, phone',
+            status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+            expert_response TEXT DEFAULT NULL COMMENT 'Uzmanın yanıtı',
+            created_relationship_id BIGINT UNSIGNED DEFAULT NULL COMMENT 'Onaylandığında oluşturulan relationship ID',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX idx_expert_status (expert_id, status),
+            INDEX idx_user (user_id),
+            INDEX idx_status (status),
+            INDEX idx_created_at (created_at)
+        ) {$charset_collate};";
+        dbDelta($sql_service_requests);
+
+        // 36. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
