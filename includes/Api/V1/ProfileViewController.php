@@ -150,6 +150,70 @@ class ProfileViewController extends WP_REST_Controller {
             return $this->error('Failed to track view', 500);
         }
         
+        // ========================================
+        // UPDATE EXPERT METRICS FOR TREND CALCULATION
+        // ========================================
+        $metricsTable = $wpdb->prefix . 'rejimde_expert_metrics';
+        $today = date('Y-m-d');
+
+        // Check if today's metrics record exists
+        $existing_metric = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$metricsTable} WHERE expert_id = %d AND metric_date = %s",
+            $expert_user_id, 
+            $today
+        ));
+
+        if ($existing_metric) {
+            // Update existing record - increment profile_views
+            $wpdb->query($wpdb->prepare(
+                "UPDATE {$metricsTable} SET profile_views = profile_views + 1 WHERE expert_id = %d AND metric_date = %s",
+                $expert_user_id, 
+                $today
+            ));
+            
+            // Update unique_viewers if this is a logged-in user viewing for first time today
+            if ($viewer_user_id) {
+                // Check if this specific viewer already viewed today
+                $viewed_today_count = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$table} 
+                    WHERE expert_user_id = %d 
+                    AND viewer_user_id = %d 
+                    AND DATE(viewed_at) = %s",
+                    $expert_user_id, 
+                    $viewer_user_id, 
+                    $today
+                ));
+                
+                // If this is the first view from this user today (count will be 1 because we just inserted)
+                if ((int)$viewed_today_count === 1) {
+                    $wpdb->query($wpdb->prepare(
+                        "UPDATE {$metricsTable} SET unique_viewers = unique_viewers + 1 WHERE expert_id = %d AND metric_date = %s",
+                        $expert_user_id, 
+                        $today
+                    ));
+                }
+            }
+        } else {
+            // Create new metrics record for today
+            $wpdb->insert(
+                $metricsTable, 
+                [
+                    'expert_id' => $expert_user_id,
+                    'metric_date' => $today,
+                    'profile_views' => 1,
+                    'unique_viewers' => $viewer_user_id ? 1 : 0,
+                    'rating_count' => 0,
+                    'rating_sum' => 0,
+                    'content_views' => 0,
+                    'client_completions' => 0
+                ],
+                ['%d', '%s', '%d', '%d', '%d', '%s', '%d', '%d']
+            );
+        }
+        // ========================================
+        // END EXPERT METRICS UPDATE
+        // ========================================
+        
         return $this->success(['tracked' => true], 'View tracked successfully', 200);
     }
 
