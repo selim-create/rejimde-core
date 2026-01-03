@@ -498,9 +498,9 @@ class EventDispatcher {
                     $parentComment = get_comment($payload['parent_comment_id']);
                     if ($parentComment && (int) $parentComment->user_id != $userId) {
                         // Get content information for the notification URL
-                        // Use entity_id if explicitly provided, otherwise use the comment's post ID
-                        $postId = isset($payload['entity_id']) ? $payload['entity_id'] : $parentComment->comment_post_ID;
-                        $post = get_post($postId);
+                        // Use entity_id if explicitly provided and valid, otherwise use the comment's post ID
+                        $postId = !empty($payload['entity_id']) ? $payload['entity_id'] : $parentComment->comment_post_ID;
+                        $post = $postId > 0 ? get_post($postId) : null;
                         $contentInfo = $this->getContentTypeAndSlug($post);
                         
                         $this->notificationService->create((int) $parentComment->user_id, 'comment_reply', [
@@ -515,7 +515,7 @@ class EventDispatcher {
                 } else {
                     // Not a reply - check if it's a comment on user's own content
                     $postId = $payload['entity_id'] ?? null;
-                    if ($postId !== null) {
+                    if ($postId !== null && $postId > 0) {
                         $post = get_post($postId);
                         if ($post && (int) $post->post_author != $userId) {
                             $contentInfo = $this->getContentTypeAndSlug($post);
@@ -585,8 +585,8 @@ class EventDispatcher {
                     $contentInfo = $this->getContentTypeFromEvent($eventType);
                     $contentSlug = '';
                     
-                    // Get content slug if entity_id is available
-                    if (isset($payload['entity_id'])) {
+                    // Get content slug if entity_id is available and valid
+                    if (isset($payload['entity_id']) && $payload['entity_id'] > 0) {
                         $post = get_post($payload['entity_id']);
                         if ($post) {
                             $contentSlug = $post->post_name;
