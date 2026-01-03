@@ -498,8 +498,8 @@ class EventDispatcher {
                     $parentComment = get_comment($payload['parent_comment_id']);
                     if ($parentComment && (int) $parentComment->user_id != $userId) {
                         // Get content information for the notification URL
-                        // Use entity_id if explicitly provided and valid, otherwise use the comment's post ID
-                        $postId = !empty($payload['entity_id']) ? $payload['entity_id'] : $parentComment->comment_post_ID;
+                        // For comment replies, always use the comment's post ID (entity_id is the comment ID)
+                        $postId = $parentComment->comment_post_ID;
                         $post = $postId > 0 ? get_post($postId) : null;
                         $contentInfo = $this->getContentTypeAndSlug($post);
                         
@@ -559,7 +559,7 @@ class EventDispatcher {
                     if ($comment && (int) $comment->user_id != $userId) {
                         // Get content information for the notification URL
                         $postId = $comment->comment_post_ID;
-                        $post = get_post($postId);
+                        $post = $postId > 0 ? get_post($postId) : null;
                         $contentInfo = $this->getContentTypeAndSlug($post);
                         
                         $this->notificationService->create((int) $comment->user_id, 'comment_liked', [
