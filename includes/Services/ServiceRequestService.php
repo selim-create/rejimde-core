@@ -8,6 +8,15 @@ namespace Rejimde\Services;
  */
 class ServiceRequestService {
     
+    // Default avatar URL constant
+    private const DEFAULT_AVATAR_URL = 'https://placehold.co/150';
+    
+    // Response messages
+    private const MSG_REQUEST_SENT = 'Talebiniz uzmana iletildi.';
+    private const MSG_CLIENT_ADDED = 'Danışan eklendi';
+    private const MSG_PACKAGE_ASSIGNED = ' ve paket atandı.';
+    private const MSG_REQUEST_REJECTED = 'Talep reddedildi';
+    
     /**
      * Create a new service request
      * 
@@ -83,7 +92,7 @@ class ServiceRequestService {
         return [
             'request_id' => $requestId,
             'status' => 'pending',
-            'message' => 'Talebiniz uzmana iletildi.'
+            'message' => self::MSG_REQUEST_SENT
         ];
     }
     
@@ -154,7 +163,7 @@ class ServiceRequestService {
                 'user' => [
                     'id' => $userId,
                     'name' => $user->display_name,
-                    'avatar' => get_user_meta($userId, 'avatar_url', true) ?: 'https://placehold.co/150',
+                    'avatar' => get_user_meta($userId, 'avatar_url', true) ?: self::DEFAULT_AVATAR_URL,
                     'email' => $user->user_email
                 ],
                 'service' => $serviceData,
@@ -220,7 +229,7 @@ class ServiceRequestService {
             
             return [
                 'status' => 'rejected',
-                'message' => 'Talep reddedildi'
+                'message' => self::MSG_REQUEST_REJECTED
             ];
         }
         
@@ -281,10 +290,17 @@ class ServiceRequestService {
             
             // TODO: Send notification to user
             
+            $message = self::MSG_CLIENT_ADDED;
+            if (!empty($data['assign_package'])) {
+                $message .= self::MSG_PACKAGE_ASSIGNED;
+            } else {
+                $message .= '.';
+            }
+            
             return [
                 'status' => 'approved',
                 'client_id' => $relationshipId,
-                'message' => 'Danışan eklendi' . (!empty($data['assign_package']) ? ' ve paket atandı.' : '.')
+                'message' => $message
             ];
         }
         
