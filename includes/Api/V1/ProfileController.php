@@ -31,6 +31,13 @@ class ProfileController extends WP_REST_Controller {
             'callback' => [$this, 'send_high_five'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+        
+        // Takip Edilen Kullanıcılar ve Aktiviteleri
+        register_rest_route($this->namespace, '/' . $this->base . '/following', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_following'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
     }
 
     public function check_auth() {
@@ -377,6 +384,131 @@ class ProfileController extends WP_REST_Controller {
             'min' => 0,
             'max' => 200
         ];
+    }
+    
+    /**
+     * Get following users with their last activities
+     */
+    public function get_following($request) {
+        $user_id = get_current_user_id();
+        
+        // Get list of users that current user follows
+        $following = get_user_meta($user_id, 'rejimde_following', true);
+        
+        if (!is_array($following) || empty($following)) {
+            return new WP_REST_Response([
+                'status' => 'success',
+                'data' => [],
+                'total_following' => 0,
+                'message' => 'Henüz kimseyi takip etmiyorsun.'
+            ], 200);
+        }
+        
+        global $wpdb;
+        $table_events = $wpdb->prefix . 'rejimde_events';
+        $data = [];
+        
+        foreach ($following as $followed_user_id) {
+            $user = get_user_by('id', $followed_user_id);
+            if (!$user) {
+                continue; // Skip if user doesn't exist anymore
+            }
+            
+            // Get last activity for this user
+            $last_event = $wpdb->get_row($wpdb->prepare(
+                "SELECT event_type, created_at, points, context 
+                FROM $table_events 
+                WHERE user_id = %d 
+                ORDER BY created_at DESC 
+                LIMIT 1",
+                $followed_user_id
+            ));
+            
+            $last_activity = null;
+            if ($last_event) {
+                $activity_info = $this->map_event_to_activity($last_event->event_type, $last_event->context);
+                $last_activity = [
+                    'type' => $last_event->event_type,
+                    'label' => $activity_info['label'],
+                    'icon' => $activity_info['icon'],
+                    'time_ago' => $this->time_ago($last_event->created_at)
+                ];
+            }
+            
+            // Get avatar
+            $custom_avatar = get_user_meta($followed_user_id, 'avatar_url', true);
+            $avatar_url = $custom_avatar ?: 'https://api.dicebear.com/9.x/personas/svg?seed=' . urlencode($user->user_login);
+            
+            $data[] = [
+                'id' => $followed_user_id,
+                'name' => $user->display_name,
+                'slug' => $user->user_nicename,
+                'avatar_url' => $avatar_url,
+                'last_activity' => $last_activity
+            ];
+        }
+        
+        return new WP_REST_Response([
+            'status' => 'success',
+            'data' => $data,
+            'total_following' => count($following)
+        ], 200);
+    }
+    
+    /**
+     * Map event type to user-friendly label and icon
+     */
+    private function map_event_to_activity($event_type, $context_json = null) {
+        $context = $context_json ? json_decode($context_json, true) : [];
+        
+        $activity_map = [
+            'water_added' => ['label' => 'Su hedefini tamamladı', 'icon' => '💧'],
+            'steps_logged' => ['label' => 'Adım hedefini tamamladı', 'icon' => '👟'],
+            'meal_photo_uploaded' => ['label' => 'Öğün fotoğrafı yükledi', 'icon' => '📸'],
+            'diet_completed' => ['label' => 'Diyet tamamladı', 'icon' => '🥗'],
+            'exercise_completed' => ['label' => 'Egzersiz tamamladı', 'icon' => '💪'],
+            'login_success' => ['label' => 'Giriş yaptı', 'icon' => '✅'],
+            'blog_points_claimed' => ['label' => 'Blog okudu', 'icon' => '📚'],
+            'comment_created' => ['label' => 'Yorum yaptı', 'icon' => '💬'],
+            'highfive_sent' => ['label' => 'Beşlik çaktı', 'icon' => '✋'],
+            'follow_accepted' => ['label' => 'Birini takip etti', 'icon' => '👥'],
+            'calculator_saved' => ['label' => 'Hesaplayıcı kullandı', 'icon' => '🧮'],
+            'circle_joined' => ['label' => "Circle'a katıldı", 'icon' => '🎯'],
+            'diet_started' => ['label' => 'Diyet başlattı', 'icon' => '🍽️'],
+            'exercise_started' => ['label' => 'Egzersiz başlattı', 'icon' => '🏃'],
+            'rating_submitted' => ['label' => 'Uzman değerlendirdi', 'icon' => '⭐'],
+        ];
+        
+        // Check for milestone events
+        if (strpos($event_type, 'milestone_') === 0) {
+            return ['label' => 'Bir başarı kazandı', 'icon' => '🏆'];
+        }
+        
+        // Return mapped activity or default
+        return $activity_map[$event_type] ?? ['label' => 'Aktivite gerçekleştirdi', 'icon' => '📌'];
+    }
+    
+    /**
+     * Calculate time ago from timestamp
+     */
+    private function time_ago($datetime) {
+        $now = new \DateTime();
+        $past = new \DateTime($datetime);
+        $diff = $now->diff($past);
+        
+        if ($diff->y > 0) {
+            return $diff->y . ' yıl önce';
+        } elseif ($diff->m > 0) {
+            return $diff->m . ' ay önce';
+        } elseif ($diff->d > 0) {
+            return $diff->d . ' gün önce';
+        } elseif ($diff->h > 0) {
+            return $diff->h . ' saat önce';
+        } elseif ($diff->i > 0) {
+            return $diff->i . ' dakika önce';
+        } else {
+            return 'Az önce';
+        }
     }
 
     /**

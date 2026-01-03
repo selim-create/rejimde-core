@@ -282,6 +282,9 @@ class GamificationController extends WP_REST_Controller {
         // Rank bilgisini al (kullanıcı deneyim seviyesi)
         $rank = (int) get_user_meta($user_id, 'rejimde_rank', true) ?: 1;
         
+        // Calculate user's rank within their level
+        $level_rank = $this->calculate_user_rank_in_level($user_id, $level, $total_score);
+        
         $earned_badges = get_user_meta($user_id, 'rejimde_earned_badges', true);
         if (!is_array($earned_badges)) $earned_badges = [];
         
@@ -310,7 +313,7 @@ class GamificationController extends WP_REST_Controller {
         return $this->success([
             'daily_score' => $daily_score,
             'total_score' => $total_score,
-            'rank' => $rank,           // Kullanıcı deneyim seviyesi
+            'rank' => $level_rank,     // User's rank within their level
             'level' => $level,         // Puan bazlı level
             'earned_badges' => $earned_badges,
             'is_pro' => $is_pro,       // Pro user status
@@ -950,6 +953,54 @@ class GamificationController extends WP_REST_Controller {
         }
         
         return null;
+    }
+    
+    /**
+     * Calculate user's rank within their level
+     * 
+     * @param int $user_id
+     * @param array $level
+     * @param int $user_score
+     * @return int
+     */
+    private function calculate_user_rank_in_level($user_id, $level, $user_score) {
+        // Query users in the same level, sorted by score
+        $user_query = new \WP_User_Query([
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => 'rejimde_total_score',
+                    'value' => $level['min'],
+                    'type' => 'NUMERIC',
+                    'compare' => '>='
+                ],
+                [
+                    'key' => 'rejimde_total_score',
+                    'value' => $level['max'],
+                    'type' => 'NUMERIC',
+                    'compare' => '<'
+                ]
+            ],
+            'orderby' => 'meta_value_num',
+            'order' => 'DESC',
+            'number' => -1,
+            'role__not_in' => ['administrator', 'rejimde_pro'],
+            'fields' => 'ID'
+        ]);
+        
+        $users = $user_query->get_results();
+        
+        // Find user's position in the sorted list
+        $rank = 1;
+        foreach ($users as $uid) {
+            if ($uid == $user_id) {
+                return $rank;
+            }
+            $rank++;
+        }
+        
+        // If user not found in level (shouldn't happen), return 1
+        return 1;
     }
 
     public function check_auth($request) { return is_user_logged_in(); }
