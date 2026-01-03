@@ -12,6 +12,11 @@ class ProfessionalController extends WP_REST_Controller {
     protected $base = 'professionals';
     private $rejiScoreService;
     
+    /**
+     * Online status timeout in seconds (15 minutes)
+     */
+    private const ONLINE_TIMEOUT_SECONDS = 900; // 15 * 60
+    
     public function __construct() {
         // Initialize RejiScore service once for reuse
         $this->rejiScoreService = new \Rejimde\Services\RejiScoreService();
@@ -457,7 +462,7 @@ class ProfessionalController extends WP_REST_Controller {
         $last_activity = get_user_meta($user_id, 'last_activity', true);
         if (!$last_activity) return false;
         
-        $fifteen_minutes_ago = time() - (15 * 60);
-        return (int)$last_activity > $fifteen_minutes_ago;
+        $timeout_threshold = time() - self::ONLINE_TIMEOUT_SECONDS;
+        return (int)$last_activity > $timeout_threshold;
     }
 }
