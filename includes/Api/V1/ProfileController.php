@@ -406,6 +406,22 @@ class ProfileController extends WP_REST_Controller {
         
         global $wpdb;
         $table_events = $wpdb->prefix . 'rejimde_events';
+        
+        // Fetch last activities for all followed users in a single query
+        $user_ids_placeholder = implode(',', array_fill(0, count($following), '%d'));
+        $query = "
+            SELECT e1.user_id, e1.event_type, e1.created_at, e1.context
+            FROM $table_events e1
+            INNER JOIN (
+                SELECT user_id, MAX(created_at) as max_created_at
+                FROM $table_events
+                WHERE user_id IN ($user_ids_placeholder)
+                GROUP BY user_id
+            ) e2 ON e1.user_id = e2.user_id AND e1.created_at = e2.max_created_at
+        ";
+        
+        $last_events = $wpdb->get_results($wpdb->prepare($query, ...$following), OBJECT_K);
+        
         $data = [];
         
         foreach ($following as $followed_user_id) {
@@ -414,15 +430,8 @@ class ProfileController extends WP_REST_Controller {
                 continue; // Skip if user doesn't exist anymore
             }
             
-            // Get last activity for this user
-            $last_event = $wpdb->get_row($wpdb->prepare(
-                "SELECT event_type, created_at, points, context 
-                FROM $table_events 
-                WHERE user_id = %d 
-                ORDER BY created_at DESC 
-                LIMIT 1",
-                $followed_user_id
-            ));
+            // Get last event for this user from our pre-fetched results
+            $last_event = isset($last_events[$followed_user_id]) ? $last_events[$followed_user_id] : null;
             
             $last_activity = null;
             if ($last_event) {
