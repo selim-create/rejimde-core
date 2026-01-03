@@ -497,12 +497,42 @@ class EventDispatcher {
                 if (isset($payload['parent_comment_id']) && $payload['parent_comment_id']) {
                     $parentComment = get_comment($payload['parent_comment_id']);
                     if ($parentComment && (int) $parentComment->user_id != $userId) {
+                        // Get content information for the notification URL
+                        // For comment replies, always use the comment's post ID (entity_id is the comment ID)
+                        $postId = $parentComment->comment_post_ID;
+                        $post = $postId > 0 ? get_post($postId) : null;
+                        $contentInfo = $this->getContentTypeAndSlug($post);
+                        
                         $this->notificationService->create((int) $parentComment->user_id, 'comment_reply', [
                             'actor_id' => $userId,
                             'entity_type' => $payload['entity_type'] ?? 'comment',
                             'entity_id' => $payload['entity_id'] ?? null,
-                            'comment_id' => $payload['comment_id'] ?? null
+                            'comment_id' => $payload['comment_id'] ?? null,
+                            'content_type' => $contentInfo['content_type'],
+                            'content_slug' => $contentInfo['content_slug']
                         ]);
+                    }
+                } else {
+                    // Not a reply - check if it's a comment on user's own content
+                    // For comment_created events, entity_id is the comment ID, post ID is in context
+                    $postId = $payload['context']['post_id'] ?? null;
+                    if ($postId !== null && $postId > 0) {
+                        $post = get_post($postId);
+                        if ($post && (int) $post->post_author != $userId) {
+                            $contentInfo = $this->getContentTypeAndSlug($post);
+                            $contentName = $post->post_title;
+                            
+                            // Notify content owner about new comment
+                            $this->notificationService->create((int) $post->post_author, 'comment_on_content', [
+                                'actor_id' => $userId,
+                                'entity_type' => $payload['entity_type'] ?? 'comment',
+                                'entity_id' => $payload['entity_id'] ?? null,  // This is the comment ID
+                                'comment_id' => $payload['comment_id'] ?? null,
+                                'content_type' => $contentInfo['content_type'],
+                                'content_slug' => $contentInfo['content_slug'],
+                                'content_name' => $contentName
+                            ]);
+                        }
                     }
                 }
                 break;
@@ -523,14 +553,52 @@ class EventDispatcher {
                 }
                 break;
                 
+            case 'comment_liked':
+                // Notify comment author about like (not milestone)
+                if (isset($payload['comment_id'])) {
+                    $comment = get_comment($payload['comment_id']);
+                    if ($comment && (int) $comment->user_id != $userId) {
+                        // Get content information for the notification URL
+                        $postId = $comment->comment_post_ID;
+                        $post = $postId > 0 ? get_post($postId) : null;
+                        $contentInfo = $this->getContentTypeAndSlug($post);
+                        
+                        $this->notificationService->create((int) $comment->user_id, 'comment_liked', [
+                            'actor_id' => $userId,
+                            'entity_type' => 'comment',
+                            'entity_id' => $payload['comment_id'],
+                            'comment_id' => $payload['comment_id'],
+                            'content_type' => $contentInfo['content_type'],
+                            'content_slug' => $contentInfo['content_slug']
+                        ]);
+                    }
+                }
+                break;
+                
             case 'blog_points_claimed':
             case 'diet_completed':
             case 'exercise_completed':
                 // Content completion notification
                 if ($result['points_earned'] > 0) {
                     $contentName = $payload['context']['content_name'] ?? 'İçerik';
+                    
+                    // Determine content type label and type from event
+                    $contentInfo = $this->getContentTypeFromEvent($eventType);
+                    $contentSlug = '';
+                    
+                    // Get content slug if entity_id is available and valid
+                    if (isset($payload['entity_id']) && $payload['entity_id'] > 0) {
+                        $post = get_post($payload['entity_id']);
+                        if ($post) {
+                            $contentSlug = $post->post_name;
+                        }
+                    }
+                    
                     $this->notificationService->create($userId, 'content_completed', [
                         'content_name' => $contentName,
+                        'content_type_label' => $contentInfo['content_type_label'],
+                        'content_type' => $contentInfo['content_type'],
+                        'content_slug' => $contentSlug,
                         'points' => $result['points_earned'],
                         'entity_type' => $payload['entity_type'] ?? null,
                         'entity_id' => $payload['entity_id'] ?? null
@@ -568,6 +636,62 @@ class EventDispatcher {
                 }
                 break;
         }
+    }
+    
+    /**
+     * Get content type and slug from a post
+     * 
+     * @param \WP_Post|null $post WordPress post object
+     * @return array ['content_type' => string, 'content_slug' => string]
+     */
+    private function getContentTypeAndSlug($post): array {
+        $contentType = 'post';
+        $contentSlug = '';
+        
+        if ($post) {
+            $contentSlug = $post->post_name;
+            
+            // Map post types to content types
+            if ($post->post_type === 'rejimde_blog') {
+                $contentType = 'blog';
+            } elseif ($post->post_type === 'rejimde_diet') {
+                $contentType = 'diet';
+            } elseif ($post->post_type === 'rejimde_exercise') {
+                $contentType = 'exercise';
+            }
+        }
+        
+        return [
+            'content_type' => $contentType,
+            'content_slug' => $contentSlug
+        ];
+    }
+    
+    /**
+     * Get content type label from event type
+     * 
+     * @param string $eventType Event type
+     * @return array ['content_type_label' => string, 'content_type' => string]
+     */
+    private function getContentTypeFromEvent(string $eventType): array {
+        $contentTypeLabel = 'İçerik';
+        $contentType = '';
+        
+        if ($eventType === 'blog_points_claimed') {
+            $contentTypeLabel = 'Blog';
+            $contentType = 'blog';
+        } elseif ($eventType === 'diet_completed') {
+            $contentTypeLabel = 'Diyet';
+            $contentType = 'diet';
+        } elseif ($eventType === 'exercise_completed') {
+            $contentTypeLabel = 'Egzersiz';
+            $contentType = 'exercise';
+        }
+        
+        return [
+            'content_type_label' => $contentTypeLabel,
+            'content_type' => $contentType
+        ];
     }
     
     /**
