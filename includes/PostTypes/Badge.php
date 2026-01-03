@@ -192,6 +192,33 @@ class Badge {
         $conditions = get_post_meta($post->ID, 'badge_conditions', true);
         $conditions_json = $conditions ? json_encode($conditions, JSON_PRETTY_PRINT) : '';
         $condition_type = get_post_meta($post->ID, 'condition_type', true) ?: 'simple';
+        
+        // Extract values from conditions for form population
+        $simple_event = '';
+        $simple_count = 1;
+        $progressive_event = '';
+        $progressive_period = 'all_time';
+        $progressive_consecutive = false;
+        $streak_type = 'daily_login';
+        $streak_target = 7;
+        
+        if (is_array($conditions)) {
+            switch ($condition_type) {
+                case 'simple':
+                    $simple_event = $conditions['event'] ?? '';
+                    $simple_count = $conditions['target'] ?? 1;
+                    break;
+                case 'progressive':
+                    $progressive_event = $conditions['event'] ?? '';
+                    $progressive_period = $conditions['period'] ?? 'all_time';
+                    $progressive_consecutive = $conditions['consecutive'] ?? false;
+                    break;
+                case 'streak':
+                    $streak_type = $conditions['streak_type'] ?? 'daily_login';
+                    $streak_target = $conditions['target'] ?? 7;
+                    break;
+            }
+        }
         ?>
         <p>
             <label><strong>Koşul Tipi:</strong></label><br>
@@ -209,21 +236,21 @@ class Badge {
                 <label><strong>Gerekli Event:</strong></label><br>
                 <select name="simple_event" style="width:100%">
                     <option value="">-- Event Seçin --</option>
-                    <option value="exercise_completed">Egzersiz Tamamlama</option>
-                    <option value="diet_completed">Diyet Tamamlama</option>
-                    <option value="blog_points_claimed">Blog Okuma</option>
-                    <option value="water_goal_reached">Su Hedefi</option>
-                    <option value="weekly_task_completed">Haftalık Görev</option>
-                    <option value="monthly_task_completed">Aylık Görev</option>
-                    <option value="circle_task_contributed">Circle Katkısı</option>
-                    <option value="highfive_sent">High-Five</option>
-                    <option value="comment_created">Yorum</option>
-                    <option value="follow_accepted">Takip</option>
+                    <option value="exercise_completed" <?php selected($simple_event, 'exercise_completed'); ?>>Egzersiz Tamamlama</option>
+                    <option value="diet_completed" <?php selected($simple_event, 'diet_completed'); ?>>Diyet Tamamlama</option>
+                    <option value="blog_points_claimed" <?php selected($simple_event, 'blog_points_claimed'); ?>>Blog Okuma</option>
+                    <option value="water_goal_reached" <?php selected($simple_event, 'water_goal_reached'); ?>>Su Hedefi</option>
+                    <option value="weekly_task_completed" <?php selected($simple_event, 'weekly_task_completed'); ?>>Haftalık Görev</option>
+                    <option value="monthly_task_completed" <?php selected($simple_event, 'monthly_task_completed'); ?>>Aylık Görev</option>
+                    <option value="circle_task_contributed" <?php selected($simple_event, 'circle_task_contributed'); ?>>Circle Katkısı</option>
+                    <option value="highfive_sent" <?php selected($simple_event, 'highfive_sent'); ?>>High-Five</option>
+                    <option value="comment_created" <?php selected($simple_event, 'comment_created'); ?>>Yorum</option>
+                    <option value="follow_accepted" <?php selected($simple_event, 'follow_accepted'); ?>>Takip</option>
                 </select>
             </p>
             <p>
                 <label><strong>Gerekli Tekrar Sayısı:</strong></label><br>
-                <input type="number" name="simple_count" min="1" value="1" style="width:100%">
+                <input type="number" name="simple_count" min="1" value="<?php echo esc_attr($simple_count); ?>" style="width:100%">
             </p>
         </div>
         
@@ -233,24 +260,24 @@ class Badge {
                 <label><strong>Sayılacak Event:</strong></label><br>
                 <select name="progressive_event" style="width:100%">
                     <option value="">-- Event Seçin --</option>
-                    <option value="exercise_completed">Egzersiz Tamamlama</option>
-                    <option value="diet_completed">Diyet Tamamlama</option>
-                    <option value="blog_points_claimed">Blog Okuma</option>
-                    <option value="water_goal_reached">Su Hedefi</option>
+                    <option value="exercise_completed" <?php selected($progressive_event, 'exercise_completed'); ?>>Egzersiz Tamamlama</option>
+                    <option value="diet_completed" <?php selected($progressive_event, 'diet_completed'); ?>>Diyet Tamamlama</option>
+                    <option value="blog_points_claimed" <?php selected($progressive_event, 'blog_points_claimed'); ?>>Blog Okuma</option>
+                    <option value="water_goal_reached" <?php selected($progressive_event, 'water_goal_reached'); ?>>Su Hedefi</option>
                 </select>
             </p>
             <p>
                 <label><strong>Periyot:</strong></label><br>
                 <select name="progressive_period" style="width:100%">
-                    <option value="all_time">Tüm Zamanlar</option>
-                    <option value="daily">Günlük (Unique günler sayılır)</option>
-                    <option value="weekly">Haftalık</option>
-                    <option value="monthly">Aylık</option>
+                    <option value="all_time" <?php selected($progressive_period, 'all_time'); ?>>Tüm Zamanlar</option>
+                    <option value="daily" <?php selected($progressive_period, 'daily'); ?>>Günlük (Unique günler sayılır)</option>
+                    <option value="weekly" <?php selected($progressive_period, 'weekly'); ?>>Haftalık</option>
+                    <option value="monthly" <?php selected($progressive_period, 'monthly'); ?>>Aylık</option>
                 </select>
             </p>
             <p>
                 <label><strong>Ardışık mı?</strong></label><br>
-                <input type="checkbox" name="progressive_consecutive" value="1">
+                <input type="checkbox" name="progressive_consecutive" value="1" <?php checked($progressive_consecutive); ?>>
                 <span class="description">Ardışık günler/haftalar gerekli mi?</span>
             </p>
         </div>
@@ -260,14 +287,14 @@ class Badge {
             <p>
                 <label><strong>Streak Tipi:</strong></label><br>
                 <select name="streak_type" style="width:100%">
-                    <option value="daily_login">Günlük Giriş</option>
-                    <option value="daily_exercise">Günlük Egzersiz</option>
-                    <option value="daily_nutrition">Günlük Beslenme</option>
+                    <option value="daily_login" <?php selected($streak_type, 'daily_login'); ?>>Günlük Giriş</option>
+                    <option value="daily_exercise" <?php selected($streak_type, 'daily_exercise'); ?>>Günlük Egzersiz</option>
+                    <option value="daily_nutrition" <?php selected($streak_type, 'daily_nutrition'); ?>>Günlük Beslenme</option>
                 </select>
             </p>
             <p>
                 <label><strong>Gerekli Streak:</strong></label><br>
-                <input type="number" name="streak_target" min="1" value="7" style="width:100%">
+                <input type="number" name="streak_target" min="1" value="<?php echo esc_attr($streak_target); ?>" style="width:100%">
             </p>
         </div>
         
