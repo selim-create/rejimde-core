@@ -122,6 +122,10 @@ class ProfessionalController extends WP_REST_Controller {
                     }
                 }
 
+                // Takipçi sayısı hesapla (tek sorguyla)
+                $followers = $user_id ? get_user_meta($user_id, 'rejimde_followers', true) : [];
+                $followers_count = is_array($followers) ? count($followers) : 0;
+
                 $experts[] = [
                     'id'            => $post_id,
                     'name'          => get_the_title(),
@@ -148,8 +152,7 @@ class ProfessionalController extends WP_REST_Controller {
                     'freshness_score'  => $rejiScoreData['freshness_score'] ?? 50,
                     
                     // Sosyal veriler
-                    'followers_count'  => is_array(get_user_meta($user_id, 'rejimde_followers', true)) 
-                                          ? count(get_user_meta($user_id, 'rejimde_followers', true)) : 0,
+                    'followers_count'  => $followers_count,
                     'client_count'     => $user_id ? $this->getActiveClientCount($user_id) : 0,
                     'content_count'    => $rejiScoreData['content_count'] ?? 0,
                     
@@ -171,7 +174,7 @@ class ProfessionalController extends WP_REST_Controller {
             if (!$a['is_verified'] && $b['is_verified']) return 1;
             
             // 3. Son olarak RejiScore'a göre (yüksekten düşüğe)
-            return ($b['reji_score'] ?? 0) - ($a['reji_score'] ?? 0);
+            return $b['reji_score'] - $a['reji_score'];
         });
 
         return new WP_REST_Response($experts, 200);
