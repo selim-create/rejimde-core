@@ -78,6 +78,7 @@ return [
         'icon' => 'fa-award',
         'title' => 'Yeni rozet kazandın! 🏅',
         'body' => '{badge_name} rozetini kazandın!',
+        'action_url' => '/dashboard/badges',
         'expires_days' => 30
     ],
     
@@ -114,8 +115,26 @@ return [
         'icon' => 'fa-comment',
         'title' => 'Yorumuna yanıt var!',
         'body' => '{actor_name} yorumuna yanıt verdi.',
-        'action_url' => '/{entity_type}/{entity_id}#comment-{comment_id}',
+        'action_url' => '/{content_type}/{content_slug}#comment-{comment_id}',
         'expires_days' => 7
+    ],
+    
+    'comment_on_content' => [
+        'category' => 'social',
+        'icon' => 'fa-comment',
+        'title' => 'İçeriğine yeni yorum!',
+        'body' => '{actor_name}, {content_name} içeriğine yorum yaptı.',
+        'action_url' => '/{content_type}/{content_slug}#comment-{comment_id}',
+        'expires_days' => 7
+    ],
+    
+    'comment_liked' => [
+        'category' => 'social',
+        'icon' => 'fa-heart',
+        'title' => 'Yorumun beğenildi! ❤️',
+        'body' => '{actor_name} yorumunu beğendi.',
+        'action_url' => '/{content_type}/{content_slug}#comment-{comment_id}',
+        'expires_days' => 3
     ],
     
     'comment_like_milestone' => [
@@ -158,8 +177,9 @@ return [
     'content_completed' => [
         'category' => 'points',
         'icon' => 'fa-check-circle',
-        'title' => 'Tebrikler! ✅',
-        'body' => '{content_name} içeriğini tamamladın! +{points} puan',
+        'title' => '{content_type_label} okudun! ✅',
+        'body' => '{content_name} tamamlandı! +{points} puan kazandın.',
+        'action_url' => '/{content_type}/{content_slug}',
         'expires_days' => 7
     ],
     
@@ -169,7 +189,7 @@ return [
         'icon' => 'fa-star',
         'title' => 'Yeni değerlendirme! ⭐',
         'body' => '{actor_name} seni {rating}/5 ile değerlendirdi.',
-        'action_url' => '/expert/ratings',
+        'action_url' => '/dashboard/pro/reviews',
         'expires_days' => 7
     ],
     
@@ -178,7 +198,7 @@ return [
         'icon' => 'fa-eye',
         'title' => 'Profilin {view_count} kez görüntülendi! 👁️',
         'body' => 'Harika! İlgi görmeye devam ediyorsun.',
-        'action_url' => '/expert/metrics',
+        'action_url' => '/dashboard/pro/analytics',
         'expires_days' => 7
     ],
     
@@ -187,7 +207,7 @@ return [
         'icon' => 'fa-graduation-cap',
         'title' => 'Danışan içerik tamamladı!',
         'body' => '{actor_name}, {content_name} içeriğini tamamladı.',
-        'action_url' => '/expert/clients',
+        'action_url' => '/dashboard/pro/clients',
         'expires_days' => 7
     ],
     
@@ -196,7 +216,7 @@ return [
         'icon' => 'fa-chart-line',
         'title' => 'Danışan aktivitesi',
         'body' => '{actor_name} yeni aktivite kaydetti.',
-        'action_url' => '/expert/clients/{actor_id}',
+        'action_url' => '/dashboard/pro/clients/{actor_id}',
         'expires_days' => 3
     ],
     
@@ -216,7 +236,7 @@ return [
         'icon' => 'fa-calendar-plus',
         'title' => 'Yeni randevu talebi! 📅',
         'body' => '{actor_name} randevu talebinde bulundu.',
-        'action_url' => '/expert/calendar/requests',
+        'action_url' => '/dashboard/pro/calendar/requests',
         'expires_days' => 7
     ],
     
@@ -272,5 +292,33 @@ return [
         'body' => '1 saat içinde randevunuz var.',
         'action_url' => '/appointments/{entity_id}',
         'expires_days' => 1
+    ],
+    
+    // SUPPORTING NOTIFICATIONS
+    'goal_reminder' => [
+        'category' => 'system',
+        'icon' => 'fa-bullseye',
+        'title' => 'Hedefe yaklaşıyorsun! 🎯',
+        'body' => 'Bugün henüz aktivite kaydetmedin. Hedefe ulaşmak için devam et!',
+        'action_url' => '/dashboard',
+        'expires_days' => 1
+    ],
+
+    'task_incomplete' => [
+        'category' => 'system', 
+        'icon' => 'fa-tasks',
+        'title' => 'Görevler bekliyor 📋',
+        'body' => 'Bugün tamamlanmamış {pending_count} görevin var.',
+        'action_url' => '/dashboard/tasks',
+        'expires_days' => 1
+    ],
+
+    'badge_progress' => [
+        'category' => 'level',
+        'icon' => 'fa-medal',
+        'title' => 'Rozete yaklaşıyorsun! 🏅',
+        'body' => '{badge_name} rozetine {remaining} adım kaldı!',
+        'action_url' => '/dashboard/badges',
+        'expires_days' => 3
     ]
 ];

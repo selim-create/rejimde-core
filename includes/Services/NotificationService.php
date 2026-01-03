@@ -228,6 +228,12 @@ class NotificationService {
                 $decoded = json_decode($notification['meta'], true);
                 $notification['meta'] = is_array($decoded) ? $decoded : null;
             }
+            
+            // Convert created_at to ISO 8601 format
+            if (!empty($notification['created_at'])) {
+                $timestamp = strtotime($notification['created_at']);
+                $notification['created_at'] = date('c', $timestamp); // ISO 8601
+            }
         }
 
         return $notifications;

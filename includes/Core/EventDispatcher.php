@@ -497,12 +497,63 @@ class EventDispatcher {
                 if (isset($payload['parent_comment_id']) && $payload['parent_comment_id']) {
                     $parentComment = get_comment($payload['parent_comment_id']);
                     if ($parentComment && (int) $parentComment->user_id != $userId) {
+                        // Get content information for the notification URL
+                        $postId = $payload['entity_id'] ?? $parentComment->comment_post_ID;
+                        $post = get_post($postId);
+                        $contentType = 'post';
+                        $contentSlug = '';
+                        
+                        if ($post) {
+                            $contentSlug = $post->post_name;
+                            // Map post types to content types
+                            if ($post->post_type === 'rejimde_blog') {
+                                $contentType = 'blog';
+                            } elseif ($post->post_type === 'rejimde_diet') {
+                                $contentType = 'diet';
+                            } elseif ($post->post_type === 'rejimde_exercise') {
+                                $contentType = 'exercise';
+                            }
+                        }
+                        
                         $this->notificationService->create((int) $parentComment->user_id, 'comment_reply', [
                             'actor_id' => $userId,
                             'entity_type' => $payload['entity_type'] ?? 'comment',
                             'entity_id' => $payload['entity_id'] ?? null,
-                            'comment_id' => $payload['comment_id'] ?? null
+                            'comment_id' => $payload['comment_id'] ?? null,
+                            'content_type' => $contentType,
+                            'content_slug' => $contentSlug
                         ]);
+                    }
+                } else {
+                    // Not a reply - check if it's a comment on user's own content
+                    $postId = $payload['entity_id'] ?? null;
+                    if ($postId) {
+                        $post = get_post($postId);
+                        if ($post && (int) $post->post_author != $userId) {
+                            $contentType = 'post';
+                            $contentSlug = $post->post_name;
+                            $contentName = $post->post_title;
+                            
+                            // Map post types to content types
+                            if ($post->post_type === 'rejimde_blog') {
+                                $contentType = 'blog';
+                            } elseif ($post->post_type === 'rejimde_diet') {
+                                $contentType = 'diet';
+                            } elseif ($post->post_type === 'rejimde_exercise') {
+                                $contentType = 'exercise';
+                            }
+                            
+                            // Notify content owner about new comment
+                            $this->notificationService->create((int) $post->post_author, 'comment_on_content', [
+                                'actor_id' => $userId,
+                                'entity_type' => $payload['entity_type'] ?? 'comment',
+                                'entity_id' => $postId,
+                                'comment_id' => $payload['comment_id'] ?? null,
+                                'content_type' => $contentType,
+                                'content_slug' => $contentSlug,
+                                'content_name' => $contentName
+                            ]);
+                        }
                     }
                 }
                 break;
@@ -523,14 +574,77 @@ class EventDispatcher {
                 }
                 break;
                 
+            case 'comment_liked':
+                // Notify comment author about like (not milestone)
+                if (isset($payload['comment_id'])) {
+                    $comment = get_comment($payload['comment_id']);
+                    if ($comment && (int) $comment->user_id != $userId) {
+                        // Get content information for the notification URL
+                        $postId = $comment->comment_post_ID;
+                        $post = get_post($postId);
+                        $contentType = 'post';
+                        $contentSlug = '';
+                        
+                        if ($post) {
+                            $contentSlug = $post->post_name;
+                            // Map post types to content types
+                            if ($post->post_type === 'rejimde_blog') {
+                                $contentType = 'blog';
+                            } elseif ($post->post_type === 'rejimde_diet') {
+                                $contentType = 'diet';
+                            } elseif ($post->post_type === 'rejimde_exercise') {
+                                $contentType = 'exercise';
+                            }
+                        }
+                        
+                        $this->notificationService->create((int) $comment->user_id, 'comment_liked', [
+                            'actor_id' => $userId,
+                            'entity_type' => 'comment',
+                            'entity_id' => $payload['comment_id'],
+                            'comment_id' => $payload['comment_id'],
+                            'content_type' => $contentType,
+                            'content_slug' => $contentSlug
+                        ]);
+                    }
+                }
+                break;
+                
             case 'blog_points_claimed':
             case 'diet_completed':
             case 'exercise_completed':
                 // Content completion notification
                 if ($result['points_earned'] > 0) {
                     $contentName = $payload['context']['content_name'] ?? 'İçerik';
+                    
+                    // Determine content type label
+                    $contentTypeLabel = 'İçerik';
+                    $contentType = '';
+                    $contentSlug = '';
+                    
+                    if ($eventType === 'blog_points_claimed') {
+                        $contentTypeLabel = 'Blog';
+                        $contentType = 'blog';
+                    } elseif ($eventType === 'diet_completed') {
+                        $contentTypeLabel = 'Diyet';
+                        $contentType = 'diet';
+                    } elseif ($eventType === 'exercise_completed') {
+                        $contentTypeLabel = 'Egzersiz';
+                        $contentType = 'exercise';
+                    }
+                    
+                    // Get content slug if entity_id is available
+                    if (isset($payload['entity_id'])) {
+                        $post = get_post($payload['entity_id']);
+                        if ($post) {
+                            $contentSlug = $post->post_name;
+                        }
+                    }
+                    
                     $this->notificationService->create($userId, 'content_completed', [
                         'content_name' => $contentName,
+                        'content_type_label' => $contentTypeLabel,
+                        'content_type' => $contentType,
+                        'content_slug' => $contentSlug,
                         'points' => $result['points_earned'],
                         'entity_type' => $payload['entity_type'] ?? null,
                         'entity_id' => $payload['entity_id'] ?? null

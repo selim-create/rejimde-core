@@ -330,7 +330,9 @@ class CommentController extends WP_REST_Controller {
         // Dispatch event for comment creation or rating
         $eventType = ($context === 'expert' && $parent === 0 && $rating > 0) ? 'rating_submitted' : 'comment_created';
         $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
-        $eventResult = $dispatcher->dispatch($eventType, [
+        
+        // Prepare event payload
+        $eventPayload = [
             'user_id' => $user_id,
             'entity_type' => 'comment',
             'entity_id' => $comment_id,
@@ -339,7 +341,27 @@ class CommentController extends WP_REST_Controller {
                 'comment_context' => $context,
                 'rating' => $rating
             ]
-        ]);
+        ];
+        
+        // Add expert_id for rating_submitted events
+        if ($eventType === 'rating_submitted') {
+            $post = get_post($post_id);
+            if ($post) {
+                $eventPayload['expert_id'] = $post->post_author;
+            }
+        }
+        
+        // Add parent_comment_id for comment_created events
+        if ($eventType === 'comment_created' && $parent > 0) {
+            $eventPayload['parent_comment_id'] = $parent;
+        }
+        
+        // Add comment_id to payload for comment_created events
+        if ($eventType === 'comment_created') {
+            $eventPayload['comment_id'] = $comment_id;
+        }
+        
+        $eventResult = $dispatcher->dispatch($eventType, $eventPayload);
         
         $points_earned = $eventResult['points_earned'] ?? 0;
 
