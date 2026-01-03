@@ -59,6 +59,7 @@ class Loader {
         if (file_exists(REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php')) require_once REJIMDE_PATH . 'includes/Cron/ScoreAggregator.php';
         if (file_exists(REJIMDE_PATH . 'includes/Cron/NotificationJobs.php')) require_once REJIMDE_PATH . 'includes/Cron/NotificationJobs.php';
         if (file_exists(REJIMDE_PATH . 'includes/Cron/ProfileViewNotifications.php')) require_once REJIMDE_PATH . 'includes/Cron/ProfileViewNotifications.php';
+        if (file_exists(REJIMDE_PATH . 'includes/Cron/TaskCron.php')) require_once REJIMDE_PATH . 'includes/Cron/TaskCron.php';
 
         // Traits (API Controllers'dan önce yüklenmeli)
         if (file_exists(REJIMDE_PATH . 'includes/Traits/ProAuthTrait.php')) require_once REJIMDE_PATH . 'includes/Traits/ProAuthTrait.php';
@@ -271,6 +272,12 @@ class Loader {
         if (class_exists('Rejimde\\Cron\\ProfileViewNotifications')) {
             $profileViewNotifications = new \Rejimde\Cron\ProfileViewNotifications();
             $profileViewNotifications->register();
+        }
+        
+        // YENİ: Cron Jobs (Task Expiration)
+        if (class_exists('Rejimde\\Cron\\TaskCron')) {
+            $taskCron = new \Rejimde\Cron\TaskCron();
+            $taskCron->register();
         }
         
         // Admin: Yorum listesine Şikayet kolonu ekle
