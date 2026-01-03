@@ -93,6 +93,13 @@ class GamificationController extends WP_REST_Controller {
             'callback' => [$this, 'get_circle_account'],
             'permission_callback' => [$this, 'check_auth'],
         ]);
+        
+        // Level bazlı leaderboard
+        register_rest_route($this->namespace, '/' . $this->base . '/level-leaderboard', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_level_leaderboard'],
+            'permission_callback' => '__return_true',
+        ]);
     }
 
     /**
@@ -642,6 +649,290 @@ class GamificationController extends WP_REST_Controller {
             'user_contribution_percentage' => $contribution_percentage,
             'members' => $members_data
         ]);
+    }
+
+    /**
+     * Level bazlı leaderboard endpoint
+     * 
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public function get_level_leaderboard($request) {
+        $level_slug = $request->get_param('level_slug');
+        $type = $request->get_param('type') ?: 'users';
+        $limit = (int) ($request->get_param('limit') ?: 50);
+        
+        // Validate level_slug
+        if (empty($level_slug)) {
+            return $this->error('level_slug parameter is required', 400);
+        }
+        
+        $level_info = $this->get_level_bounds($level_slug);
+        if (!$level_info) {
+            return $this->error('Invalid level_slug', 400);
+        }
+        
+        // Get period end date
+        $period_end = $this->get_period_end_date();
+        
+        // Promotion and relegation counts
+        $promotion_count = 5;
+        $relegation_count = 5;
+        
+        $users_data = [];
+        $circles_data = [];
+        $current_user_data = null;
+        
+        if ($type === 'circles') {
+            // Circle leaderboard for this level
+            $args = [
+                'post_type' => 'rejimde_circle',
+                'posts_per_page' => -1,
+                'post_status' => 'publish',
+                'meta_query' => [
+                    [
+                        'key' => 'total_score',
+                        'value' => [$level_info['min'], $level_info['max']],
+                        'type' => 'NUMERIC',
+                        'compare' => 'BETWEEN'
+                    ]
+                ],
+                'meta_key' => 'total_score',
+                'orderby' => 'meta_value_num',
+                'order' => 'DESC'
+            ];
+            
+            $query = new WP_Query($args);
+            $rank = 1;
+            $total_circles = $query->post_count;
+            
+            foreach ($query->posts as $post) {
+                $score = (int) get_post_meta($post->ID, 'total_score', true);
+                $zone = $this->get_zone($rank, $total_circles, $promotion_count, $relegation_count);
+                
+                $circles_data[] = [
+                    'rank' => $rank,
+                    'id' => $post->ID,
+                    'name' => $post->post_title,
+                    'slug' => $post->post_name,
+                    'logo' => get_the_post_thumbnail_url($post->ID, 'thumbnail') ?: null,
+                    'score' => $score,
+                    'zone' => $zone
+                ];
+                
+                $rank++;
+                
+                if ($rank > $limit) {
+                    break;
+                }
+            }
+        } else {
+            // User leaderboard for this level
+            $user_query = new \WP_User_Query([
+                'meta_query' => [
+                    [
+                        'key' => 'rejimde_total_score',
+                        'value' => [$level_info['min'], $level_info['max']],
+                        'type' => 'NUMERIC',
+                        'compare' => 'BETWEEN'
+                    ]
+                ],
+                'orderby' => 'meta_value_num',
+                'order' => 'DESC',
+                'number' => -1,
+                'role__not_in' => ['administrator', 'rejimde_pro'],
+                'fields' => 'all_with_meta'
+            ]);
+            
+            $users = $user_query->get_results();
+            $total_users = count($users);
+            $current_user_id = get_current_user_id();
+            $current_user_index = -1;
+            
+            $rank = 1;
+            foreach ($users as $index => $user) {
+                $score = (int) get_user_meta($user->ID, 'rejimde_total_score', true);
+                $zone = $this->get_zone($rank, $total_users, $promotion_count, $relegation_count);
+                $is_current_user = ($user->ID === $current_user_id);
+                
+                if ($is_current_user) {
+                    $current_user_index = $index;
+                }
+                
+                $user_entry = [
+                    'rank' => $rank,
+                    'id' => $user->ID,
+                    'name' => $user->display_name ?: $user->user_login,
+                    'slug' => $user->user_login,
+                    'avatar' => get_user_meta($user->ID, 'avatar_url', true),
+                    'score' => $score,
+                    'zone' => $zone,
+                    'is_current_user' => $is_current_user
+                ];
+                
+                if ($rank <= $limit) {
+                    $users_data[] = $user_entry;
+                }
+                
+                $rank++;
+            }
+            
+            // Calculate current user data if logged in
+            if ($current_user_id && $current_user_index >= 0) {
+                $current_user = $users[$current_user_index];
+                $current_score = (int) get_user_meta($current_user_id, 'rejimde_total_score', true);
+                $current_rank = $current_user_index + 1;
+                $current_zone = $this->get_zone($current_rank, $total_users, $promotion_count, $relegation_count);
+                
+                $current_user_data = [
+                    'id' => $current_user_id,
+                    'rank' => $current_rank,
+                    'score' => $current_score,
+                    'zone' => $current_zone,
+                    'points_to_promotion' => $this->calculate_points_to_promotion($current_user_index, $users, $promotion_count),
+                    'points_to_relegation' => $this->calculate_points_to_relegation($current_user_index, $users, $total_users, $relegation_count),
+                    'in_this_level' => true
+                ];
+            } elseif ($current_user_id) {
+                // User is not in this level
+                $current_score = (int) get_user_meta($current_user_id, 'rejimde_total_score', true);
+                $user_level = $this->calculate_level($current_score);
+                
+                $current_user_data = [
+                    'id' => $current_user_id,
+                    'rank' => null,
+                    'score' => $current_score,
+                    'zone' => null,
+                    'points_to_promotion' => null,
+                    'points_to_relegation' => null,
+                    'in_this_level' => false,
+                    'current_level' => $user_level['slug'],
+                    'message' => 'You are currently in ' . $user_level['name'] . ' level'
+                ];
+            }
+        }
+        
+        return $this->success([
+            'level' => [
+                'min' => $level_info['min'],
+                'max' => $level_info['max'],
+                'level' => $level_info['level'],
+                'name' => $level_info['name'],
+                'next' => $level_info['next'],
+                'prev' => $level_info['prev']
+            ],
+            'period_ends_at' => $period_end->format('Y-m-d H:i:s'),
+            'period_ends_timestamp' => $period_end->getTimestamp(),
+            'promotion_count' => $promotion_count,
+            'relegation_count' => $relegation_count,
+            'users' => $users_data,
+            'circles' => $circles_data,
+            'current_user' => $current_user_data
+        ]);
+    }
+    
+    /**
+     * Get level bounds by slug
+     * 
+     * @param string $slug
+     * @return array|null
+     */
+    private function get_level_bounds($slug) {
+        $levels = [
+            'begin' => ['min' => 0, 'max' => 200, 'level' => 1, 'name' => 'Begin', 'next' => 'adapt', 'prev' => null],
+            'adapt' => ['min' => 200, 'max' => 300, 'level' => 2, 'name' => 'Adapt', 'next' => 'commit', 'prev' => 'begin'],
+            'commit' => ['min' => 300, 'max' => 500, 'level' => 3, 'name' => 'Commit', 'next' => 'balance', 'prev' => 'adapt'],
+            'balance' => ['min' => 500, 'max' => 1000, 'level' => 4, 'name' => 'Balance', 'next' => 'strengthen', 'prev' => 'commit'],
+            'strengthen' => ['min' => 1000, 'max' => 2000, 'level' => 5, 'name' => 'Strengthen', 'next' => 'sustain', 'prev' => 'balance'],
+            'sustain' => ['min' => 2000, 'max' => 4000, 'level' => 6, 'name' => 'Sustain', 'next' => 'mastery', 'prev' => 'strengthen'],
+            'mastery' => ['min' => 4000, 'max' => 6000, 'level' => 7, 'name' => 'Mastery', 'next' => 'transform', 'prev' => 'sustain'],
+            'transform' => ['min' => 6000, 'max' => 10000, 'level' => 8, 'name' => 'Transform', 'next' => null, 'prev' => 'mastery'],
+        ];
+        return $levels[$slug] ?? null;
+    }
+    
+    /**
+     * Get period end date (Sunday 23:59:59 Istanbul time)
+     * 
+     * @return \DateTime
+     */
+    private function get_period_end_date() {
+        $now = new \DateTime('now', new \DateTimeZone('Europe/Istanbul'));
+        $dayOfWeek = (int) $now->format('N');
+        $daysUntilSunday = 7 - $dayOfWeek;
+        
+        $end = clone $now;
+        if ($daysUntilSunday > 0) {
+            $end->modify("+{$daysUntilSunday} days");
+        }
+        $end->setTime(23, 59, 59);
+        return $end;
+    }
+    
+    /**
+     * Calculate zone for user/circle
+     * 
+     * @param int $rank
+     * @param int $total
+     * @param int $promotion_count
+     * @param int $relegation_count
+     * @return string
+     */
+    private function get_zone($rank, $total, $promotion_count, $relegation_count) {
+        if ($rank <= $promotion_count) return 'promotion';
+        if ($total - $rank < $relegation_count) return 'relegation';
+        return 'safe';
+    }
+    
+    /**
+     * Calculate points needed to reach promotion zone
+     * 
+     * @param int $current_index
+     * @param array $users
+     * @param int $promotion_count
+     * @return int|null
+     */
+    private function calculate_points_to_promotion($current_index, $users, $promotion_count) {
+        if ($current_index < $promotion_count) {
+            return 0; // Already in promotion zone
+        }
+        
+        // Need to beat the last promotion zone user
+        $target_index = $promotion_count - 1;
+        if (isset($users[$target_index])) {
+            $current_score = (int) get_user_meta($users[$current_index]->ID, 'rejimde_total_score', true);
+            $target_score = (int) get_user_meta($users[$target_index]->ID, 'rejimde_total_score', true);
+            return max(0, $target_score - $current_score + 1);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Calculate points difference from relegation zone
+     * 
+     * @param int $current_index
+     * @param array $users
+     * @param int $total
+     * @param int $relegation_count
+     * @return int|null
+     */
+    private function calculate_points_to_relegation($current_index, $users, $total, $relegation_count) {
+        $relegation_start = $total - $relegation_count;
+        
+        if ($current_index >= $relegation_start) {
+            return 0; // Already in relegation zone
+        }
+        
+        // Points above the first relegation zone user
+        $first_relegation_index = $relegation_start;
+        if (isset($users[$first_relegation_index])) {
+            $current_score = (int) get_user_meta($users[$current_index]->ID, 'rejimde_total_score', true);
+            $relegation_score = (int) get_user_meta($users[$first_relegation_index]->ID, 'rejimde_total_score', true);
+            return max(0, $current_score - $relegation_score);
+        }
+        
+        return null;
     }
 
     public function check_auth($request) { return is_user_logged_in(); }
