@@ -207,7 +207,7 @@ class ProfileViewController extends WP_REST_Controller {
                     'content_views' => 0,
                     'client_completions' => 0
                 ],
-                ['%d', '%s', '%d', '%d', '%d', '%s', '%d', '%d']
+                ['%d', '%s', '%d', '%d', '%d', '%f', '%d', '%d']
             );
         }
         // ========================================
