@@ -693,7 +693,7 @@ curl -X GET https://rejimde.com/wp-json/rejimde/v1/profile/following \
   - `slug`: URL-friendly username (nicename)
   - `avatar_url`: User's avatar URL (custom or generated)
   - `last_activity`: Object containing the user's most recent activity
-    - `type`: Event type from rejimde_events table
+    - `type`: Event type from the events table
     - `label`: Human-readable activity description
     - `icon`: Emoji icon representing the activity
     - `time_ago`: Human-readable time since the activity
