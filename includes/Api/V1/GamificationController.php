@@ -94,7 +94,7 @@ class GamificationController extends WP_REST_Controller {
             'permission_callback' => [$this, 'check_auth'],
         ]);
         
-        // Level bazlı leaderboard
+        // Level-based leaderboard
         register_rest_route($this->namespace, '/' . $this->base . '/level-leaderboard', [
             'methods' => 'GET',
             'callback' => [$this, 'get_level_leaderboard'],
@@ -690,11 +690,18 @@ class GamificationController extends WP_REST_Controller {
                 'posts_per_page' => -1,
                 'post_status' => 'publish',
                 'meta_query' => [
+                    'relation' => 'AND',
                     [
                         'key' => 'total_score',
-                        'value' => [$level_info['min'], $level_info['max']],
+                        'value' => $level_info['min'],
                         'type' => 'NUMERIC',
-                        'compare' => 'BETWEEN'
+                        'compare' => '>='
+                    ],
+                    [
+                        'key' => 'total_score',
+                        'value' => $level_info['max'],
+                        'type' => 'NUMERIC',
+                        'compare' => '<'
                     ]
                 ],
                 'meta_key' => 'total_score',
@@ -730,11 +737,18 @@ class GamificationController extends WP_REST_Controller {
             // User leaderboard for this level
             $user_query = new \WP_User_Query([
                 'meta_query' => [
+                    'relation' => 'AND',
                     [
                         'key' => 'rejimde_total_score',
-                        'value' => [$level_info['min'], $level_info['max']],
+                        'value' => $level_info['min'],
                         'type' => 'NUMERIC',
-                        'compare' => 'BETWEEN'
+                        'compare' => '>='
+                    ],
+                    [
+                        'key' => 'rejimde_total_score',
+                        'value' => $level_info['max'],
+                        'type' => 'NUMERIC',
+                        'compare' => '<'
                     ]
                 ],
                 'orderby' => 'meta_value_num',
@@ -858,13 +872,16 @@ class GamificationController extends WP_REST_Controller {
      */
     private function get_period_end_date() {
         $now = new \DateTime('now', new \DateTimeZone('Europe/Istanbul'));
-        $dayOfWeek = (int) $now->format('N');
-        $daysUntilSunday = 7 - $dayOfWeek;
+        $dayOfWeek = (int) $now->format('N'); // 1 (Monday) to 7 (Sunday)
         
         $end = clone $now;
-        if ($daysUntilSunday > 0) {
+        
+        // If today is Sunday (7), keep it; otherwise calculate days until next Sunday
+        if ($dayOfWeek < 7) {
+            $daysUntilSunday = 7 - $dayOfWeek;
             $end->modify("+{$daysUntilSunday} days");
         }
+        
         $end->setTime(23, 59, 59);
         return $end;
     }

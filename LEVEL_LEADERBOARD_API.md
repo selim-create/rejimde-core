@@ -20,16 +20,18 @@ Retrieves the leaderboard for a specific level, including rankings, zones, and p
 
 #### Level Slugs and Score Ranges
 
+Scores are inclusive of the minimum and exclusive of the maximum (min ≤ score < max).
+
 | Level Slug | Name | Score Range | Level Number |
 |------------|------|-------------|--------------|
-| `begin` | Begin | 0-199 | 1 |
-| `adapt` | Adapt | 200-299 | 2 |
-| `commit` | Commit | 300-499 | 3 |
-| `balance` | Balance | 500-999 | 4 |
-| `strengthen` | Strengthen | 1000-1999 | 5 |
-| `sustain` | Sustain | 2000-3999 | 6 |
-| `mastery` | Mastery | 4000-5999 | 7 |
-| `transform` | Transform | 6000-9999 | 8 |
+| `begin` | Begin | 0-200 | 1 |
+| `adapt` | Adapt | 200-300 | 2 |
+| `commit` | Commit | 300-500 | 3 |
+| `balance` | Balance | 500-1000 | 4 |
+| `strengthen` | Strengthen | 1000-2000 | 5 |
+| `sustain` | Sustain | 2000-4000 | 6 |
+| `mastery` | Mastery | 4000-6000 | 7 |
+| `transform` | Transform | 6000-10000 | 8 |
 
 #### Response Structure
 
