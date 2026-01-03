@@ -105,9 +105,9 @@ class ProfessionalController extends WP_REST_Controller {
                     $location = get_post_meta($post_id, 'konum', true);
                 }
 
-                // RejiScore hesapla
+                // RejiScore hesapla - SADECE claim edilmiş uzmanlar için
                 $rejiScoreData = [];
-                if ($user_id) {
+                if ($user_id && $is_claimed) {
                     $rejiScoreData = $this->rejiScoreService->calculate((int) $user_id);
                 }
 
@@ -137,24 +137,24 @@ class ProfessionalController extends WP_REST_Controller {
                     'rating'        => get_post_meta($post_id, 'puan', true) ?: '0.0',
                     'score_impact'  => get_post_meta($post_id, 'skor_etkisi', true) ?: '--',
                     'is_verified'   => get_post_meta($post_id, 'onayli', true) === '1',
-                    'is_featured'   => get_post_meta($post_id, 'editor_secimi', true) === '1',
+                    'is_featured'   => get_post_meta($post_id, 'is_featured', true) === '1',
                     'is_online'     => $this->isUserOnline($user_id),
                     'location'      => $location,
                     'brand'         => get_post_meta($post_id, 'kurum', true) ?: get_user_meta($user_id, 'brand_name', true),
                     'is_claimed'    => $is_claimed,
                     
                     // RejiScore verileri
-                    'reji_score'       => $rejiScoreData['reji_score'] ?? 50,
-                    'trend_percentage' => $rejiScoreData['trend_percentage'] ?? 0,
-                    'trend_direction'  => $rejiScoreData['trend_direction'] ?? 'stable',
-                    'trust_score'      => $rejiScoreData['trust_score'] ?? 50,
-                    'contribution_score' => $rejiScoreData['contribution_score'] ?? 50,
-                    'freshness_score'  => $rejiScoreData['freshness_score'] ?? 50,
+                    'reji_score'       => $is_claimed ? ($rejiScoreData['reji_score'] ?? 50) : null,
+                    'trend_percentage' => $is_claimed ? ($rejiScoreData['trend_percentage'] ?? 0) : null,
+                    'trend_direction'  => $is_claimed ? ($rejiScoreData['trend_direction'] ?? 'stable') : null,
+                    'trust_score'      => $is_claimed ? ($rejiScoreData['trust_score'] ?? 50) : null,
+                    'contribution_score' => $is_claimed ? ($rejiScoreData['contribution_score'] ?? 50) : null,
+                    'freshness_score'  => $is_claimed ? ($rejiScoreData['freshness_score'] ?? 50) : null,
                     
                     // Sosyal veriler
                     'followers_count'  => $followers_count,
                     'client_count'     => $user_id ? $this->getActiveClientCount($user_id) : 0,
-                    'content_count'    => $rejiScoreData['content_count'] ?? 0,
+                    'content_count'    => $is_claimed ? ($rejiScoreData['content_count'] ?? 0) : 0,
                     
                     // Deneyim
                     'experience_years' => $experience_years,
@@ -163,18 +163,25 @@ class ProfessionalController extends WP_REST_Controller {
             wp_reset_postdata();
         }
 
-        // Sıralama: 1. is_featured (Editörün Seçimi), 2. is_verified (Onaylı), 3. reji_score
+        // Sıralama: 0. is_claimed, 1. is_featured, 2. is_verified, 3. reji_score
         usort($experts, function($a, $b) {
-            // 1. Önce Editörün Seçimi
+            // 0. Önce claim edilmiş uzmanlar (claim edilmemişler en sonda)
+            if ($a['is_claimed'] && !$b['is_claimed']) return -1;
+            if (!$a['is_claimed'] && $b['is_claimed']) return 1;
+            
+            // 1. Editörün Seçimi (is_featured)
             if ($a['is_featured'] && !$b['is_featured']) return -1;
             if (!$a['is_featured'] && $b['is_featured']) return 1;
             
-            // 2. Sonra Onaylı Uzmanlar
+            // 2. Onaylı Uzmanlar (is_verified)
             if ($a['is_verified'] && !$b['is_verified']) return -1;
             if (!$a['is_verified'] && $b['is_verified']) return 1;
             
-            // 3. Son olarak RejiScore'a göre (yüksekten düşüğe)
-            return $b['reji_score'] - $a['reji_score'];
+            // 3. RejiScore'a göre (yüksekten düşüğe)
+            // null değerleri 0 olarak ele al
+            $scoreA = $a['reji_score'] ?? 0;
+            $scoreB = $b['reji_score'] ?? 0;
+            return $scoreB - $scoreA;
         });
 
         return new WP_REST_Response($experts, 200);
@@ -359,7 +366,7 @@ class ProfessionalController extends WP_REST_Controller {
             'rating'        => get_post_meta($post_id, 'puan', true) ?: '0.0',
             'score_impact'  => get_post_meta($post_id, 'skor_etkisi', true) ?: '--',
             'is_verified'   => get_post_meta($post_id, 'onayli', true) === '1',
-            'is_featured'   => get_post_meta($post_id, 'editor_secimi', true) === '1',
+            'is_featured'   => get_post_meta($post_id, 'is_featured', true) === '1',
             'is_claimed'    => $is_claimed,
             'is_online'     => $this->isUserOnline($user_id),
             
@@ -411,25 +418,25 @@ class ProfessionalController extends WP_REST_Controller {
             'privacy_settings'  => $privacy_settings,
         ];
 
-        // RejiScore hesapla ve ekle
+        // RejiScore hesapla ve ekle - SADECE claim edilmiş uzmanlar için
         $rejiScoreData = [];
-        if ($user_id) {
+        if ($user_id && $is_claimed) {
             $rejiScoreData = $this->rejiScoreService->calculate((int) $user_id);
         }
 
         // RejiScore verilerini response'a ekle
-        $data['reji_score'] = $rejiScoreData['reji_score'] ?? 50;
-        $data['trust_score'] = $rejiScoreData['trust_score'] ?? 50;
-        $data['contribution_score'] = $rejiScoreData['contribution_score'] ?? 50;
-        $data['freshness_score'] = $rejiScoreData['freshness_score'] ?? 50;
-        $data['trend_percentage'] = $rejiScoreData['trend_percentage'] ?? 0;
-        $data['trend_direction'] = $rejiScoreData['trend_direction'] ?? 'stable';
-        $data['score_level'] = $rejiScoreData['level'] ?? 1;
-        $data['score_level_label'] = $rejiScoreData['level_label'] ?? 'Yeni';
-        $data['review_count'] = $rejiScoreData['review_count'] ?? 0;
-        $data['content_count'] = $rejiScoreData['content_count'] ?? 0;
+        $data['reji_score'] = $is_claimed ? ($rejiScoreData['reji_score'] ?? 50) : null;
+        $data['trust_score'] = $is_claimed ? ($rejiScoreData['trust_score'] ?? 50) : null;
+        $data['contribution_score'] = $is_claimed ? ($rejiScoreData['contribution_score'] ?? 50) : null;
+        $data['freshness_score'] = $is_claimed ? ($rejiScoreData['freshness_score'] ?? 50) : null;
+        $data['trend_percentage'] = $is_claimed ? ($rejiScoreData['trend_percentage'] ?? 0) : null;
+        $data['trend_direction'] = $is_claimed ? ($rejiScoreData['trend_direction'] ?? 'stable') : null;
+        $data['score_level'] = $is_claimed ? ($rejiScoreData['level'] ?? 1) : null;
+        $data['score_level_label'] = $is_claimed ? ($rejiScoreData['level_label'] ?? 'Yeni') : null;
+        $data['review_count'] = $is_claimed ? ($rejiScoreData['review_count'] ?? 0) : 0;
+        $data['content_count'] = $is_claimed ? ($rejiScoreData['content_count'] ?? 0) : 0;
         // Yeni alanlar
-        $data['goal_success_rate'] = $rejiScoreData['goal_success_rate'] ?? 85;
+        $data['goal_success_rate'] = $is_claimed ? ($rejiScoreData['goal_success_rate'] ?? 85) : null;
 
         // ===============================================
         // YENİ ALANLAR: Sosyal ve Danışan Verileri
