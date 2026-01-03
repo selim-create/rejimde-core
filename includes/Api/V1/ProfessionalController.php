@@ -146,15 +146,15 @@ class ProfessionalController extends WP_REST_Controller {
                     // RejiScore verileri
                     'reji_score'       => $is_claimed ? ($rejiScoreData['reji_score'] ?? 50) : null,
                     'trend_percentage' => $is_claimed ? ($rejiScoreData['trend_percentage'] ?? 0) : null,
-                    'trend_direction'  => $rejiScoreData['trend_direction'] ?? 'stable',
-                    'trust_score'      => $rejiScoreData['trust_score'] ?? 50,
-                    'contribution_score' => $rejiScoreData['contribution_score'] ?? 50,
-                    'freshness_score'  => $rejiScoreData['freshness_score'] ?? 50,
+                    'trend_direction'  => $is_claimed ? ($rejiScoreData['trend_direction'] ?? 'stable') : null,
+                    'trust_score'      => $is_claimed ? ($rejiScoreData['trust_score'] ?? 50) : null,
+                    'contribution_score' => $is_claimed ? ($rejiScoreData['contribution_score'] ?? 50) : null,
+                    'freshness_score'  => $is_claimed ? ($rejiScoreData['freshness_score'] ?? 50) : null,
                     
                     // Sosyal veriler
                     'followers_count'  => $followers_count,
                     'client_count'     => $user_id ? $this->getActiveClientCount($user_id) : 0,
-                    'content_count'    => $rejiScoreData['content_count'] ?? 0,
+                    'content_count'    => $is_claimed ? ($rejiScoreData['content_count'] ?? 0) : 0,
                     
                     // Deneyim
                     'experience_years' => $experience_years,
@@ -418,25 +418,25 @@ class ProfessionalController extends WP_REST_Controller {
             'privacy_settings'  => $privacy_settings,
         ];
 
-        // RejiScore hesapla ve ekle
+        // RejiScore hesapla ve ekle - SADECE claim edilmiş uzmanlar için
         $rejiScoreData = [];
-        if ($user_id) {
+        if ($user_id && $is_claimed) {
             $rejiScoreData = $this->rejiScoreService->calculate((int) $user_id);
         }
 
         // RejiScore verilerini response'a ekle
-        $data['reji_score'] = $rejiScoreData['reji_score'] ?? 50;
-        $data['trust_score'] = $rejiScoreData['trust_score'] ?? 50;
-        $data['contribution_score'] = $rejiScoreData['contribution_score'] ?? 50;
-        $data['freshness_score'] = $rejiScoreData['freshness_score'] ?? 50;
-        $data['trend_percentage'] = $rejiScoreData['trend_percentage'] ?? 0;
-        $data['trend_direction'] = $rejiScoreData['trend_direction'] ?? 'stable';
-        $data['score_level'] = $rejiScoreData['level'] ?? 1;
-        $data['score_level_label'] = $rejiScoreData['level_label'] ?? 'Yeni';
-        $data['review_count'] = $rejiScoreData['review_count'] ?? 0;
-        $data['content_count'] = $rejiScoreData['content_count'] ?? 0;
+        $data['reji_score'] = $is_claimed ? ($rejiScoreData['reji_score'] ?? 50) : null;
+        $data['trust_score'] = $is_claimed ? ($rejiScoreData['trust_score'] ?? 50) : null;
+        $data['contribution_score'] = $is_claimed ? ($rejiScoreData['contribution_score'] ?? 50) : null;
+        $data['freshness_score'] = $is_claimed ? ($rejiScoreData['freshness_score'] ?? 50) : null;
+        $data['trend_percentage'] = $is_claimed ? ($rejiScoreData['trend_percentage'] ?? 0) : null;
+        $data['trend_direction'] = $is_claimed ? ($rejiScoreData['trend_direction'] ?? 'stable') : null;
+        $data['score_level'] = $is_claimed ? ($rejiScoreData['level'] ?? 1) : null;
+        $data['score_level_label'] = $is_claimed ? ($rejiScoreData['level_label'] ?? 'Yeni') : null;
+        $data['review_count'] = $is_claimed ? ($rejiScoreData['review_count'] ?? 0) : 0;
+        $data['content_count'] = $is_claimed ? ($rejiScoreData['content_count'] ?? 0) : 0;
         // Yeni alanlar
-        $data['goal_success_rate'] = $rejiScoreData['goal_success_rate'] ?? 85;
+        $data['goal_success_rate'] = $is_claimed ? ($rejiScoreData['goal_success_rate'] ?? 85) : null;
 
         // ===============================================
         // YENİ ALANLAR: Sosyal ve Danışan Verileri
