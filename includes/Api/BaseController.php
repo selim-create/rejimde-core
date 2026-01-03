@@ -37,7 +37,7 @@ abstract class BaseController extends WP_REST_Controller {
     }
 
     // Yetki Kontrolü (Middleware gibi)
-    protected function check_auth($request) {
+    public function check_auth($request = null) {
         // JWT kontrolü veya WP Nonce kontrolü burada yapılabilir
         // Şimdilik basit user check
         return is_user_logged_in();
