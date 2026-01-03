@@ -744,7 +744,127 @@ class Activator {
         ) {$charset_collate};";
         dbDelta($sql_service_requests);
 
-        // 36. Terminoloji Migrasyonu
+        // 36. Task Definitions Table
+        $table_task_definitions = $wpdb->prefix . 'rejimde_task_definitions';
+        $sql_task_definitions = "CREATE TABLE {$table_task_definitions} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(100) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            description TEXT DEFAULT NULL,
+            task_type ENUM('daily', 'weekly', 'monthly', 'circle', 'mentor') NOT NULL,
+            target_value INT NOT NULL,
+            scoring_event_types LONGTEXT DEFAULT NULL COMMENT 'JSON array of event types',
+            reward_score INT DEFAULT 0,
+            reward_badge_id BIGINT UNSIGNED DEFAULT NULL,
+            badge_progress_contribution INT DEFAULT 0,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_slug (slug),
+            INDEX idx_task_type (task_type),
+            INDEX idx_active (is_active)
+        ) {$charset_collate};";
+        dbDelta($sql_task_definitions);
+
+        // 37. User Tasks Table
+        $table_user_tasks = $wpdb->prefix . 'rejimde_user_tasks';
+        $sql_user_tasks = "CREATE TABLE {$table_user_tasks} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            task_definition_id BIGINT UNSIGNED NOT NULL,
+            period_key VARCHAR(20) NOT NULL,
+            current_value INT DEFAULT 0,
+            target_value INT NOT NULL,
+            status ENUM('in_progress', 'completed', 'expired') DEFAULT 'in_progress',
+            completed_at DATETIME DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_user_task_period (user_id, task_definition_id, period_key),
+            INDEX idx_user_status (user_id, status),
+            INDEX idx_period (period_key)
+        ) {$charset_collate};";
+        dbDelta($sql_user_tasks);
+
+        // 38. Circle Tasks Table
+        $table_circle_tasks = $wpdb->prefix . 'rejimde_circle_tasks';
+        $sql_circle_tasks = "CREATE TABLE {$table_circle_tasks} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            circle_id BIGINT UNSIGNED NOT NULL,
+            task_definition_id BIGINT UNSIGNED NOT NULL,
+            period_key VARCHAR(20) NOT NULL,
+            current_value INT DEFAULT 0,
+            target_value INT NOT NULL,
+            status ENUM('in_progress', 'completed', 'expired') DEFAULT 'in_progress',
+            completed_at DATETIME DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_circle_task_period (circle_id, task_definition_id, period_key),
+            INDEX idx_circle_status (circle_id, status),
+            INDEX idx_period (period_key)
+        ) {$charset_collate};";
+        dbDelta($sql_circle_tasks);
+
+        // 39. Circle Task Contributions Table
+        $table_circle_contributions = $wpdb->prefix . 'rejimde_circle_task_contributions';
+        $sql_circle_contributions = "CREATE TABLE {$table_circle_contributions} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            circle_task_id BIGINT UNSIGNED NOT NULL,
+            user_id BIGINT UNSIGNED NOT NULL,
+            contribution_value INT DEFAULT 0,
+            contribution_date DATE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_contribution (circle_task_id, user_id, contribution_date),
+            INDEX idx_circle_task (circle_task_id),
+            INDEX idx_user (user_id)
+        ) {$charset_collate};";
+        dbDelta($sql_circle_contributions);
+
+        // 40. Badge Definitions Table
+        $table_badge_definitions = $wpdb->prefix . 'rejimde_badge_definitions';
+        $sql_badge_definitions = "CREATE TABLE {$table_badge_definitions} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            slug VARCHAR(100) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            description TEXT DEFAULT NULL,
+            icon VARCHAR(255) DEFAULT NULL,
+            category ENUM('behavior', 'discipline', 'social', 'milestone') NOT NULL,
+            tier ENUM('bronze', 'silver', 'gold', 'platinum') DEFAULT 'bronze',
+            max_progress INT NOT NULL,
+            conditions LONGTEXT NOT NULL COMMENT 'JSON rule engine conditions',
+            is_active TINYINT(1) DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_slug (slug),
+            INDEX idx_category (category),
+            INDEX idx_active (is_active)
+        ) {$charset_collate};";
+        dbDelta($sql_badge_definitions);
+
+        // 41. User Badges Table
+        $table_user_badges = $wpdb->prefix . 'rejimde_user_badges';
+        $sql_user_badges = "CREATE TABLE {$table_user_badges} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id BIGINT UNSIGNED NOT NULL,
+            badge_definition_id BIGINT UNSIGNED NOT NULL,
+            current_progress INT DEFAULT 0,
+            is_earned TINYINT(1) DEFAULT 0,
+            earned_at DATETIME DEFAULT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_user_badge (user_id, badge_definition_id),
+            INDEX idx_user_earned (user_id, is_earned),
+            INDEX idx_badge (badge_definition_id)
+        ) {$charset_collate};";
+        dbDelta($sql_user_badges);
+
+        // Seed default task definitions
+        self::seed_task_definitions();
+
+        // Seed default badge definitions
+        self::seed_badge_definitions();
+
+        // 42. Terminoloji Migrasyonu
         self::migrate_level_to_rank();
 
         error_log('[Rejimde Core] Activator::activate finished');
@@ -767,6 +887,79 @@ class Activator {
             );
 
             update_option('rejimde_level_to_rank_migration', true);
+        }
+    }
+
+    /**
+     * Seed default task definitions
+     */
+    private static function seed_task_definitions() {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'rejimde_task_definitions';
+        
+        // Check if already seeded
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
+        if ($count > 0) {
+            return; // Already seeded
+        }
+        
+        // Load task definitions from config
+        if (!file_exists(__DIR__ . '/../Config/TaskDefinitions.php')) {
+            return;
+        }
+        
+        $definitions = require __DIR__ . '/../Config/TaskDefinitions.php';
+        
+        foreach ($definitions as $slug => $def) {
+            $wpdb->insert($table, [
+                'slug' => $slug,
+                'title' => $def['title'],
+                'description' => $def['description'],
+                'task_type' => $def['task_type'],
+                'target_value' => $def['target_value'],
+                'scoring_event_types' => json_encode($def['scoring_event_types']),
+                'reward_score' => $def['reward_score'] ?? 0,
+                'reward_badge_id' => $def['reward_badge_id'] ?? null,
+                'badge_progress_contribution' => $def['badge_progress_contribution'] ?? 0,
+                'is_active' => 1
+            ]);
+        }
+    }
+
+    /**
+     * Seed default badge definitions
+     */
+    private static function seed_badge_definitions() {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'rejimde_badge_definitions';
+        
+        // Check if already seeded
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
+        if ($count > 0) {
+            return; // Already seeded
+        }
+        
+        // Load badge definitions from config
+        if (!file_exists(__DIR__ . '/../Config/BadgeRules.php')) {
+            return;
+        }
+        
+        $definitions = require __DIR__ . '/../Config/BadgeRules.php';
+        
+        foreach ($definitions as $slug => $def) {
+            $wpdb->insert($table, [
+                'slug' => $slug,
+                'title' => $def['title'],
+                'description' => $def['description'],
+                'icon' => $def['icon'] ?? null,
+                'category' => $def['category'],
+                'tier' => $def['tier'],
+                'max_progress' => $def['max_progress'],
+                'conditions' => json_encode($def['conditions']),
+                'is_active' => 1
+            ]);
         }
     }
 }
