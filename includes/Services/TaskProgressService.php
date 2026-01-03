@@ -267,14 +267,15 @@ class TaskProgressService {
         
         $taskDefIdsList = implode(',', array_map('intval', $taskDefIds));
         
-        // Update expired tasks
-        $result = $wpdb->query(
+        // Update expired tasks using prepared statement
+        $result = $wpdb->query($wpdb->prepare(
             "UPDATE $table 
              SET status = 'expired'
              WHERE task_definition_id IN ($taskDefIdsList)
-             AND period_key != '$currentPeriod'
-             AND status = 'in_progress'"
-        );
+             AND period_key != %s
+             AND status = 'in_progress'",
+            $currentPeriod
+        ));
         
         return $result ?: 0;
     }

@@ -171,9 +171,9 @@ class BadgeRuleEngine {
         $event = $conditions['event'] ?? '';
         $target = $conditions['target'] ?? 4;
         
-        // Get all weeks where event occurred
+        // Get all weeks where event occurred (using YEARWEEK for proper ordering)
         $weeks = $wpdb->get_col($wpdb->prepare(
-            "SELECT DISTINCT DATE_FORMAT(created_at, '%%Y-%%u') as week 
+            "SELECT DISTINCT YEARWEEK(created_at, 3) as week 
              FROM $eventsTable 
              WHERE user_id = %d AND event_type = %s 
              ORDER BY week DESC",
@@ -188,11 +188,10 @@ class BadgeRuleEngine {
             if ($prevWeek === null) {
                 $consecutive = 1;
             } else {
-                $current = new \DateTime($week . '-1');
-                $prev = new \DateTime($prevWeek . '-1');
-                $diff = $prev->diff($current)->days;
+                // Check if weeks are consecutive (diff should be 1)
+                $diff = $prevWeek - $week;
                 
-                if ($diff <= 7) {
+                if ($diff === 1) {
                     $consecutive++;
                 } else {
                     break;
@@ -222,20 +221,36 @@ class BadgeRuleEngine {
         $periodService = new PeriodService();
         $periodKey = $periodService->getCurrentPeriodKey($period);
         
-        $dateFilter = '';
+        // Build date filter based on period type
         if ($period === 'monthly') {
-            $dateFilter = "DATE_FORMAT(created_at, '%Y-%m') = '$periodKey'";
+            $count = (int)$wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $eventsTable 
+                 WHERE user_id = %d AND event_type = %s 
+                 AND DATE_FORMAT(created_at, '%%Y-%%m') = %s",
+                $userId, $event, $periodKey
+            ));
         } elseif ($period === 'weekly') {
-            $dateFilter = "DATE_FORMAT(created_at, '%Y-%u') = '" . str_replace('-W', '-', $periodKey) . "'";
+            // Extract year and week from periodKey (format: "2026-W01")
+            $weekParts = explode('-W', $periodKey);
+            if (count($weekParts) === 2) {
+                $count = (int)$wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM $eventsTable 
+                     WHERE user_id = %d AND event_type = %s 
+                     AND YEAR(created_at) = %d AND WEEK(created_at, 3) = %d",
+                    $userId, $event, (int)$weekParts[0], (int)$weekParts[1]
+                ));
+            } else {
+                $count = 0;
+            }
         } else {
-            $dateFilter = "DATE(created_at) = '$periodKey'";
+            // Daily
+            $count = (int)$wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $eventsTable 
+                 WHERE user_id = %d AND event_type = %s 
+                 AND DATE(created_at) = %s",
+                $userId, $event, $periodKey
+            ));
         }
-        
-        $count = (int)$wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $eventsTable 
-             WHERE user_id = %d AND event_type = %s AND $dateFilter",
-            $userId, $event
-        ));
         
         return [
             'passed' => $count >= $target,
@@ -334,15 +349,17 @@ class BadgeRuleEngine {
             return ['passed' => false, 'progress' => 0, 'max' => 1];
         }
         
-        $eventsList = implode("','", array_map('esc_sql', $events));
+        // Build placeholders for events
+        $placeholders = implode(',', array_fill(0, count($events), '%s'));
+        $params = array_merge([$userId], $events);
         
         $count = (int)$wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(DISTINCT JSON_EXTRACT(context, '$.target_user_id')) 
              FROM $eventsTable 
              WHERE user_id = %d 
-             AND event_type IN ('$eventsList')
+             AND event_type IN ($placeholders)
              AND JSON_EXTRACT(context, '$.target_user_id') IS NOT NULL",
-            $userId
+            ...$params
         ));
         
         return [

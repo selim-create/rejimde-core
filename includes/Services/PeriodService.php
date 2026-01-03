@@ -87,6 +87,10 @@ class PeriodService {
     public function getWeekNumber(\DateTime $date = null): string {
         if ($date === null) {
             $date = new \DateTime('now', new \DateTimeZone('Europe/Istanbul'));
+        } else {
+            // Ensure timezone is set
+            $date = clone $date;
+            $date->setTimezone(new \DateTimeZone('Europe/Istanbul'));
         }
         
         return $date->format('o-\WW'); // ISO 8601 week number
