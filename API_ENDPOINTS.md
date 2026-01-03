@@ -716,12 +716,12 @@ curl -X GET https://rejimde.com/wp-json/rejimde/v1/profile/following \
 - `diet_started`: "Diyet başlattı" 🍽️
 - `exercise_started`: "Egzersiz başlattı" 🏃
 - `rating_submitted`: "Uzman değerlendirdi" ⭐
-- `milestone_*`: "Bir başarı kazandı" 🏆
+- `milestone_*`: "Bir başarı kazandı" 🏆 (e.g., `milestone_weight_loss_5kg`, `milestone_streak_7_days`)
 - Default: "Aktivite gerçekleştirdi" 📌
 
 **Notes:**
 - Only returns users that are currently in the database (skips deleted users)
-- Activities are fetched from the `wp_rejimde_events` table
+- Activities are fetched from the `{prefix}rejimde_events` table (where {prefix} is the WordPress table prefix)
 - Returns the most recent activity for each followed user
 - Uses optimized SQL query for performance
 - Avatar URLs fall back to DiceBear API if no custom avatar is set
