@@ -652,7 +652,7 @@ class GamificationController extends WP_REST_Controller {
     }
 
     /**
-     * Level bazlı leaderboard endpoint
+     * Level-based leaderboard endpoint
      * 
      * @param WP_REST_Request $request
      * @return WP_REST_Response
