@@ -37,6 +37,10 @@ class Circle {
 
         register_post_type('rejimde_circle', $args);
         
+        // Circle silindiğinde üyeleri temizle
+        add_action('before_delete_post', [$this, 'cleanup_circle_members']);
+        add_action('wp_trash_post', [$this, 'cleanup_circle_members']);
+        
         // Migration: Eski rejimde_clan post'larını rejimde_circle olarak güncelle
         $this->maybe_migrate_old_clans();
     }
@@ -70,5 +74,26 @@ class Circle {
         
         // Migration tamamlandı olarak işaretle
         update_option('rejimde_clan_to_circle_migrated_v1', true);
+    }
+    
+    /**
+     * Circle silindiğinde tüm üyelerin circle meta bilgilerini temizle
+     */
+    public function cleanup_circle_members($post_id) {
+        $post = get_post($post_id);
+        if (!$post || $post->post_type !== 'rejimde_circle') {
+            return;
+        }
+        
+        // Bu circle'a ait tüm kullanıcıları bul ve temizle
+        $users = get_users([
+            'meta_key' => 'circle_id',
+            'meta_value' => $post_id
+        ]);
+        
+        foreach ($users as $user) {
+            delete_user_meta($user->ID, 'circle_id');
+            delete_user_meta($user->ID, 'circle_role');
+        }
     }
 }
