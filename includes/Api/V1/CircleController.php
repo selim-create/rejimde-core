@@ -567,7 +567,10 @@ class CircleController extends WP_REST_Controller {
         $tasks = get_post_meta($circle_id, 'circle_tasks', true);
         if (!is_array($tasks)) $tasks = [];
         
-        return new WP_REST_Response($tasks, 200);
+        return new WP_REST_Response([
+            'status' => 'success',
+            'data' => $tasks
+        ], 200);
     }
 
     /**
@@ -613,8 +616,9 @@ class CircleController extends WP_REST_Controller {
         update_post_meta($circle_id, 'circle_tasks', $tasks);
         
         return new WP_REST_Response([
-            'message' => 'Görev oluşturuldu!',
-            'task' => $new_task
+            'status' => 'success',
+            'data' => $new_task,
+            'message' => 'Görev oluşturuldu!'
         ], 201);
     }
 
@@ -654,8 +658,9 @@ class CircleController extends WP_REST_Controller {
         update_post_meta($circle_id, 'circle_tasks', $tasks);
         
         return new WP_REST_Response([
-            'message' => 'Görev güncellendi!',
-            'task' => $tasks[$task_index]
+            'status' => 'success',
+            'data' => $tasks[$task_index],
+            'message' => 'Görev güncellendi!'
         ], 200);
     }
 
@@ -688,7 +693,10 @@ class CircleController extends WP_REST_Controller {
         unset($tasks[$task_index]);
         update_post_meta($circle_id, 'circle_tasks', array_values($tasks));
         
-        return new WP_REST_Response(['message' => 'Görev silindi!'], 200);
+        return new WP_REST_Response([
+            'status' => 'success',
+            'message' => 'Görev silindi!'
+        ], 200);
     }
 
     /**
@@ -727,8 +735,9 @@ class CircleController extends WP_REST_Controller {
         update_post_meta($circle_id, 'circle_tasks', $tasks);
         
         return new WP_REST_Response([
-            'message' => 'Görev atandı!',
-            'task' => $tasks[$task_index]
+            'status' => 'success',
+            'data' => $tasks[$task_index],
+            'message' => 'Görev atandı!'
         ], 200);
     }
 
@@ -749,24 +758,40 @@ class CircleController extends WP_REST_Controller {
         ]);
         
         $members_data = [];
+        $mentors_data = [];
+        
         foreach ($members as $member) {
-            $members_data[] = [
+            $user_roles = $member->roles;
+            $is_pro = in_array('rejimde_pro', $user_roles) || in_array('rejimde_expert', $user_roles);
+            $circle_role = get_user_meta($member->ID, 'circle_role', true);
+            
+            $member_info = [
                 'id' => $member->ID,
                 'name' => $member->display_name,
                 'email' => $member->user_email,
                 'avatar' => get_user_meta($member->ID, 'avatar_url', true),
-                'role' => get_user_meta($member->ID, 'circle_role', true),
-                'score' => (int) get_user_meta($member->ID, 'rejimde_total_score', true),
+                'role' => $circle_role,
+                'score' => $is_pro ? null : (int) get_user_meta($member->ID, 'rejimde_total_score', true),
                 'joined_at' => get_user_meta($member->ID, 'circle_joined_at', true)
             ];
+            
+            // Pro kullanıcılar (mentorlar) ayrı dizide
+            if ($is_pro || $circle_role === 'mentor') {
+                $mentors_data[] = $member_info;
+            } else {
+                $members_data[] = $member_info;
+            }
         }
         
-        // Skora göre sırala
+        // Normal üyeleri skora göre sırala
         usort($members_data, function($a, $b) {
             return $b['score'] - $a['score'];
         });
         
-        return new WP_REST_Response($members_data, 200);
+        // Mentorları en üste koy, sonra normal üyeler
+        $final_members = array_merge($mentors_data, $members_data);
+        
+        return new WP_REST_Response($final_members, 200);
     }
 
     /**
