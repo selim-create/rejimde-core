@@ -99,7 +99,7 @@ class CommentController extends WP_REST_Controller {
     // ... (Kod tekrarı olmaması için buraya sadece yeni fonksiyonları ekliyorum, diğerleri önceki versiyonla aynı) ...
 
     public function get_comments($request) {
-        $post_id = $request->get_param('post');
+        $post_id = $request->get_param('post_id') ?: $request->get_param('post');
         $context = $request->get_param('context'); 
 
         // NEW filter parameters
