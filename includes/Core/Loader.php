@@ -127,6 +127,10 @@ class Loader {
         // YENİ: Task & Badge Controllers
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/TaskController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/TaskController.php';
         if (file_exists(REJIMDE_PATH . 'includes/Api/V1/BadgeController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/BadgeController.php';
+        // YENİ: Admin Bot Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AdminBotController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AdminBotController.php';
+        // YENİ: Admin Settings Controller
+        if (file_exists(REJIMDE_PATH . 'includes/Api/V1/AdminSettingsController.php')) require_once REJIMDE_PATH . 'includes/Api/V1/AdminSettingsController.php';
         // Post Types
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/Plan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/Plan.php';
         if (file_exists(REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php')) require_once REJIMDE_PATH . 'includes/PostTypes/ExercisePlan.php';
@@ -215,6 +219,10 @@ class Loader {
             // YENİ: Task & Badge Routes
             if (class_exists('Rejimde\\Api\\V1\\TaskController')) (new \Rejimde\Api\V1\TaskController())->register_routes();
             if (class_exists('Rejimde\\Api\\V1\\BadgeController')) (new \Rejimde\Api\V1\BadgeController())->register_routes();
+            // YENİ: Admin Bot Routes
+            if (class_exists('Rejimde\\Api\\V1\\AdminBotController')) (new \Rejimde\Api\V1\AdminBotController())->register_routes();
+            // YENİ: Admin Settings Routes
+            if (class_exists('Rejimde\\Api\\V1\\AdminSettingsController')) (new \Rejimde\Api\V1\AdminSettingsController())->register_routes();
         });
 
         // CPT Kayıtları
