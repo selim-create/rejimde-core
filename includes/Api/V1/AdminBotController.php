@@ -249,19 +249,41 @@ class AdminBotController extends WP_REST_Controller {
             LIMIT %d OFFSET %d
         ", $limit, $offset));
 
-        // Her bot için meta bilgilerini ekle
+        // Optimize: Fetch all meta data in a single query to avoid N+1
+        $bot_ids = array_map(function($bot) { return $bot->ID; }, $bots);
+        $bot_meta = [];
+        
+        if (!empty($bot_ids)) {
+            $ids_placeholder = implode(',', array_fill(0, count($bot_ids), '%d'));
+            $meta_results = $wpdb->get_results($wpdb->prepare("
+                SELECT user_id, meta_key, meta_value
+                FROM {$wpdb->usermeta}
+                WHERE user_id IN ($ids_placeholder)
+                AND meta_key IN ('simulation_persona', 'simulation_batch', 'simulation_active', 'rejimde_total_score')
+            ", ...$bot_ids));
+            
+            foreach ($meta_results as $meta) {
+                if (!isset($bot_meta[$meta->user_id])) {
+                    $bot_meta[$meta->user_id] = [];
+                }
+                $bot_meta[$meta->user_id][$meta->meta_key] = $meta->meta_value;
+            }
+        }
+
+        // Build bot list using cached meta data
         $bot_list = [];
         foreach ($bots as $bot) {
+            $meta = isset($bot_meta[$bot->ID]) ? $bot_meta[$bot->ID] : [];
             $bot_list[] = [
                 'id' => (int) $bot->ID,
                 'username' => $bot->user_login,
                 'email' => $bot->user_email,
                 'display_name' => $bot->display_name,
                 'registered' => $bot->user_registered,
-                'persona' => get_user_meta($bot->ID, 'simulation_persona', true),
-                'batch_id' => get_user_meta($bot->ID, 'simulation_batch', true),
-                'is_active' => get_user_meta($bot->ID, 'simulation_active', true) === '1',
-                'total_score' => (int) get_user_meta($bot->ID, 'rejimde_total_score', true),
+                'persona' => isset($meta['simulation_persona']) ? $meta['simulation_persona'] : '',
+                'batch_id' => isset($meta['simulation_batch']) ? $meta['simulation_batch'] : '',
+                'is_active' => isset($meta['simulation_active']) && $meta['simulation_active'] === '1',
+                'total_score' => isset($meta['rejimde_total_score']) ? (int) $meta['rejimde_total_score'] : 0,
             ];
         }
 
@@ -280,6 +302,11 @@ class AdminBotController extends WP_REST_Controller {
      * Batch'i sil (tüm botları kalıcı olarak sil)
      */
     public function delete_batch($request) {
+        // Ensure WordPress user functions are loaded
+        if (!function_exists('wp_delete_user')) {
+            require_once(ABSPATH . 'wp-admin/includes/user.php');
+        }
+
         $batch_id = sanitize_text_field($request->get_param('batch_id'));
         $params = $request->get_json_params();
         $confirm = isset($params['confirm']) && $params['confirm'] === true;
@@ -300,8 +327,6 @@ class AdminBotController extends WP_REST_Controller {
         if (empty($bot_ids)) {
             return new WP_Error('not_found', 'Bu batch_id ile bot bulunamadı.', ['status' => 404]);
         }
-
-        require_once(ABSPATH . 'wp-admin/includes/user.php');
 
         $deleted_count = 0;
         foreach ($bot_ids as $user_id) {

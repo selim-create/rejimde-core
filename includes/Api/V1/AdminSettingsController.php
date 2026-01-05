@@ -36,6 +36,11 @@ class AdminSettingsController extends WP_REST_Controller {
 
     /**
      * AI ayarlarını getir (OpenAI key vb.)
+     * 
+     * SECURITY NOTE: This endpoint returns the OpenAI API key in plain text.
+     * This is intentional as the bot simulation system needs the key to function.
+     * The endpoint is protected by manage_options capability (admin-only).
+     * Ensure this endpoint is only called over HTTPS and logs are properly secured.
      */
     public function get_ai_settings() {
         $api_key = get_option('rejimde_openai_api_key', '');
