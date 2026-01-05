@@ -95,6 +95,14 @@ class AuthController extends WP_REST_Controller {
                     update_user_meta($user_id, $field, sanitize_text_field($meta[$field]));
                 }
             }
+
+            // Bot Simulation Fields
+            $simulation_fields = ['is_simulation', 'simulation_persona', 'simulation_batch', 'simulation_active'];
+            foreach ($simulation_fields as $field) {
+                if (isset($meta[$field])) {
+                    update_user_meta($user_id, $field, sanitize_text_field($meta[$field]));
+                }
+            }
         }
 
         // Varsayılanlar

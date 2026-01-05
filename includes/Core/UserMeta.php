@@ -102,7 +102,13 @@ class UserMeta {
             'is_featured',     // Öne çıkarılmış mı
             'last_online',     // Son online zamanı
             'rating',
-            'score_impact'
+            'score_impact',
+
+            // Bot Simülasyon Alanları
+            'is_simulation',        // Boolean: true = simülasyon kullanıcısı
+            'simulation_persona',   // String: Persona tipi (super_active, active, normal, low_activity, dormant, diet_focused, exercise_focused)
+            'simulation_batch',     // String: Hangi batch'te oluşturuldu (batch_1736100000 gibi)
+            'simulation_active',    // Boolean: Bot aktif mi pasif mi
         ];
 
         // JSON alanları listesi
@@ -170,7 +176,7 @@ class UserMeta {
      */
     private function get_field_schema_type($field, $json_fields) {
         // Boolean alanlar
-        if (in_array($field, ['kvkk_consent', 'emergency_disclaimer', 'is_verified', 'is_featured'])) {
+        if (in_array($field, ['kvkk_consent', 'emergency_disclaimer', 'is_verified', 'is_featured', 'is_simulation', 'simulation_active'])) {
             return 'boolean';
         }
         
