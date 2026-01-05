@@ -392,6 +392,7 @@ class CircleController extends WP_REST_Controller {
         $post = get_post();
         $post_id = get_the_ID();
         $leader_id = get_post_meta($post_id, 'circle_leader_id', true);
+        $mentor_id = get_post_meta($post_id, 'circle_mentor_id', true);
         
         $members = get_users([
             'meta_key' => 'circle_id',
@@ -401,11 +402,14 @@ class CircleController extends WP_REST_Controller {
         
         $members_data = [];
         foreach ($members as $member) {
+            $is_mentor = ($member->ID == $mentor_id);
             $members_data[] = [
                 'id' => $member->ID,
                 'name' => $member->display_name,
                 'avatar' => get_user_meta($member->ID, 'avatar_url', true),
-                'role' => get_user_meta($member->ID, 'circle_role', true)
+                'role' => get_user_meta($member->ID, 'circle_role', true),
+                'score' => $is_mentor ? null : (int) get_user_meta($member->ID, 'rejimde_total_score', true),
+                'is_mentor' => $is_mentor
             ];
         }
 
@@ -757,12 +761,12 @@ class CircleController extends WP_REST_Controller {
             'meta_value' => $circle_id
         ]);
         
+        $mentor_id = get_post_meta($circle_id, 'circle_mentor_id', true);
         $members_data = [];
         $mentors_data = [];
         
         foreach ($members as $member) {
-            $user_roles = $member->roles;
-            $is_pro = in_array('rejimde_pro', $user_roles) || in_array('rejimde_expert', $user_roles);
+            $is_mentor = ($member->ID == $mentor_id);
             $circle_role = get_user_meta($member->ID, 'circle_role', true);
             
             $member_info = [
@@ -771,12 +775,13 @@ class CircleController extends WP_REST_Controller {
                 'email' => $member->user_email,
                 'avatar' => get_user_meta($member->ID, 'avatar_url', true),
                 'role' => $circle_role,
-                'score' => $is_pro ? null : (int) get_user_meta($member->ID, 'rejimde_total_score', true),
+                'score' => $is_mentor ? null : (int) get_user_meta($member->ID, 'rejimde_total_score', true),
+                'is_mentor' => $is_mentor,
                 'joined_at' => get_user_meta($member->ID, 'circle_joined_at', true)
             ];
             
-            // Pro kullanıcılar (mentorlar) ayrı dizide
-            if ($is_pro || $circle_role === 'mentor') {
+            // Sadece gerçek mentor ayrı dizide
+            if ($is_mentor) {
                 $mentors_data[] = $member_info;
             } else {
                 $members_data[] = $member_info;
