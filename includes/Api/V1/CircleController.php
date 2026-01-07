@@ -36,6 +36,13 @@ class CircleController extends WP_REST_Controller {
             'permission_callback' => '__return_true',
         ]);
 
+        // GET /rejimde/v1/circles/my-circle - Get current user's circle
+        register_rest_route($this->namespace, '/' . $this->base . '/my-circle', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_my_circle'],
+            'permission_callback' => [$this, 'check_auth'],
+        ]);
+
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)/join', [
             'methods' => 'POST',
             'callback' => [$this, 'join_circle'],
@@ -370,6 +377,51 @@ class CircleController extends WP_REST_Controller {
                 'member_count' => max(0, $count - 1),
                 'total_score' => $new_circle_score
             ]
+        ], 200);
+    }
+
+    /**
+     * GET /rejimde/v1/circles/my-circle
+     * Returns the current user's circle information
+     */
+    public function get_my_circle($request) {
+        $user_id = get_current_user_id();
+        
+        $circle_id = get_user_meta($user_id, 'circle_id', true);
+        
+        if (!$circle_id) {
+            return new WP_Error('no_circle', 'Henüz bir circle\'a üye değilsiniz.', ['status' => 404]);
+        }
+        
+        $circle = get_post($circle_id);
+        
+        if (!$circle || $circle->post_type !== 'rejimde_circle') {
+            // Stale metadata - temizle
+            delete_user_meta($user_id, 'circle_id');
+            delete_user_meta($user_id, 'circle_role');
+            return new WP_Error('circle_not_found', 'Circle bulunamadı.', ['status' => 404]);
+        }
+        
+        if ($circle->post_status !== 'publish') {
+            return new WP_Error('circle_unavailable', 'Circle şu anda kullanılamıyor.', ['status' => 404]);
+        }
+        
+        $circle_role = get_user_meta($user_id, 'circle_role', true) ?: 'member';
+        
+        return new WP_REST_Response([
+            'circle_id' => (int) $circle_id,
+            'circle' => [
+                'id' => (int) $circle_id,
+                'name' => $circle->post_title,
+                'slug' => $circle->post_name,
+                'description' => $circle->post_content,
+                'member_count' => (int) get_post_meta($circle_id, 'member_count', true),
+                'total_score' => (int) get_post_meta($circle_id, 'total_score', true),
+                'logo' => get_post_meta($circle_id, 'circle_logo_url', true),
+                'privacy' => get_post_meta($circle_id, 'privacy', true) ?: 'public'
+            ],
+            'role' => $circle_role,
+            'joined_at' => get_user_meta($user_id, 'circle_joined_at', true)
         ], 200);
     }
 

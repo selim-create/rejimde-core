@@ -421,88 +421,99 @@ class ProgressController extends WP_REST_Controller {
      * Marks content as completed
      */
     public function complete_content($request) {
-        $content_type = $request['content_type'];
-        $content_id = (int) $request['content_id'];
-        $user_id = get_current_user_id();
+        try {
+            $content_type = $request['content_type'];
+            $content_id = (int) $request['content_id'];
+            $user_id = get_current_user_id();
 
-        if (!$this->validate_content_type($content_type)) {
-            return $this->error('Invalid content_type. Allowed values: ' . implode(', ', $this->allowed_content_types), 400);
-        }
+            if (!$this->validate_content_type($content_type)) {
+                return $this->error('Invalid content_type. Allowed values: ' . implode(', ', $this->allowed_content_types), 400);
+            }
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'rejimde_user_progress';
+            global $wpdb;
+            $table = $wpdb->prefix . 'rejimde_user_progress';
 
-        // Check if record exists
-        $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, is_completed, started_at, completed_at, progress_data FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
-            $user_id, $content_type, $content_id
-        ));
+            // Check if record exists
+            $existing = $wpdb->get_row($wpdb->prepare(
+                "SELECT id, is_completed, started_at, completed_at, progress_data FROM $table WHERE user_id = %d AND content_type = %s AND content_id = %d",
+                $user_id, $content_type, $content_id
+            ));
 
-        if ($existing && $existing->is_completed) {
-            // Already completed - return 200 with already_completed flag
-            $progress_data = json_decode($existing->progress_data ?: '{}', true);
+            if ($existing && $existing->is_completed) {
+                // Already completed - return 200 with already_completed flag
+                $progress_data = json_decode($existing->progress_data ?: '{}', true);
+                return $this->success([
+                    'already_completed' => true,
+                    'message' => 'Bu içeriği zaten tamamladınız.',
+                    'is_started' => true,
+                    'is_completed' => true,
+                    'started_at' => $existing->started_at,
+                    'completed_at' => $existing->completed_at,
+                    'completed_items' => $progress_data['completed_items'] ?? []
+                ]);
+            }
+
+            if ($existing) {
+                // Check if started_at is already set
+                $update_data = [
+                    'is_started' => 1,
+                    'is_completed' => 1,
+                    'completed_at' => current_time('mysql')
+                ];
+                // Set started_at if not already set
+                if (!$existing->started_at) {
+                    $update_data['started_at'] = current_time('mysql');
+                }
+                // Update existing record
+                $wpdb->update($table, $update_data, ['id' => $existing->id]);
+            } else {
+                // Create new record with completed status
+                $wpdb->insert($table, [
+                    'user_id' => $user_id,
+                    'content_type' => $content_type,
+                    'content_id' => $content_id,
+                    'is_started' => 1,
+                    'is_completed' => 1,
+                    'started_at' => current_time('mysql'),
+                    'completed_at' => current_time('mysql')
+                ]);
+            }
+
+            // Post meta'ya da kaydet (tamamlayanlar listesi için)
+            $completed_users = get_post_meta($content_id, 'completed_users', true);
+            if (!is_array($completed_users)) $completed_users = [];
+            if (!in_array($user_id, $completed_users)) {
+                $completed_users[] = $user_id;
+                update_post_meta($content_id, 'completed_users', $completed_users);
+            }
+            
+            // Dispatch event for diet/exercise completion - ayrı try-catch ile koru
+            try {
+                if (in_array($content_type, ['diet', 'exercise'])) {
+                    $eventType = $content_type . '_completed';
+                    $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+                    $dispatcher->dispatch($eventType, [
+                        'user_id' => $user_id,
+                        'entity_type' => $content_type,
+                        'entity_id' => $content_id
+                    ]);
+                }
+            } catch (\Exception $e) {
+                error_log('ProgressController EventDispatcher error: ' . $e->getMessage());
+                // Event hatası olsa bile işlem tamamlandı, devam et
+            }
+
             return $this->success([
-                'already_completed' => true,
-                'message' => 'Bu içeriği zaten tamamladınız.',
+                'message' => ucfirst($content_type) . ' tamamlandı!',
                 'is_started' => true,
                 'is_completed' => true,
-                'started_at' => $existing->started_at,
-                'completed_at' => $existing->completed_at,
-                'completed_items' => $progress_data['completed_items'] ?? []
-            ]);
-        }
-
-        if ($existing) {
-            // Check if started_at is already set
-            $update_data = [
-                'is_started' => 1,
-                'is_completed' => 1,
-                'completed_at' => current_time('mysql')
-            ];
-            // Set started_at if not already set
-            if (!$existing->started_at) {
-                $update_data['started_at'] = current_time('mysql');
-            }
-            // Update existing record
-            $wpdb->update($table, $update_data, ['id' => $existing->id]);
-        } else {
-            // Create new record with completed status
-            $wpdb->insert($table, [
-                'user_id' => $user_id,
-                'content_type' => $content_type,
-                'content_id' => $content_id,
-                'is_started' => 1,
-                'is_completed' => 1,
-                'started_at' => current_time('mysql'),
                 'completed_at' => current_time('mysql')
             ]);
-        }
 
-        // Post meta'ya da kaydet (tamamlayanlar listesi için)
-        $completed_users = get_post_meta($content_id, 'completed_users', true);
-        if (!is_array($completed_users)) $completed_users = [];
-        if (!in_array($user_id, $completed_users)) {
-            $completed_users[] = $user_id;
-            update_post_meta($content_id, 'completed_users', $completed_users);
+        } catch (\Exception $e) {
+            error_log('ProgressController complete_content error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
+            return $this->error('İçerik tamamlanırken bir hata oluştu: ' . $e->getMessage(), 500);
         }
-        
-        // Dispatch event for diet/exercise completion
-        if (in_array($content_type, ['diet', 'exercise'])) {
-            $eventType = $content_type . '_completed';
-            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
-            $dispatcher->dispatch($eventType, [
-                'user_id' => $user_id,
-                'entity_type' => $content_type,
-                'entity_id' => $content_id
-            ]);
-        }
-
-        return $this->success([
-            'message' => 'Content marked as completed',
-            'is_started' => true,
-            'is_completed' => true,
-            'completed_at' => current_time('mysql')
-        ]);
     }
 
     /**

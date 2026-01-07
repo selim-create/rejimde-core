@@ -367,7 +367,7 @@ class CommentController extends WP_REST_Controller {
                 $eventResult = $dispatcher->dispatch($eventType, $eventPayload);
                 $points_earned = $eventResult['points_earned'] ?? 0;
             } catch (\Exception $e) {
-                error_log('EventDispatcher error in create_comment (user_id: ' . $user_id . ', comment_id: ' . $comment_id . '): ' . $e->getMessage());
+                error_log('CommentController EventDispatcher error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
                 // Event hatası olsa bile yorum oluşturulmuş, devam et
             }
 
@@ -378,11 +378,13 @@ class CommentController extends WP_REST_Controller {
                 $meta_helper = new \Rejimde\Core\CommentMeta();
                 $response_data = $this->prepare_comment_response($new_comment, $meta_helper);
             } catch (\Exception $e) {
-                error_log('CommentMeta error in create_comment (user_id: ' . $user_id . ', comment_id: ' . $comment_id . '): ' . $e->getMessage());
+                error_log('CommentController CommentMeta error: ' . $e->getMessage());
                 // Minimal response döndür
                 $response_data = [
                     'id' => $comment_id,
                     'content' => $content,
+                    'context' => $context,
+                    'parent' => $parent,
                     'status' => $comment_approved === 1 ? 'approved' : 'pending'
                 ];
             }
@@ -397,9 +399,8 @@ class CommentController extends WP_REST_Controller {
                 'status' => $comment_approved === 1 ? 'approved' : 'pending'
             ], 201);
         } catch (\Exception $e) {
-            error_log('CommentController create_comment error: ' . $e->getMessage());
-            error_log('Stack trace: ' . $e->getTraceAsString());
-            return new WP_Error('server_error', 'Yorum oluşturulurken bir hata oluştu.', ['status' => 500]);
+            error_log('CommentController create_comment fatal error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
+            return new WP_Error('server_error', 'Yorum oluşturulurken bir hata oluştu: ' . $e->getMessage(), ['status' => 500]);
         }
     }
 
