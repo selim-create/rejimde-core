@@ -367,7 +367,7 @@ class CommentController extends WP_REST_Controller {
                 $eventResult = $dispatcher->dispatch($eventType, $eventPayload);
                 $points_earned = $eventResult['points_earned'] ?? 0;
             } catch (\Exception $e) {
-                error_log('EventDispatcher error in create_comment: ' . $e->getMessage());
+                error_log('EventDispatcher error in create_comment (user_id: ' . $user_id . ', comment_id: ' . $comment_id . '): ' . $e->getMessage());
                 // Event hatası olsa bile yorum oluşturulmuş, devam et
             }
 
@@ -378,7 +378,7 @@ class CommentController extends WP_REST_Controller {
                 $meta_helper = new \Rejimde\Core\CommentMeta();
                 $response_data = $this->prepare_comment_response($new_comment, $meta_helper);
             } catch (\Exception $e) {
-                error_log('CommentMeta error in create_comment: ' . $e->getMessage());
+                error_log('CommentMeta error in create_comment (user_id: ' . $user_id . ', comment_id: ' . $comment_id . '): ' . $e->getMessage());
                 // Minimal response döndür
                 $response_data = [
                     'id' => $comment_id,
@@ -429,7 +429,7 @@ class CommentController extends WP_REST_Controller {
                     'entity_id' => $comment_id
                 ]);
             } catch (\Exception $e) {
-                error_log('EventDispatcher error in like_comment: ' . $e->getMessage());
+                error_log('EventDispatcher error in like_comment (user_id: ' . $user_id . ', comment_id: ' . $comment_id . '): ' . $e->getMessage());
                 // Event hatası like işlemini engellemesini önle
             }
         }
