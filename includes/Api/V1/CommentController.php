@@ -420,13 +420,18 @@ class CommentController extends WP_REST_Controller {
             
             // Only dispatch event when liking (not unliking)
             // Dispatch event for comment liked
-            $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
-            $dispatcher->dispatch('comment_liked', [
-                'user_id' => $user_id,
-                'comment_id' => $comment_id,
-                'entity_type' => 'comment',
-                'entity_id' => $comment_id
-            ]);
+            try {
+                $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+                $dispatcher->dispatch('comment_liked', [
+                    'user_id' => $user_id,
+                    'comment_id' => $comment_id,
+                    'entity_type' => 'comment',
+                    'entity_id' => $comment_id
+                ]);
+            } catch (\Exception $e) {
+                error_log('EventDispatcher error in like_comment: ' . $e->getMessage());
+                // Event hatası like işlemini engellemesini önle
+            }
         }
         
         update_comment_meta($comment_id, 'rejimde_likes', array_values($likes));
