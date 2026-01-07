@@ -27,6 +27,14 @@ class ProgressController extends WP_REST_Controller {
         'exercise' => 'exercises',
         'dictionary' => 'dictionary'
     ];
+    
+    // Content type to Turkish name mapping
+    private $type_turkish_map = [
+        'blog' => 'Blog',
+        'diet' => 'Diyet',
+        'exercise' => 'Egzersiz',
+        'dictionary' => 'Sözlük'
+    ];
 
     public function register_routes() {
         // GET /rejimde/v1/progress/my - Get all progress for current user
@@ -504,7 +512,7 @@ class ProgressController extends WP_REST_Controller {
             }
 
             return $this->success([
-                'message' => ucfirst($content_type) . ' tamamlandı!',
+                'message' => ($this->type_turkish_map[$content_type] ?? ucfirst($content_type)) . ' tamamlandı!',
                 'is_started' => true,
                 'is_completed' => true,
                 'completed_at' => current_time('mysql')

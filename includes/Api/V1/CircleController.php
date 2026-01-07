@@ -319,6 +319,7 @@ class CircleController extends WP_REST_Controller {
         // Add user to circle
         update_user_meta($user_id, 'circle_id', $circle_id);
         update_user_meta($user_id, 'circle_role', 'member');
+        update_user_meta($user_id, 'circle_joined_at', current_time('mysql'));
         
         // Get user's current score to contribute to circle
         $user_score = (int) get_user_meta($user_id, 'rejimde_total_score', true);
