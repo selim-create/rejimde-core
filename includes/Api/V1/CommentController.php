@@ -230,154 +230,177 @@ class CommentController extends WP_REST_Controller {
     }
 
     public function create_comment($request) {
-        $user_id = get_current_user_id();
-        $params = $request->get_json_params();
+        try {
+            $user_id = get_current_user_id();
+            $params = $request->get_json_params();
 
-        $post_id = isset($params['post']) ? (int) $params['post'] : 0;
-        $content = isset($params['content']) ? sanitize_textarea_field($params['content']) : '';
-        $context = isset($params['context']) ? sanitize_text_field($params['context']) : 'general';
-        $rating  = isset($params['rating']) ? (int) $params['rating'] : 0;
-        $parent  = isset($params['parent']) ? (int) $params['parent'] : 0;
+            $post_id = isset($params['post']) ? (int) $params['post'] : 0;
+            $content = isset($params['content']) ? sanitize_textarea_field($params['content']) : '';
+            $context = isset($params['context']) ? sanitize_text_field($params['context']) : 'general';
+            $rating  = isset($params['rating']) ? (int) $params['rating'] : 0;
+            $parent  = isset($params['parent']) ? (int) $params['parent'] : 0;
 
-        // NEW parameters
-        $is_anonymous = isset($params['is_anonymous']) ? (bool) $params['is_anonymous'] : false;
-        $goal_tag = isset($params['goal_tag']) ? sanitize_text_field($params['goal_tag']) : '';
-        $program_type = isset($params['program_type']) ? sanitize_text_field($params['program_type']) : '';
-        $process_weeks = isset($params['process_weeks']) ? (int) $params['process_weeks'] : 0;
-        $success_story = isset($params['success_story']) ? sanitize_textarea_field($params['success_story']) : '';
-        $would_recommend = isset($params['would_recommend']) ? (bool) $params['would_recommend'] : true;
+            // NEW parameters
+            $is_anonymous = isset($params['is_anonymous']) ? (bool) $params['is_anonymous'] : false;
+            $goal_tag = isset($params['goal_tag']) ? sanitize_text_field($params['goal_tag']) : '';
+            $program_type = isset($params['program_type']) ? sanitize_text_field($params['program_type']) : '';
+            $process_weeks = isset($params['process_weeks']) ? (int) $params['process_weeks'] : 0;
+            $success_story = isset($params['success_story']) ? sanitize_textarea_field($params['success_story']) : '';
+            $would_recommend = isset($params['would_recommend']) ? (bool) $params['would_recommend'] : true;
 
-        if (!$post_id || empty($content)) {
-            return new WP_Error('missing_data', 'İçerik ve Post ID zorunludur.', ['status' => 400]);
-        }
+            if (!$post_id || empty($content)) {
+                return new WP_Error('missing_data', 'İçerik ve Post ID zorunludur.', ['status' => 400]);
+            }
 
-        if ($context === 'expert') {
-            $post = get_post($post_id);
-            $is_owner = ($post->post_author == $user_id) || 
-                        (get_post_meta($post_id, 'related_user_id', true) == $user_id) ||
-                        (get_post_meta($post_id, 'user_id', true) == $user_id);
+            if ($context === 'expert') {
+                $post = get_post($post_id);
+                $is_owner = ($post->post_author == $user_id) || 
+                            (get_post_meta($post_id, 'related_user_id', true) == $user_id) ||
+                            (get_post_meta($post_id, 'user_id', true) == $user_id);
+                
+                if ($is_owner && $parent === 0) { 
+                    return new WP_Error('self_review', 'Kendi profilinize değerlendirme yapamazsınız.', ['status' => 403]);
+                }
+            }
+
+            if (in_array($context, ['expert', 'diet', 'exercise']) && $parent === 0) {
+                $existing = get_comments([
+                    'post_id' => $post_id,
+                    'user_id' => $user_id,
+                    'meta_key' => 'rejimde_context',
+                    'meta_value' => $context,
+                    'count' => true,
+                    'parent' => 0
+                ]);
+
+                if ($existing > 0) {
+                    return new WP_Error('already_reviewed', 'Bu içeriği zaten değerlendirdiniz.', ['status' => 409]);
+                }
+            }
+
+            $comment_approved = 1;
+            if ($context === 'expert') {
+                if (!current_user_can('moderate_comments')) {
+                    $comment_approved = 0; 
+                }
+            }
+
+            $comment_data = [
+                'comment_post_ID' => $post_id,
+                'comment_content' => $content,
+                'user_id'         => $user_id,
+                'comment_parent'  => $parent,
+                'comment_approved' => $comment_approved,
+            ];
+
+            $comment_id = wp_insert_comment($comment_data);
+
+            if (!$comment_id) {
+                return new WP_Error('save_error', 'Yorum kaydedilemedi.', ['status' => 500]);
+            }
+
+            update_comment_meta($comment_id, 'rejimde_context', $context);
+            if ($rating > 0) {
+                update_comment_meta($comment_id, 'rejimde_rating', $rating);
+            }
+
+            // NEW meta fields
+            if ($is_anonymous) {
+                update_comment_meta($comment_id, 'is_anonymous', true);
+            }
+            if (!empty($goal_tag)) {
+                update_comment_meta($comment_id, 'goal_tag', $goal_tag);
+            }
+            if (!empty($program_type)) {
+                update_comment_meta($comment_id, 'program_type', $program_type);
+            }
+            if ($process_weeks > 0) {
+                update_comment_meta($comment_id, 'process_weeks', $process_weeks);
+            }
+            if (!empty($success_story)) {
+                update_comment_meta($comment_id, 'success_story', $success_story);
+            }
+            update_comment_meta($comment_id, 'would_recommend', $would_recommend);
+
+            // Verified client check (appointment/payment history)
+            $verified_client = $this->check_verified_client($user_id, $post_id);
+            if ($verified_client) {
+                update_comment_meta($comment_id, 'verified_client', true);
+            }
             
-            if ($is_owner && $parent === 0) { 
-                return new WP_Error('self_review', 'Kendi profilinize değerlendirme yapamazsınız.', ['status' => 403]);
+            // Event dispatch - hata comment oluşturmayı engellemesini önle
+            $points_earned = 0;
+            try {
+                $eventType = ($context === 'expert' && $parent === 0 && $rating > 0) ? 'rating_submitted' : 'comment_created';
+                $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
+                
+                // Prepare event payload
+                $eventPayload = [
+                    'user_id' => $user_id,
+                    'entity_type' => 'comment',
+                    'entity_id' => $comment_id,
+                    'context' => [
+                        'post_id' => $post_id,
+                        'comment_context' => $context,
+                        'rating' => $rating
+                    ]
+                ];
+                
+                // Add expert_id for rating_submitted events
+                if ($eventType === 'rating_submitted') {
+                    $post = get_post($post_id);
+                    if ($post) {
+                        $eventPayload['expert_id'] = $post->post_author;
+                    }
+                }
+                
+                // Add parent_comment_id for comment_created events
+                if ($eventType === 'comment_created' && $parent > 0) {
+                    $eventPayload['parent_comment_id'] = $parent;
+                }
+                
+                // Add comment_id to payload for comment_created events
+                if ($eventType === 'comment_created') {
+                    $eventPayload['comment_id'] = $comment_id;
+                }
+                
+                $eventResult = $dispatcher->dispatch($eventType, $eventPayload);
+                $points_earned = $eventResult['points_earned'] ?? 0;
+            } catch (\Exception $e) {
+                error_log('EventDispatcher error in create_comment: ' . $e->getMessage());
+                // Event hatası olsa bile yorum oluşturulmuş, devam et
             }
-        }
 
-        if (in_array($context, ['expert', 'diet', 'exercise']) && $parent === 0) {
-            $existing = get_comments([
-                'post_id' => $post_id,
-                'user_id' => $user_id,
-                'meta_key' => 'rejimde_context',
-                'meta_value' => $context,
-                'count' => true,
-                'parent' => 0
-            ]);
-
-            if ($existing > 0) {
-                return new WP_Error('already_reviewed', 'Bu içeriği zaten değerlendirdiniz.', ['status' => 409]);
+            // Response hazırlama - hata durumunda minimal response döndür
+            $response_data = null;
+            try {
+                $new_comment = get_comment($comment_id);
+                $meta_helper = new \Rejimde\Core\CommentMeta();
+                $response_data = $this->prepare_comment_response($new_comment, $meta_helper);
+            } catch (\Exception $e) {
+                error_log('CommentMeta error in create_comment: ' . $e->getMessage());
+                // Minimal response döndür
+                $response_data = [
+                    'id' => $comment_id,
+                    'content' => $content,
+                    'status' => $comment_approved === 1 ? 'approved' : 'pending'
+                ];
             }
-        }
+            
+            $message = $comment_approved === 1 ? 'Yorumunuz yayınlandı!' : 'Değerlendirmeniz alındı, uzman onayından sonra yayınlanacaktır.';
 
-        $comment_approved = 1;
-        if ($context === 'expert') {
-            if (!current_user_can('moderate_comments')) {
-                $comment_approved = 0; 
-            }
+            return new WP_REST_Response([
+                'success' => true,
+                'data' => $response_data,
+                'earned_points' => $points_earned,
+                'message' => $message,
+                'status' => $comment_approved === 1 ? 'approved' : 'pending'
+            ], 201);
+        } catch (\Exception $e) {
+            error_log('CommentController create_comment error: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return new WP_Error('server_error', 'Yorum oluşturulurken bir hata oluştu.', ['status' => 500]);
         }
-
-        $comment_data = [
-            'comment_post_ID' => $post_id,
-            'comment_content' => $content,
-            'user_id'         => $user_id,
-            'comment_parent'  => $parent,
-            'comment_approved' => $comment_approved,
-        ];
-
-        $comment_id = wp_insert_comment($comment_data);
-
-        if (!$comment_id) {
-            return new WP_Error('save_error', 'Yorum kaydedilemedi.', ['status' => 500]);
-        }
-
-        update_comment_meta($comment_id, 'rejimde_context', $context);
-        if ($rating > 0) {
-            update_comment_meta($comment_id, 'rejimde_rating', $rating);
-        }
-
-        // NEW meta fields
-        if ($is_anonymous) {
-            update_comment_meta($comment_id, 'is_anonymous', true);
-        }
-        if (!empty($goal_tag)) {
-            update_comment_meta($comment_id, 'goal_tag', $goal_tag);
-        }
-        if (!empty($program_type)) {
-            update_comment_meta($comment_id, 'program_type', $program_type);
-        }
-        if ($process_weeks > 0) {
-            update_comment_meta($comment_id, 'process_weeks', $process_weeks);
-        }
-        if (!empty($success_story)) {
-            update_comment_meta($comment_id, 'success_story', $success_story);
-        }
-        update_comment_meta($comment_id, 'would_recommend', $would_recommend);
-
-        // Verified client check (appointment/payment history)
-        $verified_client = $this->check_verified_client($user_id, $post_id);
-        if ($verified_client) {
-            update_comment_meta($comment_id, 'verified_client', true);
-        }
-        
-        // Dispatch event for comment creation or rating
-        $eventType = ($context === 'expert' && $parent === 0 && $rating > 0) ? 'rating_submitted' : 'comment_created';
-        $dispatcher = \Rejimde\Core\EventDispatcher::getInstance();
-        
-        // Prepare event payload
-        $eventPayload = [
-            'user_id' => $user_id,
-            'entity_type' => 'comment',
-            'entity_id' => $comment_id,
-            'context' => [
-                'post_id' => $post_id,
-                'comment_context' => $context,
-                'rating' => $rating
-            ]
-        ];
-        
-        // Add expert_id for rating_submitted events
-        if ($eventType === 'rating_submitted') {
-            $post = get_post($post_id);
-            if ($post) {
-                $eventPayload['expert_id'] = $post->post_author;
-            }
-        }
-        
-        // Add parent_comment_id for comment_created events
-        if ($eventType === 'comment_created' && $parent > 0) {
-            $eventPayload['parent_comment_id'] = $parent;
-        }
-        
-        // Add comment_id to payload for comment_created events
-        if ($eventType === 'comment_created') {
-            $eventPayload['comment_id'] = $comment_id;
-        }
-        
-        $eventResult = $dispatcher->dispatch($eventType, $eventPayload);
-        
-        $points_earned = $eventResult['points_earned'] ?? 0;
-
-        $new_comment = get_comment($comment_id);
-        $meta_helper = new \Rejimde\Core\CommentMeta();
-        
-        $response_data = $this->prepare_comment_response($new_comment, $meta_helper);
-        $message = $comment_approved === 1 ? 'Yorumunuz yayınlandı!' : 'Değerlendirmeniz alındı, uzman onayından sonra yayınlanacaktır.';
-
-        return new WP_REST_Response([
-            'success' => true,
-            'data' => $response_data,
-            'earned_points' => $points_earned,
-            'message' => $message,
-            'status' => $comment_approved === 1 ? 'approved' : 'pending'
-        ], 201);
     }
 
     public function like_comment($request) {
