@@ -154,6 +154,11 @@ class BadgeService {
             // Get or create user badge record
             $userBadge = $this->getOrCreateUserBadge($userId, $badge['id']);
             
+            // Skip if badge not found in database (config badges not yet synced)
+            if (!isset($userBadge['badge_definition_id']) || $userBadge['badge_definition_id'] == 0) {
+                continue;
+            }
+            
             if ($userBadge['is_earned']) {
                 continue; // Already earned
             }
