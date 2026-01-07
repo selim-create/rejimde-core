@@ -366,7 +366,7 @@ class CommentController extends WP_REST_Controller {
                 
                 $eventResult = $dispatcher->dispatch($eventType, $eventPayload);
                 $points_earned = $eventResult['points_earned'] ?? 0;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 error_log('CommentController EventDispatcher error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
                 // Event hatası olsa bile yorum oluşturulmuş, devam et
             }
@@ -377,7 +377,7 @@ class CommentController extends WP_REST_Controller {
                 $new_comment = get_comment($comment_id);
                 $meta_helper = new \Rejimde\Core\CommentMeta();
                 $response_data = $this->prepare_comment_response($new_comment, $meta_helper);
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 error_log('CommentController CommentMeta error: ' . $e->getMessage());
                 // Minimal response döndür
                 $response_data = [
@@ -398,7 +398,7 @@ class CommentController extends WP_REST_Controller {
                 'message' => $message,
                 'status' => $comment_approved === 1 ? 'approved' : 'pending'
             ], 201);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log('CommentController create_comment fatal error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
             return new WP_Error('server_error', 'Yorum oluşturulurken bir hata oluştu: ' . $e->getMessage(), ['status' => 500]);
         }
@@ -429,7 +429,7 @@ class CommentController extends WP_REST_Controller {
                     'entity_type' => 'comment',
                     'entity_id' => $comment_id
                 ]);
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 error_log('EventDispatcher error in like_comment (user_id: ' . $user_id . ', comment_id: ' . $comment_id . '): ' . $e->getMessage());
                 // Event hatası like işlemini engellemesini önle
             }

@@ -506,7 +506,7 @@ class ProgressController extends WP_REST_Controller {
                         'entity_id' => $content_id
                     ]);
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 error_log('ProgressController EventDispatcher error: ' . $e->getMessage());
                 // Event hatası olsa bile işlem tamamlandı, devam et
             }
@@ -518,7 +518,7 @@ class ProgressController extends WP_REST_Controller {
                 'completed_at' => current_time('mysql')
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log('ProgressController complete_content error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
             return $this->error('İçerik tamamlanırken bir hata oluştu: ' . $e->getMessage(), 500);
         }
