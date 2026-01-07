@@ -177,13 +177,51 @@ class BadgeService {
     }
     
     /**
+     * Get badge ID by slug
+     * 
+     * @param string $slug Badge slug
+     * @return int|null Badge ID or null
+     */
+    private function getBadgeIdBySlug(string $slug): ?int {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rejimde_badge_definitions';
+        
+        $id = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table WHERE slug = %s",
+            $slug
+        ));
+        
+        return $id ? (int) $id : null;
+    }
+    
+    /**
      * Get or create user badge record
      * 
      * @param int $userId User ID
-     * @param int $badgeId Badge definition ID
+     * @param int|string $badgeId Badge definition ID or slug
      * @return array User badge record
      */
-    private function getOrCreateUserBadge(int $userId, int $badgeId): array {
+    private function getOrCreateUserBadge(int $userId, int|string $badgeId): array {
+        // Convert string badge slug to ID if needed
+        if (is_string($badgeId)) {
+            // Handle config badges (format: 'config_slug')
+            $slug = $badgeId;
+            if (strpos($badgeId, 'config_') === 0) {
+                $slug = substr($badgeId, 7); // Remove 'config_' prefix
+            }
+            
+            $badgeId = $this->getBadgeIdBySlug($slug);
+            if (!$badgeId) {
+                // Badge not found in database, return empty array
+                return [
+                    'user_id' => $userId,
+                    'badge_definition_id' => 0,
+                    'current_progress' => 0,
+                    'is_earned' => 0
+                ];
+            }
+        }
+        
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_user_badges';
         
@@ -214,16 +252,24 @@ class BadgeService {
      * Update badge progress
      * 
      * @param int $userId User ID
-     * @param int $badgeId Badge definition ID
+     * @param int|string $badgeId Badge definition ID or slug
      * @param int $progress New progress value
      * @return bool Success
      */
-    private function updateBadgeProgress(int $userId, int $badgeId, int $progress): bool {
+    private function updateBadgeProgress(int $userId, int|string $badgeId, int $progress): bool {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_user_badges';
         
-        // Get or create user badge
+        // Get or create user badge (this handles string->int conversion)
         $userBadge = $this->getOrCreateUserBadge($userId, $badgeId);
+        
+        // If badge not found, return false
+        if (!isset($userBadge['badge_definition_id']) || $userBadge['badge_definition_id'] == 0) {
+            return false;
+        }
+        
+        // Use the actual badge_definition_id from the user badge record
+        $actualBadgeId = (int) $userBadge['badge_definition_id'];
         
         // Only update if progress increased
         if ($progress <= (int)$userBadge['current_progress']) {
@@ -235,7 +281,7 @@ class BadgeService {
             ['current_progress' => $progress],
             [
                 'user_id' => $userId,
-                'badge_definition_id' => $badgeId
+                'badge_definition_id' => $actualBadgeId
             ],
             ['%d'],
             ['%d', '%d']
@@ -246,15 +292,23 @@ class BadgeService {
      * Check and award badge if conditions met
      * 
      * @param int $userId User ID
-     * @param int $badgeId Badge definition ID
+     * @param int|string $badgeId Badge definition ID or slug
      * @return bool True if badge was awarded
      */
-    public function checkAndAwardBadge(int $userId, int $badgeId): bool {
+    public function checkAndAwardBadge(int $userId, int|string $badgeId): bool {
         global $wpdb;
         $table = $wpdb->prefix . 'rejimde_user_badges';
         
-        // Get user badge
+        // Get user badge (handles string->int conversion)
         $userBadge = $this->getOrCreateUserBadge($userId, $badgeId);
+        
+        // If badge not found, return false
+        if (!isset($userBadge['badge_definition_id']) || $userBadge['badge_definition_id'] == 0) {
+            return false;
+        }
+        
+        // Use the actual badge_definition_id from the user badge record
+        $actualBadgeId = (int) $userBadge['badge_definition_id'];
         
         if ($userBadge['is_earned']) {
             return false; // Already earned
@@ -264,7 +318,7 @@ class BadgeService {
         $badgeDefsTable = $wpdb->prefix . 'rejimde_badge_definitions';
         $badge = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $badgeDefsTable WHERE id = %d",
-            $badgeId
+            $actualBadgeId
         ), ARRAY_A);
         
         if (!$badge) {
@@ -282,7 +336,7 @@ class BadgeService {
                 ],
                 [
                     'user_id' => $userId,
-                    'badge_definition_id' => $badgeId
+                    'badge_definition_id' => $actualBadgeId
                 ],
                 ['%d', '%s'],
                 ['%d', '%d']
@@ -291,7 +345,7 @@ class BadgeService {
             // Dispatch badge earned event
             \Rejimde\Core\EventDispatcher::getInstance()->dispatch('badge_earned', [
                 'user_id' => $userId,
-                'badge_id' => $badgeId,
+                'badge_id' => $actualBadgeId,
                 'context' => [
                     'badge_slug' => $badge['slug'],
                     'badge_title' => $badge['title'],
