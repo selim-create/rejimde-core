@@ -173,6 +173,8 @@ class ProfessionalController extends WP_REST_Controller {
         }
 
         // Sıralama: 0. is_claimed, 1. is_featured, 2. is_verified, 3. reji_score
+        // NOT: Sıralama pagination sonrası yapılıyor (mevcut davranış korundu)
+        // Daha iyi performans için database-level sorting düşünülebilir
         usort($experts, function($a, $b) {
             // 0. Önce claim edilmiş uzmanlar (claim edilmemişler en sonda)
             if ($a['is_claimed'] && !$b['is_claimed']) return -1;
