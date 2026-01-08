@@ -40,9 +40,18 @@ class ProfessionalController extends WP_REST_Controller {
      * Uzmanları Listele
      */
     public function get_items($request) {
+        // Pagination parametreleri
+        $per_page = $request->get_param('per_page') ?? 24;
+        $page = $request->get_param('page') ?? 1;
+        
+        // Güvenlik: Maximum 100 kayıt
+        $per_page = min((int) $per_page, 100);
+        $page = max((int) $page, 1);
+        
         $args = [
             'post_type'      => 'rejimde_pro',
-            'posts_per_page' => 50,
+            'posts_per_page' => $per_page,
+            'paged'          => $page,
             'post_status'    => 'publish',
         ];
 
@@ -164,6 +173,8 @@ class ProfessionalController extends WP_REST_Controller {
         }
 
         // Sıralama: 0. is_claimed, 1. is_featured, 2. is_verified, 3. reji_score
+        // NOT: Sıralama pagination sonrası yapılıyor (mevcut davranış korundu)
+        // Daha iyi performans için database-level sorting düşünülebilir
         usort($experts, function($a, $b) {
             // 0. Önce claim edilmiş uzmanlar (claim edilmemişler en sonda)
             if ($a['is_claimed'] && !$b['is_claimed']) return -1;
@@ -184,7 +195,16 @@ class ProfessionalController extends WP_REST_Controller {
             return $scoreB - $scoreA;
         });
 
-        return new WP_REST_Response($experts, 200);
+        // Response'u pagination bilgisiyle döndür
+        return new WP_REST_Response([
+            'data' => $experts,
+            'pagination' => [
+                'total' => (int) $query->found_posts,
+                'per_page' => $per_page,
+                'current_page' => $page,
+                'total_pages' => (int) $query->max_num_pages
+            ]
+        ], 200);
     }
     
     /**

@@ -28,7 +28,7 @@ class DictionaryController extends WP_REST_Controller {
 
         // Terim Güncelle (YENİ)
         register_rest_route($this->namespace, '/' . $this->base . '/(?P<id>\d+)', [
-            'methods' => 'POST',
+            'methods' => ['POST', 'PUT', 'PATCH'],
             'callback' => [$this, 'update_item'],
             'permission_callback' => [$this, 'check_pro_auth'],
         ]);
